@@ -10,6 +10,8 @@ import TableRow from "@mui/material/TableRow"
 import IconButton from "@mui/material/IconButton"
 import DeleteIcon from "@mui/icons-material/Delete"
 import EditIcon from "@mui/icons-material/Edit"
+import Collapse from "@mui/material/Collapse"
+import { KeyboardArrowDown, KeyboardArrowUp } from "@mui/icons-material"
 import Snackbar from "@mui/material/Snackbar"
 
 import PropTypes from "prop-types"
@@ -24,6 +26,7 @@ import { Alert, Typography } from "@mui/material"
 import _ from "lodash"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
+import OpportunityDetails from "./OpportunityDetails"
 
 const columns = [
     { id: "opportunityId", label: "Opportunity #" },
@@ -52,6 +55,11 @@ export default function OpportunityTable(props) {
     const [opportunityToEdit, setOpportunityToEdit] = React.useState(null)
     const [saving, setSaving] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)
+    const [open, setOpen] = React.useState(false)
+
+    const handleRowExpand = (rowId) => {
+        setOpen(open === rowId ? false : rowId)
+    }
 
     const handleChangePage = (event, newPage) => {
         dispatch(changePage(newPage))
@@ -147,31 +155,46 @@ export default function OpportunityTable(props) {
                         </TableHead>
                         <TableBody>
                             {opportunityList.map((row) => (
-                                <TableRow key={row.id}>
-                                    {columns.map((column) => (
-                                        <TableCell key={`${row.id}${column.id}`}>
-                                            <Typography variant="body2">
-                                                {column.id === "customerOrProspect" ? displayCustomerOrProspect(row) : _.get(row, column.id, "")}
-                                            </Typography>
-                                        </TableCell>
-                                    ))}
-                                    <TableCell align="right">
-                                        <IconButton
-                                            aria-label={`edit ${row.name}`}
-                                            onClick={() => setOpportunityToEdit(row)}
-                                        >
-                                            <EditIcon />
-                                        </IconButton>
-                                        {canDelete && (
+                                <React.Fragment key={row.id}>
+                                    <TableRow>
+                                        {columns.map((column) => (
+                                            <TableCell key={`${row.id}${column.id}`}>
+                                                <Typography variant="body2">
+                                                    {column.id === "customerOrProspect" ? displayCustomerOrProspect(row) : _.get(row, column.id, "")}
+                                                </Typography>
+                                            </TableCell>
+                                        ))}
+                                        <TableCell align="right">
                                             <IconButton
-                                                aria-label={`delete ${row.name}`}
-                                                onClick={() => setOpportunityToDelete(row)}
+                                                aria-label={`edit ${row.name}`}
+                                                onClick={() => setOpportunityToEdit(row)}
                                             >
-                                                <DeleteIcon />
+                                                <EditIcon />
                                             </IconButton>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
+                                            {canDelete && (
+                                                <IconButton
+                                                    aria-label={`delete ${row.name}`}
+                                                    onClick={() => setOpportunityToDelete(row)}
+                                                >
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            )}
+                                            <IconButton
+                                                aria-label={`communications ${row.name}`}
+                                                onClick={() => handleRowExpand(row.id)}
+                                            >
+                                                {open === row.id ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+                                            </IconButton>
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={columns.length + 1}>
+                                            <Collapse in={open === row.id}>
+                                                {open === row.id && <OpportunityDetails opportunity={row} />}
+                                            </Collapse>
+                                        </TableCell>
+                                    </TableRow>
+                                </React.Fragment>
                             ))}
                         </TableBody>
                     </Table>

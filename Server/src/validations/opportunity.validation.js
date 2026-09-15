@@ -1,5 +1,37 @@
 const Joi = require("joi");
-const { stageOptions } = require("../config/opportunityOptions");
+const { stageOptions, orderStatusOptions } = require("../config/opportunityOptions");
+
+const customerCommunicationItem = Joi.object().keys({
+  _id: Joi.string(),
+  customerName: Joi.string().allow(""),
+  requestDate: Joi.string().allow(""),
+  requestRef: Joi.string().allow(""),
+  linkCategory: Joi.string().allow(""),
+  address: Joi.string().allow(""),
+  cityTown: Joi.string().allow(""),
+  stateProvince: Joi.string().allow(""),
+  postalCode: Joi.string().allow(""),
+  country: Joi.string().allow(""),
+  product: Joi.string().allow(""),
+  ip: Joi.string().allow(""),
+  interface: Joi.string().allow(""),
+  downBandwidth: Joi.number().allow(null),
+  upBandwidth: Joi.number().allow(null),
+  termMonths: Joi.number().allow(null),
+  quoteSentToCustomer: Joi.string().allow(""),
+  orderStatus: Joi.string().valid(...orderStatusOptions),
+});
+
+const supplierCommunicationItem = Joi.object().keys({
+  _id: Joi.string(),
+  supplier: Joi.string().allow(""),
+  quoteRequestDate: Joi.string().allow(""),
+  quoteReceivedDate: Joi.string().allow(""),
+  lec: Joi.string().allow(""),
+  currency: Joi.string().allow(""),
+  nrc: Joi.number().allow(null),
+  mrc: Joi.number().allow(null),
+});
 
 const createOpportunity = {
   body: Joi.array().items(
@@ -51,6 +83,8 @@ const updateOpportunity = {
         orderNumber: Joi.string().allow(""),
         orderValue: Joi.number(),
       }),
+      customerCommunications: Joi.array().items(customerCommunicationItem),
+      supplierCommunications: Joi.array().items(supplierCommunicationItem),
     })
     .min(1),
 };

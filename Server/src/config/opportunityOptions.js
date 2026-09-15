@@ -9,6 +9,10 @@ const stageOptions = [
   "Lost",
 ];
 
+// Customer Communication's Order Status field.
+const orderStatusOptions = ["Pending", "Won", "Lost"];
+
 module.exports = {
   stageOptions,
+  orderStatusOptions,
 };
