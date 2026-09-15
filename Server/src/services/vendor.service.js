@@ -245,12 +245,23 @@ const bulkUploadVendors = async (fileBuffer) => {
     throw new ApiError(httpStatus.BAD_REQUEST, `CSV is missing required column(s): ${missingColumns.join(", ")}`);
   }
 
+  // Batch-fetch every vendor code this file could reference in one round
+  // trip, instead of one findOne per row - see circuit.service.js's
+  // validateBulkUploadCircuits for the same fix and the reasoning (a file
+  // with many rows turns one-lookup-per-row into hundreds of sequential DB
+  // round trips, which can time out the whole request).
+  const candidateCodes = records
+    .map((record) => _.get(record, "Vendor Name", "").trim())
+    .filter(Boolean)
+    .map((name) => createCodeFromName(name));
+  const existingVendors = await Vendor.find({ code: { $in: candidateCodes } }).select("code");
+  const existingCodes = new Set(existingVendors.map((vendor) => vendor.code));
+
   const failedRows = [];
   const validRows = [];
   const seenCodes = new Set();
 
-  for (let i = 0; i < records.length; i += 1) {
-    const record = records[i];
+  records.forEach((record, i) => {
     const rowNumber = i + 2; // account for the header row, 1-indexed
     const vendorName = _.get(record, "Vendor Name", "").trim();
     const errors = [];
@@ -263,9 +274,7 @@ const bulkUploadVendors = async (fileBuffer) => {
         errors.push("Duplicate Vendor Name within this file");
       } else {
         seenCodes.add(code);
-        // eslint-disable-next-line no-await-in-loop
-        const existingVendor = await Vendor.findOne({ code });
-        if (existingVendor) {
+        if (existingCodes.has(code)) {
           errors.push("A vendor with this name already exists");
         }
       }
@@ -284,18 +293,23 @@ const bulkUploadVendors = async (fileBuffer) => {
         vendorMTTR: _.get(record, "Vendor MTTR", "").trim(),
       });
     }
-  }
+  });
 
   if (failedRows.length > 0) {
     return { success: false, totalRows: records.length, insertedCount: 0, failedRows };
   }
 
-  const created = [];
-  for (let i = 0; i < validRows.length; i += 1) {
-    // eslint-disable-next-line no-await-in-loop
-    const vendor = await createVendor(validRows[i]);
-    created.push(vendor);
-  }
+  const created = validRows.length
+    ? await Vendor.insertMany(
+        validRows.map((row) => ({
+          name: row.name,
+          code: createCodeFromName(row.name),
+          location: _.pick(row, ["address", "postalCode", "town", "country"]),
+          vendorUptime: row.vendorUptime,
+          vendorMTTR: row.vendorMTTR,
+        }))
+      )
+    : [];
 
   return { success: true, totalRows: records.length, insertedCount: created.length, failedRows: [] };
 };
