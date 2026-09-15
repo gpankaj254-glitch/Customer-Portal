@@ -156,6 +156,15 @@ const updateUserById = async (userId, updateBody, actingUser, relatedEntity = nu
     if (actingUser.role === roleTypes.scloudxSalesAdmin && updateBody.role !== roleTypes.scloudxSalesUser) {
       throw new ApiError(httpStatus.FORBIDDEN, "You can only assign the SCX Sales User role");
     }
+    // An SCX Sales User has no editUsers right, so the only way this code
+    // path is reached for one is the self-access exception in auth.js (any
+    // authenticated user may PATCH their own /user/:id regardless of
+    // rights). Without this, that self-edit would let a Sales User hand
+    // themselves the role field directly - e.g. escalate to
+    // scloudxSalesAdmin - since none of the branches above cover them.
+    if (actingUser.role === roleTypes.scloudxSalesUser && updateBody.role !== roleTypes.scloudxSalesUser) {
+      throw new ApiError(httpStatus.FORBIDDEN, "You cannot change your own role");
+    }
   }
   // customerId/vendorId are only there to resolve relatedEntity above - they
   // aren't real User fields themselves.
