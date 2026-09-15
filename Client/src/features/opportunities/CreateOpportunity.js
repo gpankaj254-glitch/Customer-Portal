@@ -13,11 +13,12 @@ import MenuItem from "@mui/material/MenuItem"
 import FormControl from "@mui/material/FormControl"
 import FormHelperText from "@mui/material/FormHelperText"
 import Select from "@mui/material/Select"
+import PropTypes from "prop-types"
 import { useDispatch, useSelector } from "react-redux"
 import { createOpportunity, getOpportunities, selectPagination } from "./opportunitySlice"
 import { selectCustomerList } from "../customers/customerSlice"
 
-export default function CreateOpportunity() {
+export default function CreateOpportunity({ onCreated }) {
     const dispatch = useDispatch()
     const pagination = useSelector(selectPagination)
     const customerList = useSelector(selectCustomerList)
@@ -28,21 +29,23 @@ export default function CreateOpportunity() {
         event.preventDefault()
         const form = event.currentTarget
         const data = new FormData(form)
-        const value = data.get("value")
         const payload = {
             name: data.get("name"),
             customerId: selectedCustomer || undefined,
             prospectName: selectedCustomer ? "" : data.get("prospectName"),
-            value: value ? Number(value) : undefined,
-            expectedCloseDate: data.get("expectedCloseDate"),
             description: data.get("description"),
         }
         try {
-            await dispatch(createOpportunity(payload)).unwrap()
+            const created = await dispatch(createOpportunity(payload)).unwrap()
             setFeedback({ severity: "success", message: "Opportunity created successfully" })
             form.reset()
             setSelectedCustomer("")
             dispatch(getOpportunities({ limit: pagination.limit, page: pagination.page + 1 }))
+            // Jump to the list and expand the new row so its Customer/Supplier
+            // Communication tabs are immediately visible - those tabs live on
+            // the list row (a repeatable list needs the opportunity to exist
+            // first), not on this create form, which isn't obvious otherwise.
+            if (onCreated) onCreated(created.id)
         } catch (err) {
             setFeedback({ severity: "error", message: err || "Failed to create opportunity" })
         }
@@ -99,25 +102,6 @@ export default function CreateOpportunity() {
                             />
                         </Grid>
 
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                name="value"
-                                label="Estimated Value"
-                                type="number"
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                name="expectedCloseDate"
-                                label="Expected Close Date"
-                                type="date"
-                                InputLabelProps={{ shrink: true }}
-                            />
-                        </Grid>
-
                         <Grid item xs={12}>
                             <TextField
                                 fullWidth
@@ -147,4 +131,12 @@ export default function CreateOpportunity() {
             </Snackbar>
         </Container>
     )
+}
+
+CreateOpportunity.propTypes = {
+    onCreated: PropTypes.func,
+}
+
+CreateOpportunity.defaultProps = {
+    onCreated: null,
 }

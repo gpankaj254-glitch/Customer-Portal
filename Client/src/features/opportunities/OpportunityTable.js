@@ -48,6 +48,7 @@ export default function OpportunityTable(props) {
     const canDelete = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_SALES_ADMIN
 
     const pagination = props.pagination
+    const { autoExpandOpportunityId, onAutoExpanded } = props
     const dispatch = useDispatch()
 
     const [opportunityToDelete, setOpportunityToDelete] = React.useState(null)
@@ -60,6 +61,15 @@ export default function OpportunityTable(props) {
     const handleRowExpand = (rowId) => {
         setOpen(open === rowId ? false : rowId)
     }
+
+    // Auto-expand a just-created opportunity's row once it shows up in the
+    // (re-fetched) list, then clear the request so it doesn't re-trigger.
+    React.useEffect(() => {
+        if (autoExpandOpportunityId && opportunityList.some((row) => row.id === autoExpandOpportunityId)) {
+            setOpen(autoExpandOpportunityId)
+            onAutoExpanded()
+        }
+    }, [autoExpandOpportunityId, opportunityList, onAutoExpanded])
 
     const handleChangePage = (event, newPage) => {
         dispatch(changePage(newPage))
@@ -247,4 +257,11 @@ export default function OpportunityTable(props) {
 
 OpportunityTable.propTypes = {
     pagination: PropTypes.object,
+    autoExpandOpportunityId: PropTypes.string,
+    onAutoExpanded: PropTypes.func,
+}
+
+OpportunityTable.defaultProps = {
+    autoExpandOpportunityId: null,
+    onAutoExpanded: () => {},
 }

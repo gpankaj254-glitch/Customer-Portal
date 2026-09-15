@@ -41,6 +41,16 @@ function OpportunitiesContent() {
     // Local, uncommitted text box value - kept separate from the Redux
     // search term so we can debounce before actually dispatching a fetch.
     const [opportunitySearchInput, setOpportunitySearchInput] = React.useState(opportunitySearch)
+    // Set by CreateOpportunity right after a successful create - jumps back
+    // to the list and auto-expands that row so its Customer/Supplier
+    // Communication tabs (which only live on an existing opportunity's row)
+    // are immediately visible instead of requiring the user to find them.
+    const [autoExpandOpportunityId, setAutoExpandOpportunityId] = React.useState(null)
+
+    const handleOpportunityCreated = (opportunityId) => {
+        setValue(0)
+        setAutoExpandOpportunityId(opportunityId)
+    }
 
     const handleChange = (event, newValue) => {
         setValue(newValue)
@@ -86,11 +96,15 @@ function OpportunitiesContent() {
                         onChange={(event) => setOpportunitySearchInput(event.target.value)}
                         sx={{ mb: 2 }}
                     />
-                    <OpportunityTable pagination={pagination} />
+                    <OpportunityTable
+                        pagination={pagination}
+                        autoExpandOpportunityId={autoExpandOpportunityId}
+                        onAutoExpanded={() => setAutoExpandOpportunityId(null)}
+                    />
                 </>
             ),
         },
-        { label: "Create Opportunity", content: <CreateOpportunity /> },
+        { label: "Create Opportunity", content: <CreateOpportunity onCreated={handleOpportunityCreated} /> },
     ]
 
     if (isAdmin) {
