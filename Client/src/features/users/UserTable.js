@@ -47,6 +47,12 @@ function getUserTypeLabel(role) {
 }
 
 function getRoleDisplay(row) {
+    if (row.role === roles.SCLOUDX_SALES_ADMIN) {
+        return "SCX Sales Admin"
+    }
+    if (row.role === roles.SCLOUDX_SALES_USER) {
+        return "SCX Sales User"
+    }
     const userType = getUserTypeLabel(row.role)
     if (row.role === roles.CUSTOMER_ADMIN || row.role === roles.CUSTOMER_USER) {
         return `${_.get(row, "customer.name", "")} ${userType}`.trim()
@@ -58,6 +64,10 @@ function getRoleDisplay(row) {
 }
 
 const CUSTOMER_ROLE_OPTIONS = [roles.CUSTOMER_ADMIN, roles.CUSTOMER_USER]
+// An SCX Sales Admin can only move a user to SCX Sales User (server-side
+// enforced too - see updateUserById) - never promote one into a Sales Admin
+// themselves, mirroring the creation restriction.
+const SALES_ROLE_OPTIONS = [roles.SCLOUDX_SALES_USER]
 
 // Changing a user's Role to a Customer/Vendor role must also assign which
 // Customer/Vendor they belong to - the picker only appears once that kind
@@ -65,8 +75,13 @@ const CUSTOMER_ROLE_OPTIONS = [roles.CUSTOMER_ADMIN, roles.CUSTOMER_USER]
 // A Customer Admin managing their own users can only move them between
 // Customer Admin/User (server-side enforced too) - so they get a narrower
 // role list and no Customer picker at all, since it's always their own.
-function buildEditableFields(customerList, vendorList, isCustomerAdminActor) {
-    const availableRoles = isCustomerAdminActor ? CUSTOMER_ROLE_OPTIONS : roleList
+// An SCX Sales Admin is narrowed the same way, down to SALES_ROLE_OPTIONS.
+function buildEditableFields(customerList, vendorList, isCustomerAdminActor, isSalesAdminActor) {
+    const availableRoles = isCustomerAdminActor
+        ? CUSTOMER_ROLE_OPTIONS
+        : isSalesAdminActor
+            ? SALES_ROLE_OPTIONS
+            : roleList
     return (values) => {
         const fields = [
             { name: "name", label: "Name" },
@@ -113,7 +128,11 @@ export default function UserTable(props) {
     // Customer Admins manage their own customer's users the same way SCX
     // Admins manage everyone's - scoped server-side to their own customer.
     const isCustomerAdminActor = currentUser.role === roles.CUSTOMER_ADMIN
-    const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN || isCustomerAdminActor
+    // SCX Sales Admins manage only SCX Sales Admin/User accounts - the list
+    // itself only ever contains those (server-scoped in getUsers), and edits
+    // are narrowed the same way via buildEditableFields.
+    const isSalesAdminActor = currentUser.role === roles.SCLOUDX_SALES_ADMIN
+    const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN || isCustomerAdminActor || isSalesAdminActor
     const search = useSelector(selectSearch)
     const pagination = props.pagination
     const customerList = useSelector(selectCustomerList)
@@ -337,7 +356,7 @@ export default function UserTable(props) {
                 <EditDialog
                     open={!!userToEdit}
                     title="Edit user"
-                    fields={buildEditableFields(customerList, vendorList, isCustomerAdminActor)}
+                    fields={buildEditableFields(customerList, vendorList, isCustomerAdminActor, isSalesAdminActor)}
                     initialValues={{
                         name: userToEdit ? userToEdit.name : "",
                         email: userToEdit ? userToEdit.email : "",

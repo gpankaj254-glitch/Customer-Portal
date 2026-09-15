@@ -1,6 +1,6 @@
 const httpStatus = require("http-status");
 const _ = require("lodash");
-const { isCustomerRole, isVendorRole, roleTypes } = require("../config/roles");
+const { isCustomerRole, isVendorRole, isSalesRole, roleTypes } = require("../config/roles");
 const { User } = require("../models");
 const logger = require("../config/logger");
 
@@ -98,9 +98,10 @@ const getUserByEmail = async (email) => {
 /**
  * Fetch a user, enforcing that the acting user is allowed to manage it - SCX
  * roles can manage anyone; a Customer/Vendor Admin can only manage users
- * belonging to their own customer/vendor. Used by every user-management
- * action (edit, reset password, delete, restore) so a Customer/Vendor Admin
- * can never reach an account outside their own tenant.
+ * belonging to their own customer/vendor; an SCX Sales Admin can only manage
+ * SCX Sales Admin/User accounts, not the rest of the user base. Used by
+ * every user-management action (edit, reset password, delete, restore) so
+ * none of these scoped admins can reach an account outside their own scope.
  * @param {ObjectId} userId
  * @param {Object} actingUser
  * @returns {Promise<User>}
@@ -116,6 +117,10 @@ const getAuthorizedUser = async (userId, actingUser) => {
     }
   } else if (isVendorRole(actingUser.role)) {
     if (_.get(user, "vendor.id") !== _.get(actingUser, "vendor.id")) {
+      throw new ApiError(httpStatus.FORBIDDEN, "You are not authorized for this user");
+    }
+  } else if (actingUser.role === roleTypes.scloudxSalesAdmin) {
+    if (!isSalesRole(user.role)) {
       throw new ApiError(httpStatus.FORBIDDEN, "You are not authorized for this user");
     }
   }
@@ -144,6 +149,12 @@ const updateUserById = async (userId, updateBody, actingUser, relatedEntity = nu
     }
     if (isVendorRole(actingUser.role) && !isVendorRole(updateBody.role)) {
       throw new ApiError(httpStatus.FORBIDDEN, "You can only assign Vendor roles");
+    }
+    // An SCX Sales Admin can only move a user to SCX Sales User - same
+    // creation-time restriction as createUser, applied to edits too, so they
+    // can't promote one of their Sales Users into a Sales Admin themselves.
+    if (actingUser.role === roleTypes.scloudxSalesAdmin && updateBody.role !== roleTypes.scloudxSalesUser) {
+      throw new ApiError(httpStatus.FORBIDDEN, "You can only assign the SCX Sales User role");
     }
   }
   // customerId/vendorId are only there to resolve relatedEntity above - they

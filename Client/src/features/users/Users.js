@@ -35,7 +35,9 @@ function UsersContent() {
     const currentUser = useSelector(selectUser)
     // Customer Admins manage their own customer's users the same way SCX
     // Admins manage everyone's - scoped server-side to their own customer.
-    const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.CUSTOMER_ADMIN
+    // SCX Sales Admins are scoped the same way, down to Sales Admin/User
+    // accounts only (see getUsers/getDeletedUsers on the server).
+    const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.SCLOUDX_SALES_ADMIN
     // Permanently deleting a user from the database is SCX-only - Customer
     // Admins keep restore/soft-delete but never this, both here and
     // server-side (permanentlyDeleteUsers is only granted to scloudxAdmin).

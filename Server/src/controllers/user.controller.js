@@ -3,7 +3,7 @@ const _ = require("lodash");
 const pick = require("../utils/pick");
 const catchAsync = require("../utils/catchAsync");
 const { userService, customerService, vendorService } = require("../services");
-const { isCustomerRole, isVendorRole } = require("../config/roles");
+const { isCustomerRole, isVendorRole, roleTypes } = require("../config/roles");
 const { filterByCustomerId, filterByVendorId, activeOnly } = require("../utils/filters");
 
 const createUser = catchAsync(async (req, res) => {
@@ -36,6 +36,11 @@ const getUsers = catchAsync(async (req, res) => {
     newFilter = filterByCustomerId(req.user, newFilter);
   } else if (isVendorRole(req.user.role)) {
     newFilter = filterByVendorId(req.user, newFilter);
+  } else if (req.user.role === roleTypes.scloudxSalesAdmin) {
+    // An SCX Sales Admin manages only the Sales function - scope User
+    // Management down to SCX Sales Admin/User accounts, same as a
+    // Customer/Vendor Admin is scoped to their own tenant above.
+    _.assign(newFilter, { role: { $in: [roleTypes.scloudxSalesAdmin, roleTypes.scloudxSalesUser] } });
   }
 
   const search = _.trim(_.get(req.query, "search", ""));
@@ -101,6 +106,8 @@ const getDeletedUsers = catchAsync(async (req, res) => {
     filter = filterByCustomerId(req.user, filter);
   } else if (isVendorRole(req.user.role)) {
     filter = filterByVendorId(req.user, filter);
+  } else if (req.user.role === roleTypes.scloudxSalesAdmin) {
+    _.assign(filter, { role: { $in: [roleTypes.scloudxSalesAdmin, roleTypes.scloudxSalesUser] } });
   }
   const result = await userService.queryUsers(filter, options);
   res.send(result);

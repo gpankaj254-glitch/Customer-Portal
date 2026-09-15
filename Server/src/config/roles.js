@@ -50,6 +50,9 @@ const allRoles = {
   vendorAdmin: ["createUsers", "editUsers", "deleteUsers"],
   scloudxSalesAdmin: [
     "createUsers",
+    "editUsers",
+    "deleteUsers",
+    "resetUserPassword",
     "createOpportunities",
     "editOpportunities",
     "deleteOpportunities",
@@ -91,6 +94,10 @@ function isVendorRole(role) {
   return role === roleTypes.vendorAdmin || role === roleTypes.vendorUser;
 }
 
+function isSalesRole(role) {
+  return role === roleTypes.scloudxSalesAdmin || role === roleTypes.scloudxSalesUser;
+}
+
 const roles = Object.keys(allRoles);
 const roleRights = new Map(Object.entries(allRoles));
 
@@ -101,5 +108,6 @@ module.exports = {
   isScloudxUser,
   isCustomerRole,
   isVendorRole,
+  isSalesRole,
 };
 
