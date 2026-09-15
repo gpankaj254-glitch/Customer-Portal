@@ -30,4 +30,5 @@ export const bandwidthOptions = [
 export const productOptions = [
     "DIA",
     "Pt to Pt",
+    "Broad Band",
 ]

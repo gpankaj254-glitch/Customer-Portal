@@ -28,6 +28,6 @@ const bandwidthOptions = [
   "2 Gbps (2000 Mbps)",
 ];
 
-const productOptions = ["DIA", "Pt to Pt"];
+const productOptions = ["DIA", "Pt to Pt", "Broad Band"];
 
 module.exports = { bandwidthOptions, productOptions };
