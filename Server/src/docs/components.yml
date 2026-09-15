@@ -1,0 +1,182 @@
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+      example:
+        id: 5ebac534954b54139806c112
+        email: fake@example.com
+        name: fake name
+        role: user
+
+    Customer:
+      type: object
+      properties:
+        customerId:
+          type: string
+        customerCode:
+          type: string
+        name:
+          type: string
+        regions:
+          type: array
+      example:
+        customerId: 63351c6c0529c21216729cff
+        customerCode: C0001
+        name: fake customer
+        regions: [India, Asia]
+    
+    Region:
+      type: object
+      properties:
+        customerId:
+          type: string
+        regionId:
+          type: string
+        regionCode:
+          type: string
+        regionName:
+          type: string
+        regions:
+          type: array
+    
+    CreateCustomerRequest:
+      type: object
+      properties:
+        customerCode:
+          type: string
+        name:
+          type: string
+      example:
+        customerCode: C0001
+        name: fake customer
+    
+    CreateRegionRequest:
+      type: object
+      properties:
+        regionCode:
+          type: string
+        name:
+          type: string
+        customerId:
+          type: string
+      example:
+        customerId: 63351c6c0529c21216729cff
+        regionCode: C0001
+        name: fake region
+
+    UpdateCustomerRequest:
+      type: object
+      properties:
+        customerId:
+          type: string
+        customerCode:
+          type: string
+        name:
+          type: string
+      example:
+        customerId: 63351c6c0529c21216729cff
+        customerCode: C0001
+        name: fake customer
+
+    GetCustomersFilters:
+      type: object
+      properties:
+        customerCode:
+          type: string
+        name:
+          type: string
+        regions:
+          type: array
+      example:
+        {}
+    
+    GetCustomerRequest:
+      type: object
+      properties:
+        customerId:
+          type: string
+      example:
+        customerId: 63351c6c0529c21216729cff
+
+    Token:
+      type: object
+      properties:
+        token:
+          type: string
+        expires:
+          type: string
+          format: date-time
+      example:
+        token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZWJhYzUzNDk1NGI1NDEzOTgwNmMxMTIiLCJpYXQiOjE1ODkyOTg0ODQsImV4cCI6MTU4OTMwMDI4NH0.m1U63blB0MLej_WfB7yC2FTMnCziif9X8yzwDEfJXAg
+        expires: 2020-05-12T16:18:04.793Z
+
+    AuthTokens:
+      type: object
+      properties:
+        access:
+          $ref: '#/components/schemas/Token'
+        refresh:
+          $ref: '#/components/schemas/Token'
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: number
+        message:
+          type: string
+
+  responses:
+    DuplicateEmail:
+      description: Email already taken
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 400
+            message: Email already taken
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 401
+            message: Please authenticate
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 403
+            message: Forbidden
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 404
+            message: Not found
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

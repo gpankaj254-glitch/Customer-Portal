@@ -1,0 +1,11 @@
+module.exports.authController = require("./auth.controller");
+module.exports.userController = require("./user.controller");
+module.exports.customerController = require("./customer.controller");
+module.exports.regionController = require("./region.controller");
+module.exports.vendorController = require("./vendor.controller");
+module.exports.circuitController = require("./circuit.controller");
+module.exports.contactController = require("./contact.controller");
+module.exports.ticketController = require("./ticket.controller");
+module.exports.siteController = require("./site.controller");
+module.exports.dashboardController = require("./dashboard.controller");
+module.exports.opportunityController = require("./opportunity.controller");

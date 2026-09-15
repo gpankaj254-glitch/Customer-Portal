@@ -1,0 +1,655 @@
+/* eslint-disable eqeqeq */
+const httpStatus = require("http-status");
+// const { custom } = require("joi");
+const _ = require("lodash");
+const moment = require("moment");
+const { parse } = require("csv-parse/sync");
+const { roleTypes, isCustomerRole } = require("../config/roles");
+const { problemTypeOptions, priorityOptions, siteAccessHoursOptions } = require("../config/ticketOptions");
+// const logger = require("../config/logger");
+const { Ticket, Circuit, Counter } = require("../models");
+const ApiError = require("../utils/ApiError");
+const { createCodeFromName } = require("../utils/creators");
+const { getVendorById } = require("./vendor.service");
+const { getCustomerByName } = require("./customer.service");
+const { getSiteByCustomerAndName } = require("./site.service");
+
+/**
+ * Atomically reserve the next serial for a given ticket-number prefix and
+ * build the full ticket number: <prefix><YY><MM><4-digit serial>. The serial
+ * is scoped to prefix+year+month, so it naturally resets every month and
+ * stays unique even if two customers share the same first letter.
+ * @param {string} prefix
+ * @returns {Promise<string>}
+ */
+const generateTicketNumber = async (prefix) => {
+  const now = moment();
+  const yy = now.format("YY");
+  const mm = now.format("MM");
+  const counter = await Counter.findOneAndUpdate(
+    { _id: `ticketNumber-${prefix}${yy}${mm}` },
+    { $inc: { seq: 1 } },
+    { upsert: true, new: true }
+  );
+  const serial = String(counter.seq).padStart(4, "0");
+  return `${prefix}${yy}${mm}${serial}`;
+};
+
+/**
+ * Ticket number prefix is the first letter of the customer's name for a
+ * customer-created ticket, or "INT" (internal) for one SCX creates.
+ * @param {Object} ticketToCreate
+ * @param {Object} user
+ * @returns {Promise<string>}
+ */
+const getNextTicketNumber = async (ticketToCreate, user) => {
+  if (isCustomerRole(user.role)) {
+    const namePrefix = _.get(ticketToCreate, "customer.name", "").trim().charAt(0).toUpperCase() || "X";
+    return generateTicketNumber(namePrefix);
+  }
+  return generateTicketNumber("INT");
+};
+
+// const { createCodeFromName } = require("../utils/creators");
+const {
+  extractNameAndCode,
+  extractUserDetails,
+} = require("../utils/extractors");
+// const { getActiveSiteById } = require("./site.service");
+
+function getLatestUpdate(status, comment, user) {
+  return {
+    status,
+    comment,
+    user: extractUserDetails(user),
+    updatedAt: moment().toISOString(),
+  };
+}
+
+function getUpdatedHistory(history, latestUpdate) {
+  return _.concat(history, latestUpdate);
+}
+
+const updateAndSave = async (ticket, status, comment, user) => {
+  _.set(ticket, "latestUpdate", getLatestUpdate(status, comment, user));
+  _.set(
+    ticket,
+    "history",
+    getUpdatedHistory(ticket.history, ticket.latestUpdate)
+  );
+  // logger.debug(`newTicket ----> ${JSON.stringify(ticket)}`);
+
+  return ticket.save();
+};
+
+/**
+ * Create a site
+ * @param {Object} ticketBody
+ * @param {Object} circuit
+ * @param {Object} user
+ * @returns {Promise<Site>}
+ */
+const createTicket = async (ticketBody, circuit, user) => {
+  let ticketToCreate = _.pick(ticketBody, [
+    "customerReference",
+    "problemType",
+    "problemStartDate",
+    "priority",
+    "description",
+  ]);
+  // The create form has no separate "subject" field - use the problem type
+  // so anything still displaying/relying on subject has something sensible.
+  ticketToCreate.subject = ticketBody.problemType;
+  ticketToCreate.status = "Submitted";
+  ticketToCreate.siteChecklist = _.pick(ticketBody.siteChecklist, [
+    "powerAvailable",
+    "physicalConnectionCheck",
+    "siteAccessHours",
+    "siteAccessHoursOtherText",
+  ]);
+  ticketToCreate = _.assign(
+    ticketToCreate,
+    _.pick(circuit, ["site", "customer", "region", "provider"])
+  );
+  // Circuit has no "name" field of its own (unlike Site/Region/Customer) -
+  // fall back to its vendor/customer circuit id (or code) as a display name.
+  ticketToCreate.circuit = extractNameAndCode(circuit);
+  ticketToCreate.circuit.name = circuit.vendorCircuitId || circuit.customerCircuitId || circuit.code;
+  ticketToCreate.vendorCircuitId = circuit.vendorCircuitId || "";
+  if (circuit.vendorId) {
+    const vendor = await getVendorById(circuit.vendorId);
+    if (vendor) {
+      ticketToCreate.vendor = extractNameAndCode(vendor);
+    }
+  }
+  ticketToCreate.ticketId = await getNextTicketNumber(ticketToCreate, user);
+  _.set(
+    ticketToCreate,
+    "latestUpdate",
+    getLatestUpdate("Submitted", ticketBody.description, user)
+  );
+  _.set(
+    ticketToCreate,
+    "history",
+    getUpdatedHistory([], ticketToCreate.latestUpdate)
+  );
+
+  return Ticket.create(ticketToCreate);
+};
+
+/**
+ * Query for tickets
+ * @param {Object} filter - Mongo filter
+ * @param {Object} options - Query options
+ * @param {string} [options.sortBy] - Sort option in the format: sortField:(desc|asc)
+ * @param {number} [options.limit] - Maximum number of results per page (default = 10)
+ * @param {number} [options.page] - Current page (default = 1)
+ * @returns {Promise<QueryResult>}
+ */
+const queryTickets = async (filter, options) => {
+  const tickets = await Ticket.paginate(filter, options);
+  return tickets;
+};
+
+/**
+ * Get ticket by id
+ * @param {ObjectId} ticketId
+ * @returns {Promise<Ticket>}
+ */
+const getTicketById = async (ticketId) => {
+  return Ticket.findOne({ _id: ticketId });
+};
+
+/**
+ * @param {ObjectId} ticketId
+ * @returns {Promise<Site>}
+ */
+const getActiveTicketById = async (ticketId) => {
+  const ticket = await getTicketById(ticketId);
+  if (!ticket) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Ticket not found");
+  } else if (!ticket.active) {
+    throw new ApiError(httpStatus.NOT_ACCEPTABLE, "Ticket is not active");
+  }
+  return ticket;
+};
+
+/**
+ * @param {ObjectId} ticketId
+ * @param {Object} user
+ * @returns {Promise<Contact>}
+ */
+const getAuthorizedTicket = async (ticketId, user) => {
+  const ticket = await getActiveTicketById(ticketId);
+  if (
+    user.role == roleTypes.customerAdmin ||
+    user.role == roleTypes.customerUser
+  ) {
+    if (_.get(ticket, "customer.id") != _.get(user, "customer.id")) {
+      // logger.debug(`ticketToCreate ----> ${JSON.stringify(ticketToCreate)}`);
+
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        "You are not authorized for this ticket"
+      );
+    }
+  }
+  return ticket;
+};
+
+/**
+ * Update a ticket's editable fields (Problem Type, Customer Reference,
+ * Priority, Status, SCX Internal Comments, Vendor Communication tab fields)
+ * and log the status change in the activity history. Circuit/Site/Customer/
+ * Region/Vendor stay fixed - a ticket is never re-associated with a
+ * different circuit. Description/Vendor Description are not editable here -
+ * they can only be appended to (see appendTicketDescription /
+ * appendVendorDescription), so the original text is always preserved.
+ * @param {Object} ticketBody
+ * @param {Object} user
+ * @returns {Promise<Ticket>}
+ */
+const CLOSURE_DETAIL_FIELDS = [
+  "rfoStatus",
+  "ticketStartDateTime",
+  "actualIssueStartDateTime",
+  "reportedToSupplier",
+  "resolvedFromSupplier",
+  "issueReportedResolvedToAryaka",
+  "actualDownTimeMinutes",
+  "issueResolvedDateTime",
+  "overallDownTime",
+  "rfo",
+  "reason",
+  "reasonCode",
+  "remarks",
+  "scloudxBucket",
+  "supplierBucket",
+  "customerBucket",
+  "category",
+  "totalMinutes",
+  "downTimeMinutes",
+  "uptimePercent",
+  "downTimeHours",
+];
+
+const updateTicket = async (ticketBody, user) => {
+  const {
+    ticketId,
+    problemType,
+    customerReference,
+    priority,
+    status,
+    scxInternalComments,
+    vendorTicketId,
+    vendorTicketCreateDate,
+    vendorTicketStatus,
+    vendorTicketClosureDate,
+  } = ticketBody;
+  const ticket = await getAuthorizedTicket(ticketId, user);
+
+  if (problemType !== undefined) ticket.problemType = problemType;
+  if (customerReference !== undefined) ticket.customerReference = customerReference;
+  if (priority !== undefined) ticket.priority = priority;
+  if (scxInternalComments !== undefined) ticket.scxInternalComments = scxInternalComments;
+  if (vendorTicketId !== undefined) ticket.vendorTicketId = vendorTicketId;
+  if (vendorTicketCreateDate !== undefined) ticket.vendorTicketCreateDate = vendorTicketCreateDate;
+  if (vendorTicketStatus !== undefined) ticket.vendorTicketStatus = vendorTicketStatus;
+  if (vendorTicketClosureDate !== undefined) ticket.vendorTicketClosureDate = vendorTicketClosureDate;
+  CLOSURE_DETAIL_FIELDS.forEach((field) => {
+    if (ticketBody[field] !== undefined) {
+      ticket.closureDetails[field] = ticketBody[field];
+    }
+  });
+
+  ticket.status = status;
+  ticket.closed = status === "Closed";
+  if (status === "Closed" && !ticket.downTime) {
+    const created = _.get(ticket, "history[0].updatedAt");
+    if (created) {
+      ticket.downTime = moment.duration(moment().diff(created)).asMinutes();
+    }
+    ticket.closedAt = new Date();
+  }
+
+  return updateAndSave(ticket, status, "", user);
+};
+
+/**
+ * Append a note to a ticket's Description without disturbing what is
+ * already there - the original text (and any prior appended notes) is
+ * kept, and the new note is added as its own dated/attributed block.
+ * @param {Object} ticketBody
+ * @param {Object} user
+ * @returns {Promise<Ticket>}
+ */
+const appendTicketDescription = async (ticketBody, user) => {
+  const { ticketId, descriptionAppend } = ticketBody;
+  const ticket = await getAuthorizedTicket(ticketId, user);
+
+  if (ticket.closed) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Cannot add comments to a closed ticket");
+  }
+
+  const authorName = _.get(user, "name") || _.get(user, "email") || "";
+  const timestamp = moment().format("DD/MM/YYYY hh:mm A");
+  const notedBlock = `[${timestamp} - ${authorName}]: ${descriptionAppend}`;
+  ticket.description = ticket.description
+    ? `${ticket.description}\n\n${notedBlock}`
+    : notedBlock;
+
+  return updateAndSave(ticket, ticket.status, descriptionAppend, user);
+};
+
+/**
+ * Vendor Communication counterpart to appendTicketDescription - appends a
+ * dated/attributed note to vendorDescription without disturbing what's
+ * already there. SCX-only (Vendor Communication is not visible to customers).
+ * @param {Object} ticketBody
+ * @param {Object} user
+ * @returns {Promise<Ticket>}
+ */
+const appendVendorDescription = async (ticketBody, user) => {
+  const { ticketId, descriptionAppend } = ticketBody;
+  const ticket = await getAuthorizedTicket(ticketId, user);
+
+  if (ticket.closed) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Cannot add comments to a closed ticket");
+  }
+
+  const authorName = _.get(user, "name") || _.get(user, "email") || "";
+  const timestamp = moment().format("DD/MM/YYYY hh:mm A");
+  const notedBlock = `[${timestamp} - ${authorName}]: ${descriptionAppend}`;
+  ticket.vendorDescription = ticket.vendorDescription
+    ? `${ticket.vendorDescription}\n\n${notedBlock}`
+    : notedBlock;
+
+  return updateAndSave(ticket, ticket.status, descriptionAppend, user);
+};
+
+/**
+ * Attach one or more uploaded files to a ticket for reference/investigation
+ * (photos, graphs, logs, etc). Available to the same roles/conditions as
+ * appendTicketDescription - not allowed once the ticket is closed.
+ * @param {string} ticketId
+ * @param {Array} files - multer file objects (disk storage)
+ * @param {Object} user
+ * @returns {Promise<Ticket>}
+ */
+const addTicketAttachments = async (ticketId, files, user) => {
+  const ticket = await getAuthorizedTicket(ticketId, user);
+
+  if (ticket.closed) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Cannot add attachments to a closed ticket");
+  }
+
+  const uploadedBy = extractUserDetails(user);
+  const uploadedAt = moment().toISOString();
+  const attachments = files.map((file) => ({
+    filename: file.filename,
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    size: file.size,
+    uploadedBy,
+    uploadedAt,
+  }));
+  ticket.attachments = _.concat(ticket.attachments, attachments);
+
+  const fileNames = attachments.map((attachment) => attachment.originalName).join(", ");
+  return updateAndSave(ticket, ticket.status, `Attachment(s) added: ${fileNames}`, user);
+};
+
+/**
+ * Vendor Communication counterpart to addTicketAttachments - stored
+ * separately (vendorAttachments) from the customer-facing attachments.
+ * @param {string} ticketId
+ * @param {Array} files - multer file objects (disk storage)
+ * @param {Object} user
+ * @returns {Promise<Ticket>}
+ */
+const addVendorAttachments = async (ticketId, files, user) => {
+  const ticket = await getAuthorizedTicket(ticketId, user);
+
+  if (ticket.closed) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Cannot add attachments to a closed ticket");
+  }
+
+  const uploadedBy = extractUserDetails(user);
+  const uploadedAt = moment().toISOString();
+  const attachments = files.map((file) => ({
+    filename: file.filename,
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    size: file.size,
+    uploadedBy,
+    uploadedAt,
+  }));
+  ticket.vendorAttachments = _.concat(ticket.vendorAttachments, attachments);
+
+  const fileNames = attachments.map((attachment) => attachment.originalName).join(", ");
+  return updateAndSave(ticket, ticket.status, `Vendor attachment(s) added: ${fileNames}`, user);
+};
+
+/**
+ * @param {ObjectId} ticketId
+ * @param {String} contactId
+ * @returns {Promise<Ticket>}
+ */
+const addContact = async (ticketId, contactId) => {
+  const ticket = await getActiveTicketById(ticketId);
+  const contacts = _.concat(ticket.contacts, contactId);
+  _.set(ticket, "contactPersons", contacts);
+  await ticket.save();
+  return ticket;
+};
+
+/**
+ * Deactivate ticket by id
+ * @param {ObjectId} ticketId
+ * @returns {Promise<Ticket>}
+ */
+const deactivateTicketById = async (ticketId) => {
+  const ticket = await getTicketById(ticketId);
+  if (!ticket) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Ticket not found");
+  } else if (!ticket.active) {
+    throw new ApiError(httpStatus.NOT_ACCEPTABLE, "Ticket is not active");
+  }
+  ticket.active = false;
+  await ticket.save();
+  return ticket;
+};
+
+/**
+ * Look up one attachment's stored metadata on a ticket the requesting user
+ * is authorized to see, for a secure (auth-checked) download.
+ * @param {string} ticketId
+ * @param {string} filename - the stored (disk) filename, not the original one
+ * @param {Object} user
+ * @returns {Promise<Object>}
+ */
+const getTicketAttachment = async (ticketId, filename, user) => {
+  const ticket = await getAuthorizedTicket(ticketId, user);
+  const attachment = ticket.attachments.find((item) => item.filename === filename);
+  if (!attachment) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Attachment not found");
+  }
+  return attachment;
+};
+
+/**
+ * Vendor Communication counterpart to getTicketAttachment.
+ * @param {string} ticketId
+ * @param {string} filename
+ * @param {Object} user
+ * @returns {Promise<Object>}
+ */
+const getVendorAttachment = async (ticketId, filename, user) => {
+  const ticket = await getAuthorizedTicket(ticketId, user);
+  const attachment = ticket.vendorAttachments.find((item) => item.filename === filename);
+  if (!attachment) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Attachment not found");
+  }
+  return attachment;
+};
+
+/**
+ * @param {Array} ticketIds
+ * @returns {Promise<Contact>}
+ */
+const getActiveTicketsById = async (ticketIds) => {
+  const tickets = await Promise.all(
+    ticketIds.map(async (ticketId) => {
+      const ticket = await getTicketById(ticketId);
+      if (ticket && ticket.active) {
+        return _.pick(ticket, [
+          "code",
+          "orderReference",
+          // "id",
+          "provider",
+          "providerTicketId",
+          "customerTicketId",
+        ]);
+        // return ticket;
+      }
+    })
+  );
+  return _.compact(tickets);
+};
+
+const BULK_UPLOAD_COLUMNS = [
+  "Customer Name",
+  "Site Name",
+  "Vendor Circuit ID",
+  "Problem Type",
+  "Priority",
+  "Description",
+  "Customer Reference",
+  "Problem Start Date",
+  "Power Available",
+  "Physical Connection Check",
+  "Site Access Hours",
+  "Site Access Hours Other Text",
+];
+
+// Power Available / Physical Connection Check are the only two boolean
+// fields on the create form - "" is treated as not-checked (false), same as
+// the checkboxes' own unchecked default, rather than being an error.
+function parseYesNo(rawValue, label, errors) {
+  const value = (rawValue || "").trim();
+  if (!value) return false;
+  if (/^yes$/i.test(value)) return true;
+  if (/^no$/i.test(value)) return false;
+  errors.push(`${label} must be "Yes" or "No"`);
+  return false;
+}
+
+/**
+ * Bulk-create tickets from an uploaded CSV buffer. SCX-only (unlike normal
+ * ticket creation, which Customers can also do) - see bulkUpload right.
+ * Each row identifies its Circuit by Customer Name + Site Name + Vendor
+ * Circuit ID (the same natural key Circuit bulk upload itself matches on),
+ * not a raw circuitId, since a human filling in a spreadsheet has no way to
+ * know a Mongo id. Unlike Site/Circuit/Vendor bulk upload, there is no
+ * "duplicate" check - creating several tickets against the same circuit is
+ * completely normal (that's exactly what happens over a circuit's life),
+ * so nothing here treats repeated rows as an error. Only inserts anything
+ * if every row passes (all-or-nothing), and does not fire the
+ * ticket-created email alert per row - that notification is for a single
+ * live submission, not a bulk/historical import.
+ * @param {Buffer} fileBuffer
+ * @param {Object} actingUser
+ * @returns {Promise<{success: boolean, totalRows: number, insertedCount: number, failedRows: Array}>}
+ */
+const bulkUploadTickets = async (fileBuffer, actingUser) => {
+  let records;
+  try {
+    records = parse(fileBuffer, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+      bom: true,
+    });
+  } catch (err) {
+    throw new ApiError(httpStatus.BAD_REQUEST, `Could not parse CSV file: ${err.message}`);
+  }
+
+  if (records.length === 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "CSV file has no data rows");
+  }
+
+  const missingColumns = BULK_UPLOAD_COLUMNS.filter((column) => !(column in records[0]));
+  if (missingColumns.length > 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, `CSV is missing required column(s): ${missingColumns.join(", ")}`);
+  }
+
+  const failedRows = [];
+  const validRows = [];
+
+  for (let i = 0; i < records.length; i += 1) {
+    const record = records[i];
+    const rowNumber = i + 2; // account for the header row, 1-indexed
+    const customerName = _.get(record, "Customer Name", "").trim();
+    const siteName = _.get(record, "Site Name", "").trim();
+    const vendorCircuitId = _.get(record, "Vendor Circuit ID", "").trim();
+    const problemType = _.get(record, "Problem Type", "").trim();
+    const priority = _.get(record, "Priority", "").trim();
+    const description = _.get(record, "Description", "").trim();
+    const siteAccessHours = _.get(record, "Site Access Hours", "").trim();
+    const errors = [];
+
+    if (!customerName) errors.push("Customer Name is required");
+    if (!siteName) errors.push("Site Name is required");
+    if (!vendorCircuitId) errors.push("Vendor Circuit ID is required");
+    if (!problemType) errors.push("Problem Type is required");
+    else if (!problemTypeOptions.includes(problemType)) errors.push(`Problem Type "${problemType}" is not a valid option`);
+    if (!priority) errors.push("Priority is required");
+    else if (!priorityOptions.includes(priority)) errors.push(`Priority "${priority}" is not a valid option`);
+    if (!description) errors.push("Description is required");
+    if (siteAccessHours && !siteAccessHoursOptions.includes(siteAccessHours)) {
+      errors.push(`Site Access Hours "${siteAccessHours}" is not a valid option`);
+    }
+
+    const powerAvailable = parseYesNo(_.get(record, "Power Available", ""), "Power Available", errors);
+    const physicalConnectionCheck = parseYesNo(_.get(record, "Physical Connection Check", ""), "Physical Connection Check", errors);
+
+    let circuit = null;
+    if (customerName && siteName) {
+      // eslint-disable-next-line no-await-in-loop
+      const customer = await getCustomerByName(customerName);
+      if (!customer || !customer.active) {
+        errors.push("Customer not found or inactive");
+      } else {
+        // eslint-disable-next-line no-await-in-loop
+        const site = await getSiteByCustomerAndName(customer, siteName);
+        if (!site || !site.active) {
+          errors.push("Site not found for this customer, or inactive");
+        } else if (vendorCircuitId) {
+          const code = createCodeFromName(vendorCircuitId, site.code);
+          // eslint-disable-next-line no-await-in-loop
+          const matchedCircuit = await Circuit.findOne({ code });
+          if (!matchedCircuit || !matchedCircuit.active) {
+            errors.push("Circuit not found for this Vendor Circuit ID at this site, or inactive");
+          } else {
+            circuit = matchedCircuit;
+          }
+        }
+      }
+    }
+
+    if (errors.length > 0) {
+      failedRows.push({ row: rowNumber, customerName, siteName, vendorCircuitId, errors: errors.join("; ") });
+    } else {
+      validRows.push({
+        circuit,
+        ticketBody: {
+          problemType,
+          priority,
+          description,
+          customerReference: _.get(record, "Customer Reference", "").trim(),
+          problemStartDate: _.get(record, "Problem Start Date", "").trim(),
+          siteChecklist: {
+            powerAvailable,
+            physicalConnectionCheck,
+            siteAccessHours,
+            siteAccessHoursOtherText: _.get(record, "Site Access Hours Other Text", "").trim(),
+          },
+        },
+      });
+    }
+  }
+
+  if (failedRows.length > 0) {
+    return { success: false, totalRows: records.length, insertedCount: 0, failedRows };
+  }
+
+  const created = [];
+  for (let i = 0; i < validRows.length; i += 1) {
+    const { circuit, ticketBody } = validRows[i];
+    // eslint-disable-next-line no-await-in-loop
+    const ticket = await createTicket(ticketBody, circuit, actingUser);
+    created.push(ticket);
+  }
+
+  return { success: true, totalRows: records.length, insertedCount: created.length, failedRows: [] };
+};
+
+module.exports = {
+  createTicket,
+  bulkUploadTickets,
+  queryTickets,
+  getTicketById,
+  updateTicket,
+  appendTicketDescription,
+  addTicketAttachments,
+  getTicketAttachment,
+  appendVendorDescription,
+  addVendorAttachments,
+  getVendorAttachment,
+  deactivateTicketById,
+  getActiveTicketById,
+  addContact,
+  // createTicketBySite,
+  getActiveTicketsById,
+  getAuthorizedTicket,
+};

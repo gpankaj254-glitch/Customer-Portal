@@ -1,0 +1,14 @@
+module.exports.authService = require("./auth.service");
+module.exports.emailService = require("./email.service");
+module.exports.tokenService = require("./token.service");
+module.exports.userService = require("./user.service");
+module.exports.customerService = require("./customer.service");
+module.exports.regionService = require("./region.service");
+module.exports.vendorService = require("./vendor.service");
+module.exports.circuitService = require("./circuit.service");
+module.exports.contactService = require("./contact.service");
+module.exports.ticketService = require("./ticket.service");
+module.exports.siteService = require("./site.service");
+module.exports.alertService = require("./alert.service");
+module.exports.dashboardService = require("./dashboard.service");
+module.exports.opportunityService = require("./opportunity.service");

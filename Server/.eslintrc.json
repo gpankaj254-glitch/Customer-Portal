@@ -1,0 +1,40 @@
+// {
+//     "env": {
+//         "node": true,
+//         "commonjs": true
+//         // "es6": false
+//     },
+//     "extends":["plugin:@typescript-eslint/recommended",
+//         "prettier"],
+//     "parser": "@typescript-eslint/parser",
+//     "plugins": ["@typescript-eslint"],
+//     "overrides": [
+//     ],
+//     "rules": {
+//         "camelcase":1,
+//         "@typescript-eslint/no-var-requires" : 0,
+//         "@typescript-eslint/no-require-imports":0
+
+//     }
+// }
+
+{
+    "env": {
+      "node": true,
+      "jest": true
+    },
+    "extends": ["airbnb-base", "plugin:jest/recommended", "plugin:security/recommended", "plugin:prettier/recommended"],
+    "plugins": ["jest", "security", "prettier"],
+    "parserOptions": {
+      "ecmaVersion": 2018
+    },
+    "rules": {
+      "no-console": "error",
+      "func-names": "off",
+      "no-underscore-dangle": "off",
+      "consistent-return": "off",
+      "jest/expect-expect": "off",
+      "security/detect-object-injection": "off"
+    }
+  }
+  

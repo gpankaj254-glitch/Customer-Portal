@@ -1,0 +1,9 @@
+﻿Customer,Region,Site,Site-Address,Postal code,Town,Country,End User
+Customer-1,Dublin,Site-1,"Waterloo Exchange, Waterloo Road, Dublin, Ireland 4",,Dublin,Ireland,Jazz
+Customer-1,France,Site-2,"CityOne, 84 quai Charles de Gaulle, Lyon, France 69006",69006,Lyon,France,Jazz
+Customer-1,Philippines,Site-3 ,"28 1st Avenue Bagumbayan Taguig City, Metro Manila 1631 Philippines",1631,Metro manila,Philippines,Hubbel
+Customer-2,Germany,Site-4,"An der Hammer Brücke 5, 41460 , Neuss NRW, Germany",41460,Nesus NRW,Germany,lease Plan
+Customer-2,Dublin,Site-5,"Waterloo Exchange, Waterloo Road, Dublin, Ireland 4",,Dublin,Ireland,Jazz
+Customer-3,France,Site-6,"CityOne, 84 quai Charles de Gaulle, Lyon, France 69006",69006,Lyon,France,Jazz
+Customer-3,Philippines,Site-7 ,"28 1st Avenue Bagumbayan Taguig City, Metro Manila 1631 Philippines",1631,Metro manila,Philippines,Hubbel
+Customer-4,Germany,Site-8,"An der Hammer Brücke 5, 41460 , Neuss NRW, Germany",41460,Nesus NRW,Germany,lease Plan
