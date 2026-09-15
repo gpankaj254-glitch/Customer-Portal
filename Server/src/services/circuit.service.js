@@ -7,13 +7,12 @@ const { parse } = require("csv-parse/sync");
 const { roleTypes } = require("../config/roles");
 const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
 const logger = require("../config/logger");
-const { Circuit, Site } = require("../models");
+const { Circuit, Site, Customer, Vendor } = require("../models");
 const ApiError = require("../utils/ApiError");
 const { createCodeFromName } = require("../utils/creators");
 const { extractNameAndCode, extractUserDetails } = require("../utils/extractors");
-const { getSiteById, getSiteByCustomerAndName } = require("./site.service");
-const { getVendorById, getVendorByName } = require("./vendor.service");
-const { getCustomerByName } = require("./customer.service");
+const { getSiteById } = require("./site.service");
+const { getVendorById } = require("./vendor.service");
 
 const BILL_START_DATE_FORMAT = "DD-MM-YYYY";
 
@@ -418,6 +417,59 @@ const validateBulkUploadCircuits = async (fileBuffer) => {
     throw new ApiError(httpStatus.BAD_REQUEST, `CSV is missing required column(s): ${missingColumns.join(", ")}`);
   }
 
+  // Batch-fetch every Customer and Vendor this file references in one round
+  // trip each, instead of one findOne per row - a file with hundreds of
+  // rows typically only references a handful of distinct customers/vendors
+  // (e.g. 219 rows / 2 customers / 84 vendors is typical), so looking each
+  // one up per row turned a bulk upload into hundreds of sequential DB
+  // round trips and could time out the whole request.
+  const customerCodes = new Set();
+  const vendorCodes = new Set();
+  records.forEach((record) => {
+    const customerName = _.get(record, "Customer Name", "").trim();
+    const vendorName = _.get(record, "Vendor Name", "").trim();
+    if (customerName) customerCodes.add(createCodeFromName(customerName));
+    if (vendorName) vendorCodes.add(createCodeFromName(vendorName));
+  });
+  const [customers, vendors] = await Promise.all([
+    Customer.find({ code: { $in: [...customerCodes] } }),
+    Vendor.find({ code: { $in: [...vendorCodes] } }),
+  ]);
+  const customersByCode = new Map(customers.map((customer) => [customer.code, customer]));
+  const vendorsByCode = new Map(vendors.map((vendor) => [vendor.code, vendor]));
+
+  // Sites are keyed by customer code (their parent), so their codes can
+  // only be computed once each row's customer has resolved above - still
+  // one more batched round trip rather than one per row.
+  const siteCodes = new Set();
+  records.forEach((record) => {
+    const customerName = _.get(record, "Customer Name", "").trim();
+    const siteName = _.get(record, "Site Name", "").trim();
+    const customer = customersByCode.get(createCodeFromName(customerName));
+    if (customer && siteName) {
+      siteCodes.add(createCodeFromName(siteName, customer.code));
+    }
+  });
+  const sites = await Site.find({ code: { $in: [...siteCodes] } });
+  const sitesByCode = new Map(sites.map((site) => [site.code, site]));
+
+  // Same idea for "does a circuit with this code already exist" - collect
+  // every candidate code up front and check them all in one query rather
+  // than one findOne per row.
+  const circuitCodes = new Set();
+  records.forEach((record) => {
+    const customerName = _.get(record, "Customer Name", "").trim();
+    const siteName = _.get(record, "Site Name", "").trim();
+    const vendorCircuitId = _.get(record, "Vendor Circuit ID", "").trim();
+    const customer = customersByCode.get(createCodeFromName(customerName));
+    const site = customer && siteName ? sitesByCode.get(createCodeFromName(siteName, customer.code)) : null;
+    if (site) {
+      circuitCodes.add(createCodeFromName(vendorCircuitId, site.code));
+    }
+  });
+  const existingCircuits = await Circuit.find({ code: { $in: [...circuitCodes] } }).select("code");
+  const existingCircuitCodes = new Set(existingCircuits.map((circuit) => circuit.code));
+
   const failedRows = [];
   const validRows = [];
   const seenCodes = new Set();
@@ -449,13 +501,11 @@ const validateBulkUploadCircuits = async (fileBuffer) => {
 
     let site = null;
     if (customerName && siteName) {
-      // eslint-disable-next-line no-await-in-loop
-      const customer = await getCustomerByName(customerName);
+      const customer = customersByCode.get(createCodeFromName(customerName));
       if (!customer || !customer.active) {
         errors.push("Customer not found or inactive");
       } else {
-        // eslint-disable-next-line no-await-in-loop
-        const matchedSite = await getSiteByCustomerAndName(customer, siteName);
+        const matchedSite = sitesByCode.get(createCodeFromName(siteName, customer.code));
         if (!matchedSite || !matchedSite.active) {
           errors.push("Site not found for this customer, or inactive");
         } else {
@@ -466,8 +516,7 @@ const validateBulkUploadCircuits = async (fileBuffer) => {
 
     let vendor = null;
     if (vendorName) {
-      // eslint-disable-next-line no-await-in-loop
-      const matchedVendor = await getVendorByName(vendorName);
+      const matchedVendor = vendorsByCode.get(createCodeFromName(vendorName));
       if (!matchedVendor || !matchedVendor.active) {
         errors.push("Vendor not found or inactive");
       } else {
@@ -481,9 +530,7 @@ const validateBulkUploadCircuits = async (fileBuffer) => {
         errors.push("Duplicate circuit (same Site + Vendor Circuit ID) within this file");
       } else {
         seenCodes.add(code);
-        // eslint-disable-next-line no-await-in-loop
-        const existingCircuit = await Circuit.findOne({ code });
-        if (existingCircuit) {
+        if (existingCircuitCodes.has(code)) {
           errors.push("A circuit with this Vendor Circuit ID already exists for this site");
         }
       }
@@ -518,10 +565,76 @@ const validateBulkUploadCircuits = async (fileBuffer) => {
   return { totalRows: records.length, failedRows, validRows };
 };
 
+/**
+ * Insert every circuit from a validated bulk upload in a small, fixed
+ * number of DB round trips regardless of row count: one insertMany for all
+ * the circuit documents, then one bulkWrite to push each new circuit onto
+ * its site's `circuits` array. Mirrors createCircuitBySite's per-row logic,
+ * batched - and skips the isCodeTaken re-check createCircuitBySite does,
+ * since validateBulkUploadCircuits already confirmed every code is free
+ * (the schema's unique index on `code` still catches a genuine race).
+ * @param {Array<{site: Object, circuitBody: Object}>} validRows
+ * @returns {Promise<Array<Circuit>>}
+ */
+const bulkCreateCircuitsBySite = async (validRows) => {
+  if (validRows.length === 0) {
+    return [];
+  }
+
+  const docs = validRows.map(({ site, circuitBody }) => {
+    const circuitToCreate = _.pick(circuitBody, [
+      "customerCircuitId",
+      "vendorCircuitId",
+      "vendorId",
+      "scloudxOrderReference",
+      "vendorOrderReference",
+      "customerOrderReference",
+      "customerCircuitBillStartDate",
+      "customerCircuitContractTerm",
+      "vendorCircuitBillStartDate",
+      "vendorCircuitContractTerm",
+      "vendorLECName",
+      "bandwidth",
+      "product",
+      "vendorUptime",
+      "vendorMTTR",
+    ]);
+    circuitToCreate.code = createCodeFromName(circuitBody.vendorCircuitId, site.code);
+    circuitToCreate.customer = site.customer;
+    circuitToCreate.region = site.region;
+    circuitToCreate.site = extractNameAndCode(site);
+    return circuitToCreate;
+  });
+
+  // insertMany returns documents in the same order as the input array, so
+  // index i here always corresponds to validRows[i].
+  const createdCircuits = await Circuit.insertMany(docs, { ordered: true });
+
+  const circuitIdsBySiteId = new Map();
+  createdCircuits.forEach((circuit, index) => {
+    const siteId = validRows[index].site._id.toString();
+    const ids = circuitIdsBySiteId.get(siteId) || [];
+    ids.push(circuit._id.toString());
+    circuitIdsBySiteId.set(siteId, ids);
+  });
+
+  await Site.bulkWrite(
+    [...circuitIdsBySiteId.entries()].map(([siteId, circuitIds]) => ({
+      updateOne: {
+        filter: { _id: siteId },
+        update: { $push: { circuits: { $each: circuitIds } } },
+      },
+    }))
+  );
+
+  return createdCircuits;
+};
+
 module.exports = {
   // createCircuit,
   queryCircuits,
   validateBulkUploadCircuits,
+  bulkCreateCircuitsBySite,
   // createOrUpdateCircuitByVendorId,
   getActiveCircuitByVendorId,
   getCircuitById,

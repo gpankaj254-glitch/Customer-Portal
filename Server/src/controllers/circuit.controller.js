@@ -106,13 +106,7 @@ const bulkUploadCircuits = catchAsync(async (req, res) => {
     return;
   }
 
-  const created = [];
-  for (let i = 0; i < validRows.length; i += 1) {
-    const { site, circuitBody } = validRows[i];
-    // eslint-disable-next-line no-await-in-loop
-    const circuit = await createCircuitBySite(site, circuitBody);
-    created.push(circuit);
-  }
+  const created = await circuitService.bulkCreateCircuitsBySite(validRows);
 
   res.send({ success: true, totalRows, insertedCount: created.length, failedRows: [] });
 });
