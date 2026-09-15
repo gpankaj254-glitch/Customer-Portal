@@ -10,6 +10,7 @@ export const bandwidthOptions = [
     "50 Mbps",
     "60 Mbps",
     "70 Mbps",
+    "75 Mbps",
     "80 Mbps",
     "90 Mbps",
     "100 Mbps",
@@ -30,5 +31,5 @@ export const bandwidthOptions = [
 export const productOptions = [
     "DIA",
     "Pt to Pt",
-    "Broad Band",
+    "BroadBand",
 ]
