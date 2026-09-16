@@ -94,16 +94,17 @@ export default function CreateOpportunity({ onCreated }) {
         <Container component="main" maxWidth="md">
             <CssBaseline />
             <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <Typography component="h1" variant="h5">Create New Opportunity</Typography>
+                <Typography component="h1" variant="h6">Create New Opportunity</Typography>
 
-                <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 3, width: "100%" }}>
-                    <Grid container spacing={2}>
+                <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 2, width: "100%" }}>
+                    <Grid container spacing={1.5}>
                         <Grid item xs={12}>
                             <TextField
                                 autoComplete="off"
                                 name="name"
                                 required
                                 fullWidth
+                                size="small"
                                 id="opportunityName"
                                 label="Opportunity Name"
                                 autoFocus
@@ -111,7 +112,7 @@ export default function CreateOpportunity({ onCreated }) {
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth size="small">
                                 <InputLabel id="customer-select-label">Existing Customer</InputLabel>
                                 <Select
                                     labelId="customer-select-label"
@@ -134,6 +135,7 @@ export default function CreateOpportunity({ onCreated }) {
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
+                                size="small"
                                 name="prospectName"
                                 label="Prospect Name"
                                 disabled={!!selectedCustomer}
@@ -144,6 +146,7 @@ export default function CreateOpportunity({ onCreated }) {
                         <Grid item xs={12}>
                             <TextField
                                 fullWidth
+                                size="small"
                                 multiline
                                 minRows={2}
                                 name="description"
@@ -154,15 +157,16 @@ export default function CreateOpportunity({ onCreated }) {
 
                         <Grid item xs={12}>
                             <Divider sx={{ my: 1 }} />
-                            <Typography variant="subtitle1">Customer Request</Typography>
+                            <Typography variant="subtitle2">Customer Request</Typography>
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth name="requestId" label="Request ID" />
+                            <TextField fullWidth size="small" name="requestId" label="Request ID" />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
+                                size="small"
                                 type="date"
                                 name="requestDate"
                                 label="Request Date"
@@ -171,7 +175,7 @@ export default function CreateOpportunity({ onCreated }) {
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth size="small">
                                 <InputLabel id="linkType-label">Link Type</InputLabel>
                                 <Select
                                     labelId="linkType-label"
@@ -190,21 +194,22 @@ export default function CreateOpportunity({ onCreated }) {
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth name="siteAddress" label="Site Address" />
+                            <TextField fullWidth size="small" name="siteAddress" label="Site Address" />
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth name="city" label="City" />
+                            <TextField fullWidth size="small" name="city" label="City" />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth name="state" label="State" />
+                            <TextField fullWidth size="small" name="state" label="State" />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth name="zipCode" label="ZIP Code" />
+                            <TextField fullWidth size="small" name="zipCode" label="ZIP Code" />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                             <Autocomplete
                                 fullWidth
+                                size="small"
                                 options={countryOptions}
                                 value={country || null}
                                 onChange={(event, newValue) => setCountry(newValue || "")}
@@ -213,7 +218,7 @@ export default function CreateOpportunity({ onCreated }) {
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth size="small">
                                 <InputLabel id="product-label">Product</InputLabel>
                                 <Select
                                     labelId="product-label"
@@ -232,7 +237,7 @@ export default function CreateOpportunity({ onCreated }) {
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth size="small">
                                 <InputLabel id="ipRequirement-label">IP Requirement</InputLabel>
                                 <Select
                                     labelId="ipRequirement-label"
@@ -251,7 +256,7 @@ export default function CreateOpportunity({ onCreated }) {
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth size="small">
                                 <InputLabel id="interface-label">Interface</InputLabel>
                                 <Select
                                     labelId="interface-label"
@@ -270,7 +275,7 @@ export default function CreateOpportunity({ onCreated }) {
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth size="small">
                                 <InputLabel id="downBandwidth-label">Down Bandwidth</InputLabel>
                                 <Select
                                     labelId="downBandwidth-label"
@@ -289,7 +294,7 @@ export default function CreateOpportunity({ onCreated }) {
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth size="small">
                                 <InputLabel id="upBandwidth-label">Up Bandwidth</InputLabel>
                                 <Select
                                     labelId="upBandwidth-label"
@@ -308,11 +313,11 @@ export default function CreateOpportunity({ onCreated }) {
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth name="contractTerm" label="Contract Term" placeholder="e.g. 12 Months" />
+                            <TextField fullWidth size="small" name="contractTerm" label="Contract Term" placeholder="e.g. 12 Months" />
                         </Grid>
 
                         <Grid item xs={12}>
-                            <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }}>
+                            <Button type="submit" fullWidth variant="contained" sx={{ mt: 2, mb: 2 }}>
                                 Create Opportunity
                             </Button>
                         </Grid>

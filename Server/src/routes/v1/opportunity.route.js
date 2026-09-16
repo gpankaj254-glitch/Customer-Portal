@@ -24,6 +24,10 @@ router
   );
 
 router
+  .route("/dashboard-summary")
+  .post(auth("viewDashboard"), opportunityController.getSalesDashboardSummary);
+
+router
   .route("/deleted")
   .post(
     auth("deleteOpportunities"),

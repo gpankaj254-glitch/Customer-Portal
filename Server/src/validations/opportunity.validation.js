@@ -2,6 +2,7 @@ const Joi = require("joi");
 const {
   stageOptions,
   quoteStatusOptions,
+  supplierQuoteStatusOptions,
   linkTypeOptions,
   ipRequirementOptions,
   interfaceOptions,
@@ -28,7 +29,9 @@ const customerRequestSchema = Joi.object().keys({
   contractTerm: Joi.string().allow(""),
   quoteSubmitDate: Joi.string().allow(""),
   quoteStatus: Joi.string().valid(...quoteStatusOptions),
-  quoteStatusUpdatedAt: Joi.string().allow(""),
+  currency: Joi.string().valid("", ...currencyCodes),
+  nrc: Joi.number().allow(null),
+  mrc: Joi.number().allow(null),
 });
 
 const supplierCommunicationItem = Joi.object().keys({
@@ -40,8 +43,7 @@ const supplierCommunicationItem = Joi.object().keys({
   nrc: Joi.number().allow(null),
   mrc: Joi.number().allow(null),
   quoteSubmitDate: Joi.string().allow(""),
-  quoteStatus: Joi.string().valid(...quoteStatusOptions),
-  quoteStatusUpdatedAt: Joi.string().allow(""),
+  quoteStatus: Joi.string().valid(...supplierQuoteStatusOptions),
 });
 
 const createOpportunity = {

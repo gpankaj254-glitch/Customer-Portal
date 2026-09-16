@@ -11,7 +11,7 @@ import Typography from "@mui/material/Typography"
 import PropTypes from "prop-types"
 import _ from "lodash"
 
-export default function EditDialog({ open, title, fields, initialValues, lastEditedNote, onSave, onCancel, loading }) {
+export default function EditDialog({ open, title, fields, initialValues, lastEditedNote, onSave, onCancel, loading, dense }) {
     const [values, setValues] = React.useState(initialValues)
 
     React.useEffect(() => {
@@ -30,9 +30,11 @@ export default function EditDialog({ open, title, fields, initialValues, lastEdi
     // e.g. a Role select revealing a Customer/Vendor picker once selected.
     const resolvedFields = typeof fields === "function" ? fields(values) : fields
 
+    const inputSize = dense ? "small" : "medium"
+
     return (
         <Dialog open={open} onClose={onCancel} fullWidth maxWidth="sm">
-            <DialogTitle>{title}</DialogTitle>
+            <DialogTitle sx={dense ? { fontSize: "1.1rem" } : undefined}>{title}</DialogTitle>
             <DialogContent>
                 {lastEditedNote && (
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
@@ -46,6 +48,7 @@ export default function EditDialog({ open, title, fields, initialValues, lastEdi
                         return (
                             <Autocomplete
                                 key={field.name}
+                                size={inputSize}
                                 options={field.options}
                                 getOptionLabel={(option) => option.label}
                                 isOptionEqualToValue={(option, value) => option.value === value.value}
@@ -68,6 +71,7 @@ export default function EditDialog({ open, title, fields, initialValues, lastEdi
                             InputLabelProps={field.type === "date" ? { shrink: true } : undefined}
                             fullWidth
                             margin="dense"
+                            size={inputSize}
                             label={field.label}
                             value={_.get(values, field.name, "")}
                             onChange={handleChange(field.name)}
@@ -97,6 +101,7 @@ EditDialog.propTypes = {
     onSave: PropTypes.func.isRequired,
     onCancel: PropTypes.func.isRequired,
     loading: PropTypes.bool,
+    dense: PropTypes.bool,
 }
 
 EditDialog.defaultProps = {
@@ -104,4 +109,5 @@ EditDialog.defaultProps = {
     initialValues: {},
     lastEditedNote: null,
     loading: false,
+    dense: false,
 }

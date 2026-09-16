@@ -37,6 +37,11 @@ const getOpportunities = catchAsync(async (req, res) => {
   res.send(result);
 });
 
+const getSalesDashboardSummary = catchAsync(async (req, res) => {
+  const summary = await opportunityService.getSalesDashboardSummary();
+  res.send(summary);
+});
+
 const getOpportunity = catchAsync(async (req, res) => {
   const opportunity = await opportunityService.getActiveOpportunityById(req.params.opportunityId);
   res.send(opportunity);
@@ -78,6 +83,7 @@ const permanentlyDeleteOpportunity = catchAsync(async (req, res) => {
 module.exports = {
   createOpportunity,
   getOpportunities,
+  getSalesDashboardSummary,
   getOpportunity,
   updateOpportunity,
   deactivateOpportunity,

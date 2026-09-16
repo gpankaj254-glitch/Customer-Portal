@@ -18,7 +18,7 @@ function roleBasedPermissions(role) {
     case roles.VENDOR_USER:
         return []
     case roles.SCLOUDX_SALES_ADMIN:
-        return [permisiions.USER_MANAGEMENT, permisiions.SALES_OPPORTUNITIES]
+        return [permisiions.USER_MANAGEMENT, permisiions.SALES_OPPORTUNITIES, permisiions.VENDOR_MANAGEMENT]
     case roles.SCLOUDX_SALES_USER:
         return [permisiions.SALES_OPPORTUNITIES]
     default:

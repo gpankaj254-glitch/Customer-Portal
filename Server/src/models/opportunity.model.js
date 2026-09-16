@@ -3,6 +3,7 @@ const { toJSON, paginate } = require("./plugins");
 const {
   stageOptions,
   quoteStatusOptions,
+  supplierQuoteStatusOptions,
   linkTypeOptions,
   ipRequirementOptions,
   interfaceOptions,
@@ -101,9 +102,26 @@ const opportunitySchema = mongoose.Schema(
       contractTerm: { type: String, default: "" },
       quoteSubmitDate: { type: String, default: "" },
       quoteStatus: { type: String, enum: quoteStatusOptions, default: "Pending" },
-      // Stamped server-side whenever quoteStatus actually changes - see
-      // opportunity.service.js's updateOpportunityById.
-      quoteStatusUpdatedAt: { type: String, default: "" },
+      currency: { type: String, enum: ["", ...currencyCodes], default: "" },
+      nrc: { type: Number, default: null },
+      mrc: { type: Number, default: null },
+      // Every quoteStatus this Customer Request has been set to, in order,
+      // including the initial value at creation - see
+      // opportunity.service.js's createOpportunity/updateOpportunityById.
+      // currency/nrc/mrc are a snapshot of those fields as of that change,
+      // not just the status itself.
+      statusHistory: {
+        type: [
+          {
+            status: { type: String },
+            changedAt: { type: String },
+            currency: { type: String },
+            nrc: { type: Number },
+            mrc: { type: Number },
+          },
+        ],
+        default: [],
+      },
     },
     supplierCommunications: {
       type: [
@@ -115,8 +133,22 @@ const opportunitySchema = mongoose.Schema(
           nrc: { type: Number, default: null },
           mrc: { type: Number, default: null },
           quoteSubmitDate: { type: String, default: "" },
-          quoteStatus: { type: String, enum: quoteStatusOptions, default: "Pending" },
-          quoteStatusUpdatedAt: { type: String, default: "" },
+          quoteStatus: { type: String, enum: supplierQuoteStatusOptions, default: "Pending" },
+          // Every quoteStatus this entry has been set to, in order, including
+          // the initial value at creation. currency/nrc/mrc are a snapshot
+          // of those fields as of that change, not just the status itself.
+          statusHistory: {
+            type: [
+              {
+                status: { type: String },
+                changedAt: { type: String },
+                currency: { type: String },
+                nrc: { type: Number },
+                mrc: { type: Number },
+              },
+            ],
+            default: [],
+          },
         },
       ],
       default: [],

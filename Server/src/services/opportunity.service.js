@@ -62,6 +62,21 @@ const createOpportunity = async (reqBody, user, relatedCustomer = null) => {
     user
   );
   opportunityToCreate.history = [opportunityToCreate.latestUpdate];
+  // Seed the Customer Request's status log with its initial value (default
+  // "Pending" if not otherwise set) so the Log isn't empty until the first
+  // later change. Snapshots currency/nrc/mrc alongside the status itself.
+  opportunityToCreate.customerRequest = {
+    ...(opportunityToCreate.customerRequest || {}),
+    statusHistory: [
+      {
+        status: _.get(opportunityToCreate, "customerRequest.quoteStatus", "Pending"),
+        changedAt: new Date().toISOString(),
+        currency: _.get(opportunityToCreate, "customerRequest.currency", ""),
+        nrc: _.get(opportunityToCreate, "customerRequest.nrc", null),
+        mrc: _.get(opportunityToCreate, "customerRequest.mrc", null),
+      },
+    ],
+  };
   return Opportunity.create(opportunityToCreate);
 };
 
@@ -115,30 +130,57 @@ const updateOpportunityById = async (opportunityId, updateBody, actingUser, rela
   if (updateBody.customerRequest) {
     const existingCustomerRequest = snapshot.customerRequest || {};
     const mergedCustomerRequest = { ...existingCustomerRequest, ...updateBody.customerRequest };
-    if (
+    const statusChanged =
       updateBody.customerRequest.quoteStatus !== undefined &&
-      updateBody.customerRequest.quoteStatus !== existingCustomerRequest.quoteStatus
-    ) {
-      mergedCustomerRequest.quoteStatusUpdatedAt = new Date().toISOString();
-    }
+      updateBody.customerRequest.quoteStatus !== existingCustomerRequest.quoteStatus;
+    mergedCustomerRequest.statusHistory = statusChanged
+      ? _.concat(existingCustomerRequest.statusHistory || [], {
+          status: updateBody.customerRequest.quoteStatus,
+          changedAt: new Date().toISOString(),
+          currency: mergedCustomerRequest.currency || "",
+          nrc: mergedCustomerRequest.nrc ?? null,
+          mrc: mergedCustomerRequest.mrc ?? null,
+        })
+      : existingCustomerRequest.statusHistory || [];
     updateBody.customerRequest = mergedCustomerRequest;
   }
 
   // supplierCommunications is saved as a whole-array replace (the client
-  // always sends every entry back), so only the per-entry status-change
-  // timestamp needs stamping here - matched by _id against the prior array.
+  // always sends every entry back with only the fields it edits), so every
+  // entry's statusHistory has to be explicitly carried over here or it would
+  // be silently dropped on save - a brand new entry (no _id yet) gets seeded
+  // with its initial status, an existing entry only gets a new log line when
+  // its status actually changed, otherwise its prior history is preserved.
   if (updateBody.supplierCommunications) {
     const existingById = _.keyBy(snapshot.supplierCommunications || [], (entry) => String(entry._id));
     updateBody.supplierCommunications = updateBody.supplierCommunications.map((entry) => {
       const existingEntry = entry._id && existingById[String(entry._id)];
-      if (
-        existingEntry &&
-        entry.quoteStatus !== undefined &&
-        entry.quoteStatus !== existingEntry.quoteStatus
-      ) {
-        return { ...entry, quoteStatusUpdatedAt: new Date().toISOString() };
+      const now = new Date().toISOString();
+      if (!existingEntry) {
+        return {
+          ...entry,
+          statusHistory: [
+            {
+              status: entry.quoteStatus || "Pending",
+              changedAt: now,
+              currency: entry.currency || "",
+              nrc: entry.nrc ?? null,
+              mrc: entry.mrc ?? null,
+            },
+          ],
+        };
       }
-      return entry;
+      const statusChanged = entry.quoteStatus !== undefined && entry.quoteStatus !== existingEntry.quoteStatus;
+      const statusHistory = statusChanged
+        ? _.concat(existingEntry.statusHistory || [], {
+            status: entry.quoteStatus,
+            changedAt: now,
+            currency: entry.currency || "",
+            nrc: entry.nrc ?? null,
+            mrc: entry.mrc ?? null,
+          })
+        : existingEntry.statusHistory || [];
+      return { ...entry, statusHistory };
     });
   }
 
@@ -162,6 +204,127 @@ const updateOpportunityById = async (opportunityId, updateBody, actingUser, rela
   opportunity.updatedBy = extractUserDetails(actingUser);
   await opportunity.save();
   return opportunity;
+};
+
+/**
+ * Sales dashboard metrics for the Sales User/Sales Admin landing page -
+ * all computed live from active opportunities, no persisted rollups.
+ *
+ * - totalOpenOpportunities: active opportunities whose Customer Request
+ *   quoteStatus is "Pending".
+ * - openOpportunitiesOverThreeDays: of those, ones whose requestDate is
+ *   more than 3 days old.
+ * - customerLast30Days: among Customer Requests whose quoteSubmitDate is
+ *   within the last 30 days - quotesSubmitted (all of them), quotesWon
+ *   (status Won), quotesAwaitingFeedback (status Submitted).
+ * - supplierQuotesPending: Supplier Communication entries (across all
+ *   active opportunities) whose quoteStatus is "Submitted" - i.e. we're
+ *   waiting on the supplier to respond.
+ * - supplierQuotesPendingOverThreeDays: of those, ones whose
+ *   quoteSubmitDate is more than 3 days old.
+ * - supplierLast30Days: among Supplier Communication entries whose
+ *   quoteSubmitDate is within the last 30 days - quotesSubmitted (all of
+ *   them), quotesReceived (status Received).
+ * - supplierWiseReport: the supplierQuotesPending/OverThreeDays counts
+ *   broken down per supplier name, sorted by pending count descending.
+ * - openOpportunities: one row per "Pending" opportunity (opportunityId,
+ *   name, customerOrProspect, requestDate, daysPending), sorted by
+ *   daysPending descending - the detail list behind the two Open
+ *   Opportunity tiles, same idea as supplierWiseReport.
+ * @returns {Promise<Object>}
+ */
+const getSalesDashboardSummary = async () => {
+  const opportunities = await Opportunity.find({ active: true })
+    .select("opportunityId name customer prospectName customerRequest supplierCommunications")
+    .lean();
+
+  const today = moment().startOf("day");
+  const daysSince = (dateString) => {
+    if (!dateString) return null;
+    const parsed = moment(dateString).startOf("day");
+    if (!parsed.isValid()) return null;
+    return today.diff(parsed, "days");
+  };
+
+  let totalOpenOpportunities = 0;
+  let openOpportunitiesOverThreeDays = 0;
+  let customerQuotesSubmitted = 0;
+  let customerQuotesWon = 0;
+  let customerQuotesAwaitingFeedback = 0;
+  let supplierQuotesPending = 0;
+  let supplierQuotesPendingOverThreeDays = 0;
+  let supplierQuotesSubmittedLast30Days = 0;
+  let supplierQuotesReceivedLast30Days = 0;
+  const supplierStats = {};
+  const openOpportunities = [];
+
+  opportunities.forEach((opportunity) => {
+    const customerRequest = opportunity.customerRequest || {};
+
+    if (customerRequest.quoteStatus === "Pending") {
+      totalOpenOpportunities += 1;
+      const requestAge = daysSince(customerRequest.requestDate);
+      if (requestAge !== null && requestAge > 3) {
+        openOpportunitiesOverThreeDays += 1;
+      }
+      openOpportunities.push({
+        opportunityId: opportunity.opportunityId,
+        name: opportunity.name,
+        customerOrProspect: _.get(opportunity, "customer.name") || opportunity.prospectName || "",
+        requestDate: customerRequest.requestDate || "",
+        daysPending: requestAge,
+      });
+    }
+
+    const submitAge = daysSince(customerRequest.quoteSubmitDate);
+    if (submitAge !== null && submitAge < 30) {
+      customerQuotesSubmitted += 1;
+      if (customerRequest.quoteStatus === "Won") customerQuotesWon += 1;
+      if (customerRequest.quoteStatus === "Submitted") customerQuotesAwaitingFeedback += 1;
+    }
+
+    (opportunity.supplierCommunications || []).forEach((entry) => {
+      const entrySubmitAge = daysSince(entry.quoteSubmitDate);
+      if (entrySubmitAge !== null && entrySubmitAge < 30) {
+        supplierQuotesSubmittedLast30Days += 1;
+        if (entry.quoteStatus === "Received") supplierQuotesReceivedLast30Days += 1;
+      }
+
+      if (entry.quoteStatus !== "Submitted") return;
+      const supplierName = entry.supplier || "Unknown";
+      if (!supplierStats[supplierName]) {
+        supplierStats[supplierName] = { supplier: supplierName, pending: 0, pendingOverThreeDays: 0 };
+      }
+      supplierQuotesPending += 1;
+      supplierStats[supplierName].pending += 1;
+
+      if (entrySubmitAge !== null && entrySubmitAge > 3) {
+        supplierQuotesPendingOverThreeDays += 1;
+        supplierStats[supplierName].pendingOverThreeDays += 1;
+      }
+    });
+  });
+
+  const supplierWiseReport = _.orderBy(Object.values(supplierStats), ["pending"], ["desc"]);
+  const openOpportunitiesSorted = _.orderBy(openOpportunities, ["daysPending"], ["desc"]);
+
+  return {
+    totalOpenOpportunities,
+    openOpportunitiesOverThreeDays,
+    openOpportunities: openOpportunitiesSorted,
+    customerLast30Days: {
+      quotesSubmitted: customerQuotesSubmitted,
+      quotesWon: customerQuotesWon,
+      quotesAwaitingFeedback: customerQuotesAwaitingFeedback,
+    },
+    supplierQuotesPending,
+    supplierQuotesPendingOverThreeDays,
+    supplierLast30Days: {
+      quotesSubmitted: supplierQuotesSubmittedLast30Days,
+      quotesReceived: supplierQuotesReceivedLast30Days,
+    },
+    supplierWiseReport,
+  };
 };
 
 /**
@@ -220,6 +383,7 @@ const permanentlyDeleteOpportunityById = async (opportunityId) => {
 module.exports = {
   createOpportunity,
   queryOpportunities,
+  getSalesDashboardSummary,
   getOpportunityById,
   getActiveOpportunityById,
   updateOpportunityById,

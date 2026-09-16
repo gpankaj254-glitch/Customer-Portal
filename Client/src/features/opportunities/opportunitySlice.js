@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit"
-import { fetchGetOpportunities, fetchCreateOpportunity, fetchDeactivateOpportunity, fetchUpdateOpportunity } from "./opportunityAPI"
+import { fetchGetOpportunities, fetchCreateOpportunity, fetchDeactivateOpportunity, fetchUpdateOpportunity, fetchSalesDashboardSummary } from "./opportunityAPI"
 import { pageStatusVals } from "./utils"
 
 const initialState = {
@@ -12,7 +12,10 @@ const initialState = {
         limit: 20,
         totalPages: 0,
         totalResults: 0
-    }
+    },
+    salesDashboardSummary: null,
+    salesDashboardSummaryStatus: pageStatusVals.idle,
+    salesDashboardSummaryError: null,
 }
 
 export const getOpportunities = createAsyncThunk(
@@ -43,6 +46,14 @@ export const updateOpportunity = createAsyncThunk(
     "opportunities/fetchUpdateOpportunity",
     async (data, { rejectWithValue }) => {
         const response = await fetchUpdateOpportunity(data, rejectWithValue)
+        return response
+    }
+)
+
+export const getSalesDashboardSummary = createAsyncThunk(
+    "opportunities/fetchSalesDashboardSummary",
+    async (data, { rejectWithValue }) => {
+        const response = await fetchSalesDashboardSummary(rejectWithValue)
         return response
     }
 )
@@ -102,6 +113,17 @@ export const opportunitySlice = createSlice({
             .addCase(updateOpportunity.rejected, (state) => {
                 state.pageStatus = pageStatusVals.error
             })
+            .addCase(getSalesDashboardSummary.pending, (state) => {
+                state.salesDashboardSummaryStatus = pageStatusVals.loading
+            })
+            .addCase(getSalesDashboardSummary.fulfilled, (state, { payload }) => {
+                state.salesDashboardSummaryStatus = pageStatusVals.fetched
+                state.salesDashboardSummary = payload
+            })
+            .addCase(getSalesDashboardSummary.rejected, (state, { payload }) => {
+                state.salesDashboardSummaryStatus = pageStatusVals.error
+                state.salesDashboardSummaryError = payload
+            })
     }
 })
 
@@ -112,5 +134,8 @@ export const selectGetOpportunitiesError = (state) => state.opportunities.getOpp
 export const selectPageStatus = (state) => state.opportunities.pageStatus
 export const selectPagination = (state) => state.opportunities.pagination
 export const selectSearch = (state) => state.opportunities.search
+export const selectSalesDashboardSummary = (state) => state.opportunities.salesDashboardSummary
+export const selectSalesDashboardSummaryStatus = (state) => state.opportunities.salesDashboardSummaryStatus
+export const selectSalesDashboardSummaryError = (state) => state.opportunities.salesDashboardSummaryError
 
 export default opportunitySlice.reducer

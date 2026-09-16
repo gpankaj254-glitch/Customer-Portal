@@ -12,6 +12,16 @@ export async function fetchGetOpportunities(data, rejectWithValue) {
     }
 }
 
+export async function fetchSalesDashboardSummary(rejectWithValue) {
+    try {
+        const response = await axios.post(`${baseURL}/opportunity/dashboard-summary`, {}, { headers: headers() })
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
 export async function fetchCreateOpportunity(data, rejectWithValue) {
     try {
         const response = await axios.post(`${baseURL}/opportunity/create`, [data], { headers: headers() })

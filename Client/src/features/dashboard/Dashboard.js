@@ -29,6 +29,7 @@ import { useSelector, useDispatch } from "react-redux"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
 import { pageStatusVals } from "../tickets/utils"
+import SalesDashboard from "../opportunities/SalesDashboard"
 
 function StatTile({ title, value }) {
     return (
@@ -75,6 +76,7 @@ function DashboardContent() {
     const user = useSelector(selectUser)
     const isScx = user.role === roles.SCLOUDX_ADMIN || user.role === roles.SCLOUDX_USER
     const isCustomerRole = user.role === roles.CUSTOMER_ADMIN || user.role === roles.CUSTOMER_USER
+    const isSalesRole = user.role === roles.SCLOUDX_SALES_ADMIN || user.role === roles.SCLOUDX_SALES_USER
     // SCX sees every customer's inventory with a Customer filter; a Customer
     // Admin/User sees the identical layout but pre-scoped server-side to
     // just their own customer, with the now-redundant Customer picker and
@@ -97,6 +99,11 @@ function DashboardContent() {
     const [filterCustomerId, setFilterCustomerId] = React.useState("")
 
     React.useEffect(() => {
+        // SalesDashboard fetches its own data (Sales roles have no rights to
+        // site/customer data, and neither is relevant to it anyway).
+        if (isSalesRole) {
+            return
+        }
         const data = { limit: 200, page: 1 }
         dispatch(getSites(data))
         dispatch(getCustomers(data))
@@ -118,10 +125,10 @@ function DashboardContent() {
         dispatch(getClosedTicketsAnalysis({}))
     }
 
-    if (getSiteError || getCustomerError) {
+    if (!isSalesRole && (getSiteError || getCustomerError)) {
         return <Alert severity="error">Unable to load</Alert>
     }
-    if (getCustomerStatus !== pageStatusVals.fetched || getSiteStatus !== pageStatusVals.fetched) {
+    if (!isSalesRole && (getCustomerStatus !== pageStatusVals.fetched || getSiteStatus !== pageStatusVals.fetched)) {
         return <div>loading</div>
     }
 
@@ -134,7 +141,11 @@ function DashboardContent() {
                     </Typography>
                 </Grid>
 
-                {showFullDashboard ? (
+                {isSalesRole ? (
+                    <Grid item xs={12}>
+                        <SalesDashboard />
+                    </Grid>
+                ) : showFullDashboard ? (
                     <>
                         {isScx && (
                             <Grid item xs={12} sm={6} md={4}>

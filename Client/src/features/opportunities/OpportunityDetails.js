@@ -13,17 +13,20 @@ import Button from "@mui/material/Button"
 import DeleteIcon from "@mui/icons-material/Delete"
 import EditIcon from "@mui/icons-material/Edit"
 import AddIcon from "@mui/icons-material/Add"
+import HistoryIcon from "@mui/icons-material/History"
 import Snackbar from "@mui/material/Snackbar"
 import Alert from "@mui/material/Alert"
 import PropTypes from "prop-types"
 import _ from "lodash"
+import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
 import { updateOpportunity } from "./opportunitySlice"
-import { quoteStatusOptions } from "../../consts/opportunityCommOptions"
+import { supplierQuoteStatusOptions } from "../../consts/opportunityCommOptions"
 import { currencyOptions } from "../../consts/currencyOptions"
 import { selectVendorList } from "../vendors/vendorSlice"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
+import StatusHistoryDialog from "../../components/StatusHistoryDialog"
 
 const currencySelectOptions = currencyOptions.map((option) => ({
     value: option.code,
@@ -34,29 +37,35 @@ function buildSupplierCommunicationFields(vendorOptions) {
     return [
         { name: "supplier", label: "Supplier", type: "autocomplete", options: vendorOptions },
         { name: "quoteRequestDate", label: "Quote Request Date", type: "date" },
-        { name: "currency", label: "Currency", type: "autocomplete", options: currencySelectOptions },
         { name: "lec", label: "LEC" },
-        { name: "nrc", label: "NRC" },
-        { name: "mrc", label: "MRC" },
-        { name: "quoteSubmitDate", label: "Quote Submit Date", type: "date" },
         {
             name: "quoteStatus",
             label: "Quote Status",
             type: "select",
-            options: quoteStatusOptions.map((status) => ({ value: status, label: status })),
+            options: supplierQuoteStatusOptions.map((status) => ({ value: status, label: status })),
         },
+        { name: "quoteSubmitDate", label: "Quote Submit Date", type: "date" },
+        { name: "currency", label: "Currency", type: "autocomplete", options: currencySelectOptions },
+        { name: "nrc", label: "NRC" },
+        { name: "mrc", label: "MRC" },
     ]
 }
 const supplierCommunicationNumberFields = ["nrc", "mrc"]
 
+function formatDateTime(value) {
+    return value ? moment(value).format("MMM D, YYYY h:mm A") : ""
+}
+
+function lastStatusChangeDate(entry) {
+    return formatDateTime(_.get(_.last(entry.statusHistory), "changedAt"))
+}
+
 const supplierCommunicationColumns = [
     { id: "supplier", label: "Supplier" },
-    { id: "quoteRequestDate", label: "Quote Request Date" },
-    { id: "currency", label: "Currency" },
-    { id: "nrc", label: "NRC" },
-    { id: "mrc", label: "MRC" },
-    { id: "quoteSubmitDate", label: "Quote Submit Date" },
+    { id: "quoteRequestDate", label: "Quote Request Date", format: formatDateTime },
+    { id: "lec", label: "LEC" },
     { id: "quoteStatus", label: "Quote Status" },
+    { id: "quoteStatusDate", label: "Quote Status Date", render: lastStatusChangeDate },
 ]
 
 function emptyValuesFor(fields) {
@@ -72,6 +81,7 @@ function emptyValuesFor(fields) {
 function CommunicationList({ entries, onChange, columns, fields, numberFields, entityLabel }) {
     const [editingIndex, setEditingIndex] = React.useState(null) // -1 = adding new
     const [deletingIndex, setDeletingIndex] = React.useState(null)
+    const [viewingLogIndex, setViewingLogIndex] = React.useState(null)
 
     const handleSaveEntry = (values) => {
         const cleaned = { ...values }
@@ -113,9 +123,13 @@ function CommunicationList({ entries, onChange, columns, fields, numberFields, e
                     <TableHead>
                         <TableRow>
                             {columns.map((column) => (
-                                <TableCell key={column.id}>{column.label}</TableCell>
+                                <TableCell key={column.id}>
+                                    <Typography variant="subtitle2">{column.label}</Typography>
+                                </TableCell>
                             ))}
-                            <TableCell align="right">Actions</TableCell>
+                            <TableCell align="right">
+                                <Typography variant="subtitle2">Actions</Typography>
+                            </TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -131,15 +145,26 @@ function CommunicationList({ entries, onChange, columns, fields, numberFields, e
                         {entries.map((entry, index) => (
                             // eslint-disable-next-line react/no-array-index-key
                             <TableRow key={entry._id || index}>
-                                {columns.map((column) => (
-                                    <TableCell key={column.id}>{_.get(entry, column.id, "")}</TableCell>
-                                ))}
+                                {columns.map((column) => {
+                                    const rawValue = _.get(entry, column.id, "")
+                                    const cellContent = column.render
+                                        ? column.render(entry)
+                                        : column.format
+                                            ? column.format(rawValue)
+                                            : rawValue
+                                    return (
+                                        <TableCell key={column.id}>{cellContent}</TableCell>
+                                    )
+                                })}
                                 <TableCell align="right">
                                     <IconButton aria-label={`edit ${entityLabel} ${index}`} onClick={() => setEditingIndex(index)}>
                                         <EditIcon fontSize="small" />
                                     </IconButton>
                                     <IconButton aria-label={`delete ${entityLabel} ${index}`} onClick={() => setDeletingIndex(index)}>
                                         <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                    <IconButton aria-label={`log ${entityLabel} ${index}`} onClick={() => setViewingLogIndex(index)}>
+                                        <HistoryIcon fontSize="small" />
                                     </IconButton>
                                 </TableCell>
                             </TableRow>
@@ -155,6 +180,7 @@ function CommunicationList({ entries, onChange, columns, fields, numberFields, e
                 initialValues={editingValues}
                 onSave={handleSaveEntry}
                 onCancel={() => setEditingIndex(null)}
+                dense
             />
             <ConfirmDialog
                 open={deletingIndex !== null}
@@ -162,6 +188,12 @@ function CommunicationList({ entries, onChange, columns, fields, numberFields, e
                 message={`Are you sure you want to delete this ${entityLabel.toLowerCase()} entry?`}
                 onConfirm={handleConfirmDelete}
                 onCancel={() => setDeletingIndex(null)}
+            />
+            <StatusHistoryDialog
+                open={viewingLogIndex !== null}
+                title={`${entityLabel} Status Log`}
+                history={viewingLogIndex !== null ? (entries[viewingLogIndex].statusHistory || []) : []}
+                onClose={() => setViewingLogIndex(null)}
             />
         </Box>
     )
@@ -195,9 +227,16 @@ export default function OpportunityDetails({ opportunity }) {
     const handleSave = async () => {
         setSaving(true)
         try {
+            // statusHistory (and the older quoteStatusUpdatedAt some entries
+            // still carry) is server-managed - it comes back from the API on
+            // read, but echoing it back on write isn't allowed. The server
+            // recomputes it itself from the entry's prior stored state.
+            const supplierCommunicationsToSave = supplierCommunications.map((entry) =>
+                _.omit(entry, ["statusHistory", "quoteStatusUpdatedAt"])
+            )
             await dispatch(updateOpportunity({
                 opportunityId: opportunity.id,
-                supplierCommunications,
+                supplierCommunications: supplierCommunicationsToSave,
             })).unwrap()
             setFeedback({ severity: "success", message: "Communications saved successfully" })
         } catch (err) {

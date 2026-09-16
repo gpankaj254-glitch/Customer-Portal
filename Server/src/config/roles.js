@@ -58,6 +58,7 @@ const allRoles = {
     "deleteOpportunities",
     "viewOpportunities",
     "viewDashboard",
+    "createVendors",
   ],
   scloudxSalesUser: ["createOpportunities", "editOpportunities", "viewOpportunities", "viewDashboard"],
 };

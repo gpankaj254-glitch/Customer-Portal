@@ -10,16 +10,18 @@ import TableRow from "@mui/material/TableRow"
 import IconButton from "@mui/material/IconButton"
 import DeleteIcon from "@mui/icons-material/Delete"
 import EditIcon from "@mui/icons-material/Edit"
+import HistoryIcon from "@mui/icons-material/History"
 import Collapse from "@mui/material/Collapse"
 import { KeyboardArrowDown, KeyboardArrowUp } from "@mui/icons-material"
 import Snackbar from "@mui/material/Snackbar"
 
 import PropTypes from "prop-types"
+import moment from "moment"
 
 // eslint-disable-next-line no-unused-vars
 import { changeLimit, changePage, getOpportunities, selectGetOpportunitiesError, selectOpportunityList, deactivateOpportunity, updateOpportunity } from "./opportunitySlice"
-import { stageOptions } from "./utils"
 import { quoteStatusOptions } from "../../consts/opportunityCommOptions"
+import { currencyOptions } from "../../consts/currencyOptions"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
 import { useSelector, useDispatch } from "react-redux"
@@ -27,20 +29,39 @@ import { Alert, Typography } from "@mui/material"
 import _ from "lodash"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
+import StatusHistoryDialog from "../../components/StatusHistoryDialog"
 import OpportunityDetails from "./OpportunityDetails"
-
-const columns = [
-    { id: "opportunityId", label: "Opportunity #" },
-    { id: "name", label: "Name" },
-    { id: "customerOrProspect", label: "Customer / Prospect" },
-    { id: "value", label: "Value" },
-    { id: "stage", label: "Stage" },
-    { id: "owner.name", label: "Owner" },
-]
 
 function displayCustomerOrProspect(row) {
     return _.get(row, "customer.name") || row.prospectName || ""
 }
+
+function formatDateTime(value) {
+    return value ? moment(value).format("MMM D, YYYY h:mm A") : ""
+}
+
+function lastStatusChangeDate(row) {
+    const history = _.get(row, "customerRequest.statusHistory", [])
+    return formatDateTime(_.get(_.last(history), "changedAt"))
+}
+
+const columns = [
+    { id: "opportunityId", label: "Opportunity #" },
+    { id: "name", label: "Name" },
+    { id: "customerOrProspect", label: "Customer / Prospect", render: displayCustomerOrProspect },
+    {
+        id: "customerRequest.requestDate",
+        label: "Request Date",
+        render: (row) => formatDateTime(_.get(row, "customerRequest.requestDate")),
+    },
+    { id: "customerRequest.quoteStatus", label: "Quote Status" },
+    { id: "quoteStatusDate", label: "Quote Status Date", render: lastStatusChangeDate },
+]
+
+const currencySelectOptions = currencyOptions.map((option) => ({
+    value: option.code,
+    label: `${option.code} - ${option.name}`,
+}))
 
 export default function OpportunityTable(props) {
     const errorMessage = useSelector(selectGetOpportunitiesError)
@@ -55,6 +76,7 @@ export default function OpportunityTable(props) {
     const [opportunityToDelete, setOpportunityToDelete] = React.useState(null)
     const [deleting, setDeleting] = React.useState(false)
     const [opportunityToEdit, setOpportunityToEdit] = React.useState(null)
+    const [opportunityToViewLog, setOpportunityToViewLog] = React.useState(null)
     const [saving, setSaving] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)
     const [open, setOpen] = React.useState(false)
@@ -98,16 +120,17 @@ export default function OpportunityTable(props) {
         try {
             const payload = {
                 opportunityId: opportunityToEdit.id,
-                value: values.value !== "" ? Number(values.value) : undefined,
                 stage: values.stage,
-                expectedCloseDate: values.expectedCloseDate,
                 description: values.description,
                 // customerRequest is merged server-side, not replaced, so
-                // sending just these two fields doesn't wipe out the rest of
+                // sending just these fields doesn't wipe out the rest of
                 // customerRequest that Create Opportunity captured.
                 customerRequest: {
                     quoteSubmitDate: values.quoteSubmitDate,
                     quoteStatus: values.quoteStatus,
+                    currency: values.currency,
+                    nrc: values.nrc !== "" && values.nrc !== undefined ? Number(values.nrc) : null,
+                    mrc: values.mrc !== "" && values.mrc !== undefined ? Number(values.mrc) : null,
                 },
             }
             if (values.stage === "Converted") {
@@ -131,22 +154,17 @@ export default function OpportunityTable(props) {
     const editFields = (values) => {
         const fields = [
             { name: "name", label: "Opportunity Name", disabled: true },
-            {
-                name: "stage",
-                label: "Stage",
-                type: "select",
-                options: stageOptions.map((stage) => ({ value: stage, label: stage })),
-            },
-            { name: "value", label: "Estimated Value" },
-            { name: "expectedCloseDate", label: "Expected Close Date" },
             { name: "description", label: "Description" },
-            { name: "quoteSubmitDate", label: "Quote Submit Date", type: "date" },
             {
                 name: "quoteStatus",
                 label: "Quote Status",
                 type: "select",
                 options: quoteStatusOptions.map((status) => ({ value: status, label: status })),
             },
+            { name: "quoteSubmitDate", label: "Quote Submit Date", type: "date" },
+            { name: "currency", label: "Currency", type: "autocomplete", options: currencySelectOptions },
+            { name: "nrc", label: "NRC" },
+            { name: "mrc", label: "MRC" },
         ]
         if (_.get(values, "stage") === "Converted") {
             fields.push(
@@ -164,16 +182,16 @@ export default function OpportunityTable(props) {
         return (
             <Paper sx={{ width: "100%", overflow: "hidden" }}>
                 <TableContainer sx={{ maxHeight: 440 }}>
-                    <Table stickyHeader aria-label="sticky table">
+                    <Table stickyHeader size="small" aria-label="sticky table">
                         <TableHead>
                             <TableRow>
                                 {columns.map((column) => (
                                     <TableCell key={column.id}>
-                                        <Typography variant="h6">{column.label}</Typography>
+                                        <Typography variant="subtitle2">{column.label}</Typography>
                                     </TableCell>
                                 ))}
                                 <TableCell align="right">
-                                    <Typography variant="h6">Actions</Typography>
+                                    <Typography variant="subtitle2">Actions</Typography>
                                 </TableCell>
                             </TableRow>
                         </TableHead>
@@ -184,30 +202,40 @@ export default function OpportunityTable(props) {
                                         {columns.map((column) => (
                                             <TableCell key={`${row.id}${column.id}`}>
                                                 <Typography variant="body2">
-                                                    {column.id === "customerOrProspect" ? displayCustomerOrProspect(row) : _.get(row, column.id, "")}
+                                                    {column.render ? column.render(row) : _.get(row, column.id, "")}
                                                 </Typography>
                                             </TableCell>
                                         ))}
                                         <TableCell align="right">
                                             <IconButton
+                                                size="small"
                                                 aria-label={`edit ${row.name}`}
                                                 onClick={() => setOpportunityToEdit(row)}
                                             >
-                                                <EditIcon />
+                                                <EditIcon fontSize="small" />
                                             </IconButton>
                                             {canDelete && (
                                                 <IconButton
+                                                    size="small"
                                                     aria-label={`delete ${row.name}`}
                                                     onClick={() => setOpportunityToDelete(row)}
                                                 >
-                                                    <DeleteIcon />
+                                                    <DeleteIcon fontSize="small" />
                                                 </IconButton>
                                             )}
                                             <IconButton
+                                                size="small"
+                                                aria-label={`log ${row.name}`}
+                                                onClick={() => setOpportunityToViewLog(row)}
+                                            >
+                                                <HistoryIcon fontSize="small" />
+                                            </IconButton>
+                                            <IconButton
+                                                size="small"
                                                 aria-label={`communications ${row.name}`}
                                                 onClick={() => handleRowExpand(row.id)}
                                             >
-                                                {open === row.id ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+                                                {open === row.id ? <KeyboardArrowUp fontSize="small" /> : <KeyboardArrowDown fontSize="small" />}
                                             </IconButton>
                                         </TableCell>
                                     </TableRow>
@@ -247,17 +275,25 @@ export default function OpportunityTable(props) {
                     initialValues={{
                         name: opportunityToEdit ? opportunityToEdit.name : "",
                         stage: opportunityToEdit ? opportunityToEdit.stage : "New",
-                        value: opportunityToEdit && opportunityToEdit.value !== null && opportunityToEdit.value !== undefined ? opportunityToEdit.value : "",
-                        expectedCloseDate: opportunityToEdit ? opportunityToEdit.expectedCloseDate : "",
                         description: opportunityToEdit ? opportunityToEdit.description : "",
                         orderNumber: _.get(opportunityToEdit, "convertedOrder.orderNumber") || "",
                         orderValue: _.get(opportunityToEdit, "convertedOrder.orderValue") || "",
                         quoteSubmitDate: _.get(opportunityToEdit, "customerRequest.quoteSubmitDate") || "",
                         quoteStatus: _.get(opportunityToEdit, "customerRequest.quoteStatus") || "Pending",
+                        currency: _.get(opportunityToEdit, "customerRequest.currency") || "",
+                        nrc: _.get(opportunityToEdit, "customerRequest.nrc") ?? "",
+                        mrc: _.get(opportunityToEdit, "customerRequest.mrc") ?? "",
                     }}
                     onSave={handleSaveEdit}
                     onCancel={() => setOpportunityToEdit(null)}
                     loading={saving}
+                    dense
+                />
+                <StatusHistoryDialog
+                    open={!!opportunityToViewLog}
+                    title="Opportunity Status Log"
+                    history={_.get(opportunityToViewLog, "customerRequest.statusHistory", [])}
+                    onClose={() => setOpportunityToViewLog(null)}
                 />
                 <Snackbar
                     open={!!feedback}
