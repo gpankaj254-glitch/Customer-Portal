@@ -514,23 +514,29 @@ export default function TicketDetails({ ticket, mode }) {
                                     </FormControl>
                                 </Grid>
                                 {mode === "open" && closingNow && (
-                                    <Grid item xs={12} sm={4}>
-                                        <FormControl fullWidth required>
-                                            <InputLabel id={`closure-code-${ticket.id}`}>Closure Code</InputLabel>
-                                            <Select
-                                                labelId={`closure-code-${ticket.id}`}
-                                                value={closureCode}
-                                                label="Closure Code"
-                                                onChange={(event) => setClosureCode(event.target.value)}
-                                            >
-                                                {closureCodeOptions.map((option) => (
-                                                    <MenuItem key={option} value={option}>{option}</MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Grid>
+                                    <>
+                                        {/* Two spacers push Closure Code into the same column as
+                                            Status directly above it (Priority/Created Date/Status
+                                            fill the row above, 3 x sm4). */}
+                                        <Grid item xs={false} sm={4} sx={{ display: { xs: "none", sm: "block" } }} />
+                                        <Grid item xs={false} sm={4} sx={{ display: { xs: "none", sm: "block" } }} />
+                                        <Grid item xs={12} sm={4}>
+                                            <FormControl fullWidth required>
+                                                <InputLabel id={`closure-code-${ticket.id}`}>Closure Code</InputLabel>
+                                                <Select
+                                                    labelId={`closure-code-${ticket.id}`}
+                                                    value={closureCode}
+                                                    label="Closure Code"
+                                                    onChange={(event) => setClosureCode(event.target.value)}
+                                                >
+                                                    {closureCodeOptions.map((option) => (
+                                                        <MenuItem key={option} value={option}>{option}</MenuItem>
+                                                    ))}
+                                                </Select>
+                                            </FormControl>
+                                        </Grid>
+                                    </>
                                 )}
-
                                 <Grid item xs={12} sm={6}>
                                     <TextField
                                         fullWidth
