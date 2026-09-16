@@ -14,19 +14,119 @@ import DeleteIcon from "@mui/icons-material/Delete"
 import EditIcon from "@mui/icons-material/Edit"
 import AddIcon from "@mui/icons-material/Add"
 import HistoryIcon from "@mui/icons-material/History"
+import AttachFileIcon from "@mui/icons-material/AttachFile"
 import Snackbar from "@mui/material/Snackbar"
 import Alert from "@mui/material/Alert"
+import Dialog from "@mui/material/Dialog"
+import DialogTitle from "@mui/material/DialogTitle"
+import DialogContent from "@mui/material/DialogContent"
+import DialogActions from "@mui/material/DialogActions"
 import PropTypes from "prop-types"
 import _ from "lodash"
 import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
-import { updateOpportunity } from "./opportunitySlice"
+import { updateOpportunity, uploadSupplierCommunicationAttachment } from "./opportunitySlice"
+import { downloadSupplierCommunicationAttachment } from "./opportunityAPI"
 import { supplierQuoteStatusOptions } from "../../consts/opportunityCommOptions"
 import { currencyOptions } from "../../consts/currencyOptions"
 import { selectVendorList } from "../vendors/vendorSlice"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
 import StatusHistoryDialog from "../../components/StatusHistoryDialog"
+
+const ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.gif,.bmp,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+
+// Upload/list/download UI for one Supplier Communication entry's
+// attachments - only usable once the entry has a real _id (i.e. it's been
+// saved at least once), since attachments upload straight to the server
+// against that id rather than living in local unsaved state.
+function SupplierAttachmentsDialog({ open, opportunityId, entry, onClose }) {
+    const dispatch = useDispatch()
+    const [uploading, setUploading] = React.useState(false)
+    const [error, setError] = React.useState("")
+    const fileInputRef = React.useRef(null)
+
+    const attachments = _.get(entry, "attachments", [])
+
+    const handleFilesSelected = async (event) => {
+        const files = Array.from(event.target.files || [])
+        event.target.value = ""
+        if (files.length === 0) return
+        setUploading(true)
+        setError("")
+        try {
+            await dispatch(uploadSupplierCommunicationAttachment({
+                opportunityId,
+                entryId: entry._id,
+                files,
+            })).unwrap()
+        } catch (err) {
+            setError(err || "Failed to upload attachment(s)")
+        } finally {
+            setUploading(false)
+        }
+    }
+
+    const handleDownload = async (attachment) => {
+        try {
+            await downloadSupplierCommunicationAttachment(opportunityId, entry._id, attachment._id, attachment.originalName)
+        } catch (err) {
+            setError("Failed to download attachment")
+        }
+    }
+
+    return (
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+            <DialogTitle sx={{ fontSize: "1.1rem" }}>Attachments</DialogTitle>
+            <DialogContent>
+                {attachments.length === 0 && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        No attachments
+                    </Typography>
+                )}
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mb: 2 }}>
+                    {attachments.map((attachment) => (
+                        <Box key={attachment._id} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <Button size="small" onClick={() => handleDownload(attachment)}>
+                                {attachment.originalName}
+                            </Button>
+                            <Typography variant="caption" color="text.secondary">
+                                {formatDateTime(attachment.uploadedAt)} - {_.get(attachment, "uploadedBy.name", "")}
+                            </Typography>
+                        </Box>
+                    ))}
+                </Box>
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept={ATTACHMENT_ACCEPT}
+                    style={{ display: "none" }}
+                    onChange={handleFilesSelected}
+                />
+                <Button
+                    variant="outlined"
+                    startIcon={<AttachFileIcon />}
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                >
+                    {uploading ? "Uploading..." : "Add Files"}
+                </Button>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Close</Button>
+            </DialogActions>
+        </Dialog>
+    )
+}
+
+SupplierAttachmentsDialog.propTypes = {
+    open: PropTypes.bool.isRequired,
+    opportunityId: PropTypes.string,
+    entry: PropTypes.object,
+    onClose: PropTypes.func.isRequired,
+}
 
 const currencySelectOptions = currencyOptions.map((option) => ({
     value: option.code,
@@ -78,10 +178,11 @@ function emptyValuesFor(fields) {
 // Shared add/edit/delete list UI for Supplier Communication - entries live
 // in the parent's local state (not saved until the "Save Communications"
 // button).
-function CommunicationList({ entries, onChange, columns, fields, numberFields, entityLabel }) {
+function CommunicationList({ entries, onChange, columns, fields, numberFields, entityLabel, opportunityId, showAttachments }) {
     const [editingIndex, setEditingIndex] = React.useState(null) // -1 = adding new
     const [deletingIndex, setDeletingIndex] = React.useState(null)
     const [viewingLogIndex, setViewingLogIndex] = React.useState(null)
+    const [viewingAttachmentsIndex, setViewingAttachmentsIndex] = React.useState(null)
 
     const handleSaveEntry = (values) => {
         const cleaned = { ...values }
@@ -166,6 +267,16 @@ function CommunicationList({ entries, onChange, columns, fields, numberFields, e
                                     <IconButton aria-label={`log ${entityLabel} ${index}`} onClick={() => setViewingLogIndex(index)}>
                                         <HistoryIcon fontSize="small" />
                                     </IconButton>
+                                    {showAttachments && (
+                                        <IconButton
+                                            aria-label={`attachments ${entityLabel} ${index}`}
+                                            disabled={!entry._id}
+                                            title={entry._id ? "Attachments" : "Save this entry first to add attachments"}
+                                            onClick={() => setViewingAttachmentsIndex(index)}
+                                        >
+                                            <AttachFileIcon fontSize="small" />
+                                        </IconButton>
+                                    )}
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -195,6 +306,14 @@ function CommunicationList({ entries, onChange, columns, fields, numberFields, e
                 history={viewingLogIndex !== null ? (entries[viewingLogIndex].statusHistory || []) : []}
                 onClose={() => setViewingLogIndex(null)}
             />
+            {showAttachments && (
+                <SupplierAttachmentsDialog
+                    open={viewingAttachmentsIndex !== null}
+                    opportunityId={opportunityId}
+                    entry={viewingAttachmentsIndex !== null ? entries[viewingAttachmentsIndex] : null}
+                    onClose={() => setViewingAttachmentsIndex(null)}
+                />
+            )}
         </Box>
     )
 }
@@ -206,6 +325,13 @@ CommunicationList.propTypes = {
     fields: PropTypes.array.isRequired,
     numberFields: PropTypes.array.isRequired,
     entityLabel: PropTypes.string.isRequired,
+    opportunityId: PropTypes.string,
+    showAttachments: PropTypes.bool,
+}
+
+CommunicationList.defaultProps = {
+    opportunityId: undefined,
+    showAttachments: false,
 }
 
 export default function OpportunityDetails({ opportunity }) {
@@ -227,12 +353,13 @@ export default function OpportunityDetails({ opportunity }) {
     const handleSave = async () => {
         setSaving(true)
         try {
-            // statusHistory (and the older quoteStatusUpdatedAt some entries
-            // still carry) is server-managed - it comes back from the API on
-            // read, but echoing it back on write isn't allowed. The server
-            // recomputes it itself from the entry's prior stored state.
+            // statusHistory and attachments (and the older quoteStatusUpdatedAt
+            // some entries still carry) are server-managed - they come back
+            // from the API on read, but echoing them back on write isn't
+            // allowed. The server recomputes/carries them over itself from
+            // the entry's prior stored state.
             const supplierCommunicationsToSave = supplierCommunications.map((entry) =>
-                _.omit(entry, ["statusHistory", "quoteStatusUpdatedAt"])
+                _.omit(entry, ["statusHistory", "quoteStatusUpdatedAt", "attachments"])
             )
             await dispatch(updateOpportunity({
                 opportunityId: opportunity.id,
@@ -258,6 +385,8 @@ export default function OpportunityDetails({ opportunity }) {
                     fields={supplierCommunicationFields}
                     numberFields={supplierCommunicationNumberFields}
                     entityLabel="Supplier Communication"
+                    opportunityId={opportunity.id}
+                    showAttachments
                 />
 
                 <Box sx={{ mt: 2 }}>

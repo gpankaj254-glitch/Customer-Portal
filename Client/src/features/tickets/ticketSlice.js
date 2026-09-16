@@ -6,6 +6,7 @@ const initialState = {
     ticketList: [],
     openTicketList: [],
     closedTicketList: [],
+    completedTicketList: [],
     pageStatus: pageStatusVals.loading,
     getTicketError: null,
     createTicketError: null,
@@ -41,6 +42,16 @@ export const getClosedTickets = createAsyncThunk(
     "tickets/fetchGetClosedTicket",
     async (data, { rejectWithValue }) => {
         data.closed = true
+        data.status = "Closed"
+        const response = await fetchGetTickets(data, rejectWithValue)
+        return response
+    }
+)
+
+export const getCompletedTickets = createAsyncThunk(
+    "tickets/fetchGetCompletedTicket",
+    async (data, { rejectWithValue }) => {
+        data.status = "Completed"
         const response = await fetchGetTickets(data, rejectWithValue)
         return response
     }
@@ -158,6 +169,21 @@ export const ticketSlice = createSlice({
                 state.pagination.totalResults = payload.totalResults
                 state.pagination.totalPages = payload.totalPages
             })
+            .addCase(getCompletedTickets.rejected, (state, {payload}) => {
+                state.pageStatus = pageStatusVals.error
+                state.getTicketError = payload
+            })
+            .addCase(getCompletedTickets.pending, (state) => {
+                state.pageStatus = pageStatusVals.loading
+                state.updateTicketMessage = null
+                state.updateTicketError = null
+            })
+            .addCase(getCompletedTickets.fulfilled, (state, {payload}) => {
+                state.pageStatus = pageStatusVals.fetched
+                state.completedTicketList = payload.results
+                state.pagination.totalResults = payload.totalResults
+                state.pagination.totalPages = payload.totalPages
+            })
             .addCase(getOpenTickets.rejected, (state, {payload}) => {
                 state.pageStatus = pageStatusVals.error
                 state.getTicketError = payload
@@ -187,9 +213,20 @@ export const ticketSlice = createSlice({
                 state.updateTicketMessage = null
                 state.updateTicketError = null
             })
-            .addCase(updateTicket.fulfilled, (state) => {
+            .addCase(updateTicket.fulfilled, (state, { payload }) => {
                 state.updateTicketMessage = "Ticket updated"
                 state.updateTicketError = null
+                // Patch the ticket in place wherever it's currently listed, so
+                // an open TicketDetails panel immediately sees the persisted
+                // status/closureCode (e.g. to lock the form once Closed is
+                // saved) without needing a full list refetch.
+                const updated = payload[0]
+                const openIndex = state.openTicketList.findIndex((t) => t.id === updated.id)
+                if (openIndex !== -1) state.openTicketList[openIndex] = updated
+                const closedIndex = state.closedTicketList.findIndex((t) => t.id === updated.id)
+                if (closedIndex !== -1) state.closedTicketList[closedIndex] = updated
+                const completedIndex = state.completedTicketList.findIndex((t) => t.id === updated.id)
+                if (completedIndex !== -1) state.completedTicketList[completedIndex] = updated
             })
             .addCase(appendTicketDescription.rejected, (state, {payload}) => {
                 state.appendDescriptionMessage = null
@@ -257,6 +294,7 @@ export const { changePage, changeLimit, setSearch } = ticketSlice.actions
 export const selectTicketList = (state) => state.tickets.ticketList
 export const selectOpenTicketList = (state) => state.tickets.openTicketList
 export const selectClosedTicketList = (state) => state.tickets.closedTicketList
+export const selectCompletedTicketList = (state) => state.tickets.completedTicketList
 
 export const selectGetTicketError = (state) => state.tickets.getTicketError
 export const selectCreateTicketError = (state) => state.tickets.createTicketError

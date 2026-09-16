@@ -1,4 +1,3 @@
-const path = require("path");
 const httpStatus = require("http-status");
 const _ = require("lodash");
 const pick = require("../utils/pick");
@@ -7,9 +6,26 @@ const catchAsync = require("../utils/catchAsync");
 const { ticketService, circuitService, alertService } = require("../services");
 // const logger = require("../config/logger");
 const { filterByCustomerId } = require("../utils/filters");
-const { TICKET_UPLOADS_ROOT } = require("../middlewares/upload");
+const { getObjectStream } = require("../utils/s3");
 
 // const { isTicket } = require("../config/roles");
+
+/**
+ * Set headers and pipe an S3 object's stream as a file download.
+ * @param {import("express").Response} res
+ * @param {{Body: NodeJS.ReadableStream, ContentType?: string}} object
+ * @param {string} originalName
+ * @param {string} mimeType
+ */
+const streamAttachmentDownload = (res, object, originalName, mimeType) => {
+  const safeName = originalName.replace(/[\r\n"\\]/g, "_");
+  res.setHeader("Content-Type", mimeType || object.ContentType || "application/octet-stream");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(originalName)}`
+  );
+  object.Body.pipe(res);
+};
 
 const createTicket = catchAsync(async (req, res) => {
   const reqBody = req.body[0];
@@ -90,11 +106,11 @@ const uploadAttachment = catchAsync(async (req, res) => {
 });
 
 const downloadAttachment = catchAsync(async (req, res) => {
-  const { ticketId, filename } = req.params;
-  const attachment = await ticketService.getTicketAttachment(ticketId, filename, req.user);
-  const filePath = path.join(TICKET_UPLOADS_ROOT, ticketId, filename);
+  const { ticketId, attachmentId } = req.params;
+  const attachment = await ticketService.getTicketAttachment(ticketId, attachmentId, req.user);
+  const object = await getObjectStream(attachment.key);
 
-  res.download(filePath, attachment.originalName);
+  streamAttachmentDownload(res, object, attachment.originalName, attachment.mimeType);
 });
 
 const appendVendorDescription = catchAsync(async (req, res) => {
@@ -113,11 +129,11 @@ const uploadVendorAttachment = catchAsync(async (req, res) => {
 });
 
 const downloadVendorAttachment = catchAsync(async (req, res) => {
-  const { ticketId, filename } = req.params;
-  const attachment = await ticketService.getVendorAttachment(ticketId, filename, req.user);
-  const filePath = path.join(TICKET_UPLOADS_ROOT, ticketId, "vendor", filename);
+  const { ticketId, attachmentId } = req.params;
+  const attachment = await ticketService.getVendorAttachment(ticketId, attachmentId, req.user);
+  const object = await getObjectStream(attachment.key);
 
-  res.download(filePath, attachment.originalName);
+  streamAttachmentDownload(res, object, attachment.originalName, attachment.mimeType);
 });
 
 const deactivateTicket = catchAsync(async (req, res) => {

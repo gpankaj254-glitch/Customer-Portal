@@ -15,7 +15,7 @@ import Chip from "@mui/material/Chip"
 
 import PropTypes from "prop-types"
 
-import {changeLimit, changePage, getClosedTickets, selectGetTicketError, selectPageStatus, getOpenTickets, selectClosedTicketList, selectOpenTicketList, selectSearch, setSearch} from "./ticketSlice"
+import {changeLimit, changePage, getClosedTickets, getCompletedTickets, selectGetTicketError, selectPageStatus, getOpenTickets, selectClosedTicketList, selectCompletedTicketList, selectOpenTicketList, selectSearch, setSearch} from "./ticketSlice"
 import { useSelector, useDispatch } from "react-redux"
 import { Alert, Collapse, Typography} from "@mui/material"
 import { pageStatusVals} from "./utils"
@@ -27,15 +27,17 @@ import { getFormattedDateTimeGMT } from "../../utils/dates"
 
 const PRIORITY_COLORS = { High: "error", Medium: "info", Low: "default" }
 
-const columns = [
-    { id: "ticketId", label: "Ticket ID" },
-    { id: "customerReference", label: "Customer Reference" },
-    { id: "problemType", label: "Problem Type" },
-    { id: "priority", label: "Priority" },
-    { id: "status", label: "Status" },
-    { id: "createdBy", label: "Created By" },
-    { id: "createdDate", label: "Created Date (GMT)" },
-]
+function buildColumns (mode) {
+    return [
+        { id: "ticketId", label: "Ticket ID" },
+        { id: "customerReference", label: "Customer Reference" },
+        { id: "problemType", label: "Problem Type" },
+        { id: "priority", label: "Priority" },
+        mode === "open" ? { id: "status", label: "Status" } : { id: "closureCode", label: "Closure Code" },
+        { id: "createdBy", label: "Created By" },
+        { id: "createdDate", label: "Created Date (GMT)" },
+    ]
+}
 
 function createDisplayData (data) {
     return {
@@ -44,6 +46,7 @@ function createDisplayData (data) {
         problemType: _.get(data, "problemType", ""),
         priority: _.get(data, "priority", ""),
         status: _.get(data, "status", ""),
+        closureCode: _.get(data, "closureCode", ""),
         createdBy: _.get(data, "history[0].user.email", ""),
         createdDate: getFormattedDateTimeGMT(_.get(data, "history[0].updatedAt", "")),
     }
@@ -55,10 +58,12 @@ export default function TicketsTable(props) {
     const errorMessage = useSelector(selectGetTicketError)
     const opneTicketList = useSelector(selectOpenTicketList)
     const closedTicketList = useSelector(selectClosedTicketList)
+    const completedTicketList = useSelector(selectCompletedTicketList)
     const search = useSelector(selectSearch)
 
     const pagination = props.pagination
-    const closed = props.closed
+    const mode = props.mode
+    const columns = React.useMemo(() => buildColumns(mode), [mode])
 
     const [open, setOpen] = React.useState(false)
     const [searchInput, setSearchInput] = React.useState(search)
@@ -111,12 +116,17 @@ export default function TicketsTable(props) {
         const data = {
             limit: pagination.limit,
             page: pagination.page + 1,
-            closed,
             search,
         }
-        closed ? dispatch(getClosedTickets(data)) : dispatch(getOpenTickets(data))
+        if (mode === "closed") {
+            dispatch(getClosedTickets(data))
+        } else if (mode === "completed") {
+            dispatch(getCompletedTickets(data))
+        } else {
+            dispatch(getOpenTickets(data))
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pagination.page, pagination.limit, search, closed])
+    }, [pagination.page, pagination.limit, search, mode])
 
     // Debounce the search box: only commit to Redux (and trigger the fetch
     // above) 400ms after the user stops typing.
@@ -135,7 +145,7 @@ export default function TicketsTable(props) {
     } else if (status === pageStatusVals.loading) {
         return <div>loading</div>
     } else if (status === pageStatusVals.fetched) {
-        const ticketList = closed ? closedTicketList : opneTicketList
+        const ticketList = mode === "closed" ? closedTicketList : mode === "completed" ? completedTicketList : opneTicketList
         return (
             <Paper sx={{ width: "100%", overflow: "hidden", p: 2 }}>
                 <TextField
@@ -177,7 +187,7 @@ export default function TicketsTable(props) {
                                     <TableRow key={`${row.id}-collapse`} >
                                         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={columns.length + 1}>
                                             <Collapse in = {open === row.id}>
-                                                {open === row.id && <TicketDetails ticket={row} />}
+                                                {open === row.id && <TicketDetails ticket={row} mode={mode} />}
                                             </Collapse>
                                         </TableCell>
                                     </TableRow>
@@ -203,5 +213,9 @@ export default function TicketsTable(props) {
 
 TicketsTable.propTypes = {
     pagination: PropTypes.object,
-    closed: PropTypes.bool,
+    mode: PropTypes.oneOf(["open", "closed", "completed"]),
+}
+
+TicketsTable.defaultProps = {
+    mode: "open",
 }

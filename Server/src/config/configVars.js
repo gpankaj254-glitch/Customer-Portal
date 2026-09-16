@@ -1,10 +1,10 @@
 // This file's dev-default values are committed to a public repo, so it must
 // never contain real credentials - only placeholders. A production host
 // (Render, Railway, a VM, etc.) or a local, gitignored .env file supplies the
-// real MONGODB_URL/JWT_SECRET/API_KEY via actual environment variables, which
-// config.js already merges over these defaults. For local dev against a real
-// database, put your own values in Server/.env (already gitignored) rather
-// than editing this file.
+// real MONGODB_URL/JWT_SECRET/API_KEY/AWS_* via actual environment
+// variables, which config.js already merges over these defaults. For local
+// dev against a real database, put your own values in Server/.env (already
+// gitignored) rather than editing this file.
 module.exports = {
   HOME: "/",
   MONGODB_URL: "mongodb://127.0.0.1:27017/scloudx",
@@ -48,4 +48,12 @@ module.exports = {
   CORS_ORIGIN: "*",
   // SendGrid API key - placeholder only, override via a real env var.
   API_KEY: "replace-with-a-real-sendgrid-api-key",
+  // Ticket / Supplier Communication attachment storage. Access key/secret
+  // are intentionally left blank here - set them locally in Server/.env
+  // (gitignored) or via real env vars in production, never commit real
+  // values to this public repo. Bucket name/region aren't secret.
+  AWS_ACCESS_KEY_ID: "",
+  AWS_SECRET_ACCESS_KEY: "",
+  AWS_REGION: "eu-north-1",
+  AWS_S3_BUCKET: "scloudx-cp-attachments-341936016869-eu-north-1-an",
 };

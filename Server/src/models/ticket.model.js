@@ -2,11 +2,17 @@ const mongoose = require("mongoose");
 // const validator = require("validator");
 // const bcrypt = require("bcryptjs");
 const { toJSON, paginate } = require("./plugins");
-const { problemTypeOptions, priorityOptions, siteAccessHoursOptions, statusOptions, rfoStatusOptions } = require("../config/ticketOptions");
+const { problemTypeOptions, priorityOptions, siteAccessHoursOptions, statusOptions, closureCodeOptions, rfoStatusOptions } = require("../config/ticketOptions");
 // const { roles } = require("../config/roles");
 
 const attachmentSchema = {
-  filename: { type: String, required: true },
+  // New uploads are stored in S3 and keyed here. Entries from before
+  // attachments moved to S3 only have the legacy `filename` field below -
+  // their underlying file no longer exists (Railway's local disk isn't
+  // persistent across deploys), so they're kept only as a historical
+  // record, not downloadable.
+  key: { type: String, default: "" },
+  filename: { type: String },
   originalName: { type: String, required: true },
   mimeType: { type: String },
   size: { type: Number },
@@ -230,9 +236,13 @@ const ticketSchema = mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Why the ticket was closed - required to close a ticket (see
+    // ticket.service.js's updateTicket) and shown in place of Status on the
+    // Closed Tickets list.
     closureCode: {
-      type: Number,
-      default: null,
+      type: String,
+      enum: ["", ...closureCodeOptions],
+      default: "",
     },
     downTime: {
       type: Number,

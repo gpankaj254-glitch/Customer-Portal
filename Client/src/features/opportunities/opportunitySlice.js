@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit"
-import { fetchGetOpportunities, fetchCreateOpportunity, fetchDeactivateOpportunity, fetchUpdateOpportunity, fetchSalesDashboardSummary } from "./opportunityAPI"
+import { fetchGetOpportunities, fetchCreateOpportunity, fetchDeactivateOpportunity, fetchUpdateOpportunity, fetchSalesDashboardSummary, fetchUploadSupplierCommunicationAttachment } from "./opportunityAPI"
 import { pageStatusVals } from "./utils"
 
 const initialState = {
@@ -46,6 +46,14 @@ export const updateOpportunity = createAsyncThunk(
     "opportunities/fetchUpdateOpportunity",
     async (data, { rejectWithValue }) => {
         const response = await fetchUpdateOpportunity(data, rejectWithValue)
+        return response
+    }
+)
+
+export const uploadSupplierCommunicationAttachment = createAsyncThunk(
+    "opportunities/fetchUploadSupplierCommunicationAttachment",
+    async (data, { rejectWithValue }) => {
+        const response = await fetchUploadSupplierCommunicationAttachment(data, rejectWithValue)
         return response
     }
 )
@@ -112,6 +120,12 @@ export const opportunitySlice = createSlice({
             })
             .addCase(updateOpportunity.rejected, (state) => {
                 state.pageStatus = pageStatusVals.error
+            })
+            .addCase(uploadSupplierCommunicationAttachment.fulfilled, (state, { payload }) => {
+                const index = state.opportunityList.findIndex((opportunity) => opportunity.id === payload.id)
+                if (index !== -1) {
+                    state.opportunityList[index] = payload
+                }
             })
             .addCase(getSalesDashboardSummary.pending, (state) => {
                 state.salesDashboardSummaryStatus = pageStatusVals.loading

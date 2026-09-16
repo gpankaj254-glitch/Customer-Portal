@@ -25,7 +25,7 @@ import { updateTicket, appendTicketDescription, uploadTicketAttachments, appendV
 import { downloadTicketAttachment, downloadVendorAttachment } from "./ticketsAPI"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
-import { problemTypeOptions, priorityOptions, statusOptions, rfoStatusOptions } from "../../consts/ticketOptions"
+import { problemTypeOptions, priorityOptions, statusOptions, openStatusOptions, closureCodeOptions, rfoStatusOptions } from "../../consts/ticketOptions"
 
 const ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.gif,.bmp,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
 
@@ -48,7 +48,7 @@ function AttachmentList({ attachments, onDownload }) {
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mt: 0.5 }}>
             {attachments.map((attachment) => (
-                <Box key={attachment.filename} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box key={attachment._id} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <Button size="small" onClick={() => onDownload(attachment)}>
                         {attachment.originalName}
                     </Button>
@@ -66,7 +66,7 @@ AttachmentList.propTypes = {
     onDownload: PropTypes.func.isRequired,
 }
 
-export default function TicketDetails({ ticket }) {
+export default function TicketDetails({ ticket, mode }) {
     const dispatch = useDispatch()
     const currentUser = useSelector(selectUser)
     const canUpdateTicket = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_USER
@@ -80,6 +80,7 @@ export default function TicketDetails({ ticket }) {
     const [customerReference, setCustomerReference] = React.useState(_.get(ticket, "customerReference", ""))
     const [priority, setPriority] = React.useState(_.get(ticket, "priority", ""))
     const [status, setStatus] = React.useState(_.get(ticket, "status", "Submitted"))
+    const [closureCode, setClosureCode] = React.useState(_.get(ticket, "closureCode", ""))
     const [description, setDescription] = React.useState(_.get(ticket, "description", ""))
     const [scxInternalComments, setScxInternalComments] = React.useState(_.get(ticket, "scxInternalComments", ""))
     const [descriptionNote, setDescriptionNote] = React.useState("")
@@ -124,11 +125,21 @@ export default function TicketDetails({ ticket }) {
 
     const history = _.get(ticket, "history", [])
     const createdAt = _.get(history, "[0].updatedAt", "")
-    // Driven by the live Status value (not just the persisted ticket.closed)
-    // so Customer/Vendor Communication lock immediately once "Closed" is
-    // selected, in the same moment the Ticket Closure details tab appears -
-    // only that tab stays editable from then on.
-    const isClosed = status === "Closed"
+    const ticketStatus = _.get(ticket, "status")
+    // Customer Communication / Vendor Communication (the core ticket fields
+    // and their comment threads) are only editable from the Open Tickets
+    // view - once a ticket has moved to the Closed or Completed tab, only
+    // the Ticket Closure details tab may still be touched (and none at all
+    // once Completed), mirroring the server's own guard in updateTicket.
+    const mainFieldsLocked = mode !== "open"
+    // The locally selected, not-yet-saved status - drives whether Closure
+    // Code appears (Open mode only) the moment "Closed" is picked, ahead of
+    // the eventual save.
+    const closingNow = status === "Closed"
+    // Tab 0's Status field must always include the ticket's actual current
+    // value as a MenuItem (even disabled) or MUI renders it blank - Open
+    // mode is the only place "Completed" is deliberately left off the list.
+    const tab0StatusOptions = mode === "open" ? openStatusOptions : statusOptions
 
     // Description grows with every appended comment - keep the box a fixed
     // size and default the scroll position to the bottom so the latest
@@ -145,17 +156,14 @@ export default function TicketDetails({ ticket }) {
         }
     }, [vendorDescription])
 
-    // Ticket Closure details is only relevant once the ticket is Closed -
-    // if the (unsaved) status is changed away from Closed while that tab is
-    // open, fall back to Customer Communication rather than leaving it stranded.
-    React.useEffect(() => {
-        if (status !== "Closed" && activeTab === 2) {
-            setActiveTab(0)
-        }
-    }, [status, activeTab])
-
+    // The general ticket edit form - Open Tickets tab only (Customer/Vendor
+    // Communication). Ticket Closure details has its own handler below.
     const handleSubmit = async (event) => {
         event.preventDefault()
+        if (closingNow && !closureCode) {
+            setFeedback({ severity: "error", message: "Closure Code is required to close a ticket" })
+            return
+        }
         setSubmitting(true)
         try {
             await dispatch(updateTicket([{
@@ -164,11 +172,31 @@ export default function TicketDetails({ ticket }) {
                 customerReference,
                 priority,
                 status,
+                closureCode,
                 scxInternalComments,
                 vendorTicketId,
                 vendorTicketCreateDate,
                 vendorTicketStatus,
                 vendorTicketClosureDate,
+            }])).unwrap()
+            setFeedback({ severity: "success", message: "Ticket updated successfully" })
+        } catch (err) {
+            setFeedback({ severity: "error", message: err || "Failed to update ticket" })
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    // Ticket Closure details - Closed Tickets tab only. Lets the ticket
+    // either stay Closed (just resaving the closure details) or move on to
+    // Completed; nothing else on the ticket changes from here.
+    const handleClosureSubmit = async (event) => {
+        event.preventDefault()
+        setSubmitting(true)
+        try {
+            await dispatch(updateTicket([{
+                ticketId: ticket.id,
+                status,
                 rfoStatus,
                 ticketStartDateTime,
                 actualIssueStartDateTime,
@@ -205,7 +233,7 @@ export default function TicketDetails({ ticket }) {
 
     const handleDownload = async (attachment) => {
         try {
-            await downloadTicketAttachment(ticket.id, attachment.filename, attachment.originalName)
+            await downloadTicketAttachment(ticket.id, attachment._id, attachment.originalName)
         } catch (err) {
             setFeedback({ severity: "error", message: "Failed to download attachment" })
         }
@@ -247,7 +275,7 @@ export default function TicketDetails({ ticket }) {
 
     const handleVendorDownload = async (attachment) => {
         try {
-            await downloadVendorAttachment(ticket.id, attachment.filename, attachment.originalName)
+            await downloadVendorAttachment(ticket.id, attachment._id, attachment.originalName)
         } catch (err) {
             setFeedback({ severity: "error", message: "Failed to download attachment" })
         }
@@ -284,6 +312,7 @@ export default function TicketDetails({ ticket }) {
     // Customer role keeps today's flat (non-tabbed) panel - Vendor
     // Communication and Ticket Closure details are SCX-only.
     if (!canUpdateTicket) {
+        const ticketDone = ticketStatus === "Closed" || ticketStatus === "Completed"
         return (
             <Box sx={{ p: 2 }}>
                 <Paper sx={{ p: 2, mb: 2 }}>
@@ -344,7 +373,7 @@ export default function TicketDetails({ ticket }) {
                             />
                         </Grid>
 
-                        {isClosed ? (
+                        {ticketDone ? (
                             <Grid item xs={12}>
                                 <Typography variant="body2" color="text.secondary">
                                     This ticket is closed - comments can no longer be added.
@@ -416,294 +445,331 @@ export default function TicketDetails({ ticket }) {
                 <Tabs value={activeTab} onChange={(event, newValue) => setActiveTab(newValue)} sx={{ mb: 2 }}>
                     <Tab label="Customer Communication" />
                     <Tab label="Vendor Communication" />
-                    {status === "Closed" && <Tab label="Ticket Closure details" />}
+                    {mode !== "open" && <Tab label="Ticket Closure details" />}
                 </Tabs>
 
-                <Box component="form" noValidate onSubmit={handleSubmit}>
-                    {activeTab === 0 && (
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Circuit Name" value={_.get(ticket, "circuit.name", "")} disabled />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth required disabled={isClosed}>
-                                    <InputLabel id={`problem-type-${ticket.id}`}>Problem Type</InputLabel>
-                                    <Select
-                                        labelId={`problem-type-${ticket.id}`}
-                                        value={problemType}
-                                        label="Problem Type"
-                                        onChange={(event) => setProblemType(event.target.value)}
-                                    >
-                                        {problemTypeOptions.map((option) => (
-                                            <MenuItem key={option} value={option}>{option}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    label="Customer Reference"
-                                    value={customerReference}
-                                    onChange={(event) => setCustomerReference(event.target.value)}
-                                    disabled={isClosed}
-                                />
-                            </Grid>
-
-                            <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth required disabled={isClosed}>
-                                    <InputLabel id={`priority-${ticket.id}`}>Priority</InputLabel>
-                                    <Select
-                                        labelId={`priority-${ticket.id}`}
-                                        value={priority}
-                                        label="Priority"
-                                        onChange={(event) => setPriority(event.target.value)}
-                                    >
-                                        {priorityOptions.map((option) => (
-                                            <MenuItem key={option} value={option}>{option}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Created Date" value={createdAt ? getFormattedDate(createdAt) : ""} disabled />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth required disabled={isClosed}>
-                                    <InputLabel id={`status-${ticket.id}`}>Status</InputLabel>
-                                    <Select
-                                        labelId={`status-${ticket.id}`}
-                                        value={status}
-                                        label="Status"
-                                        onChange={(event) => setStatus(event.target.value)}
-                                    >
-                                        {statusOptions.map((option) => (
-                                            <MenuItem key={option} value={option}>{option}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    multiline
-                                    minRows={5}
-                                    maxRows={5}
-                                    label="Description"
-                                    value={description}
-                                    disabled
-                                    inputRef={descriptionRef}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    multiline
-                                    minRows={5}
-                                    label="SCX Internal Comments"
-                                    value={scxInternalComments}
-                                    onChange={(event) => setScxInternalComments(event.target.value)}
-                                    disabled={isClosed}
-                                />
-                            </Grid>
-
-                            {!isClosed && (
-                                <Grid item xs={12}>
-                                    <Button type="submit" variant="contained" disabled={submitting}>
-                                        {submitting ? "Saving..." : "Save"}
-                                    </Button>
+                {(activeTab === 0 || activeTab === 1) && (
+                    <Box component="form" noValidate onSubmit={handleSubmit}>
+                        {activeTab === 0 && (
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField fullWidth label="Circuit Name" value={_.get(ticket, "circuit.name", "")} disabled />
                                 </Grid>
-                            )}
-
-                            {isClosed ? (
-                                <Grid item xs={12}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        This ticket is closed - comments can no longer be added.
-                                    </Typography>
-                                </Grid>
-                            ) : (
-                                <>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            multiline
-                                            minRows={3}
-                                            label="Add Comments"
-                                            placeholder="Add additional details - this is appended below the existing description and does not overwrite it"
-                                            value={descriptionNote}
-                                            onChange={(event) => setDescriptionNote(event.target.value)}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <Button variant="outlined" component="label">
-                                            Select File
-                                            <input
-                                                hidden
-                                                multiple
-                                                type="file"
-                                                ref={fileInputRef}
-                                                accept={ATTACHMENT_ACCEPT}
-                                                onChange={handleFileChange}
-                                            />
-                                        </Button>
-                                        {selectedFiles.length > 0 && (
-                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                                {selectedFiles.map((file) => file.name).join(", ")}
-                                            </Typography>
-                                        )}
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <Button
-                                            type="button"
-                                            variant="contained"
-                                            disabled={submitting || (!descriptionNote.trim() && selectedFiles.length === 0)}
-                                            onClick={handleAddComment}
+                                <Grid item xs={12} sm={4}>
+                                    <FormControl fullWidth required disabled={mainFieldsLocked}>
+                                        <InputLabel id={`problem-type-${ticket.id}`}>Problem Type</InputLabel>
+                                        <Select
+                                            labelId={`problem-type-${ticket.id}`}
+                                            value={problemType}
+                                            label="Problem Type"
+                                            onChange={(event) => setProblemType(event.target.value)}
                                         >
-                                            {submitting ? "Adding..." : "Add Comment/ File"}
-                                        </Button>
-                                    </Grid>
-                                </>
-                            )}
-
-                            <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ mt: 1 }}>Attachments</Typography>
-                                <AttachmentList attachments={attachments} onDownload={handleDownload} />
-                            </Grid>
-                        </Grid>
-                    )}
-
-                    {activeTab === 1 && (
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Vendor Name" value={_.get(ticket, "vendor.name", "")} disabled />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Vendor Circuit ID" value={_.get(ticket, "vendorCircuitId", "")} disabled />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    label="Vendor Ticket Number"
-                                    value={vendorTicketId}
-                                    onChange={(event) => setVendorTicketId(event.target.value)}
-                                    disabled={isClosed}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="date"
-                                    label="Vendor Ticket Create Date"
-                                    InputLabelProps={{ shrink: true }}
-                                    value={vendorTicketCreateDate}
-                                    onChange={(event) => setVendorTicketCreateDate(event.target.value)}
-                                    disabled={isClosed}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    label="Vendor Ticket Status"
-                                    value={vendorTicketStatus}
-                                    onChange={(event) => setVendorTicketStatus(event.target.value)}
-                                    disabled={isClosed}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="date"
-                                    label="Vendor Ticket Closure Date"
-                                    InputLabelProps={{ shrink: true }}
-                                    value={vendorTicketClosureDate}
-                                    onChange={(event) => setVendorTicketClosureDate(event.target.value)}
-                                    disabled={isClosed}
-                                />
-                            </Grid>
-
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    multiline
-                                    minRows={5}
-                                    maxRows={5}
-                                    label="Description"
-                                    value={vendorDescription}
-                                    disabled
-                                    inputRef={vendorDescriptionRef}
-                                />
-                            </Grid>
-
-                            {!isClosed && (
-                                <Grid item xs={12}>
-                                    <Button type="submit" variant="contained" disabled={submitting}>
-                                        {submitting ? "Saving..." : "Save"}
-                                    </Button>
+                                            {problemTypeOptions.map((option) => (
+                                                <MenuItem key={option} value={option}>{option}</MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
                                 </Grid>
-                            )}
-
-                            {isClosed ? (
-                                <Grid item xs={12}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        This ticket is closed - comments can no longer be added.
-                                    </Typography>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        fullWidth
+                                        label="Customer Reference"
+                                        value={customerReference}
+                                        onChange={(event) => setCustomerReference(event.target.value)}
+                                        disabled={mainFieldsLocked}
+                                    />
                                 </Grid>
-                            ) : (
-                                <>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            multiline
-                                            minRows={3}
-                                            label="Add Comments"
-                                            placeholder="Add additional details - this is appended below the existing description and does not overwrite it"
-                                            value={vendorDescriptionNote}
-                                            onChange={(event) => setVendorDescriptionNote(event.target.value)}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <Button variant="outlined" component="label">
-                                            Select File
-                                            <input
-                                                hidden
-                                                multiple
-                                                type="file"
-                                                ref={vendorFileInputRef}
-                                                accept={ATTACHMENT_ACCEPT}
-                                                onChange={handleVendorFileChange}
-                                            />
-                                        </Button>
-                                        {vendorSelectedFiles.length > 0 && (
-                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                                {vendorSelectedFiles.map((file) => file.name).join(", ")}
-                                            </Typography>
-                                        )}
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <Button
-                                            type="button"
-                                            variant="contained"
-                                            disabled={submitting || (!vendorDescriptionNote.trim() && vendorSelectedFiles.length === 0)}
-                                            onClick={handleAddVendorComment}
+
+                                <Grid item xs={12} sm={4}>
+                                    <FormControl fullWidth required disabled={mainFieldsLocked}>
+                                        <InputLabel id={`priority-${ticket.id}`}>Priority</InputLabel>
+                                        <Select
+                                            labelId={`priority-${ticket.id}`}
+                                            value={priority}
+                                            label="Priority"
+                                            onChange={(event) => setPriority(event.target.value)}
                                         >
-                                            {submitting ? "Adding..." : "Add Comment/ File"}
+                                            {priorityOptions.map((option) => (
+                                                <MenuItem key={option} value={option}>{option}</MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField fullWidth label="Created Date" value={createdAt ? getFormattedDate(createdAt) : ""} disabled />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <FormControl fullWidth required disabled={mainFieldsLocked}>
+                                        <InputLabel id={`status-${ticket.id}`}>Status</InputLabel>
+                                        <Select
+                                            labelId={`status-${ticket.id}`}
+                                            value={status}
+                                            label="Status"
+                                            onChange={(event) => setStatus(event.target.value)}
+                                        >
+                                            {tab0StatusOptions.map((option) => (
+                                                <MenuItem key={option} value={option}>{option}</MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                {mode === "open" && closingNow && (
+                                    <Grid item xs={12} sm={4}>
+                                        <FormControl fullWidth required>
+                                            <InputLabel id={`closure-code-${ticket.id}`}>Closure Code</InputLabel>
+                                            <Select
+                                                labelId={`closure-code-${ticket.id}`}
+                                                value={closureCode}
+                                                label="Closure Code"
+                                                onChange={(event) => setClosureCode(event.target.value)}
+                                            >
+                                                {closureCodeOptions.map((option) => (
+                                                    <MenuItem key={option} value={option}>{option}</MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+                                )}
+
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        multiline
+                                        minRows={5}
+                                        maxRows={5}
+                                        label="Description"
+                                        value={description}
+                                        disabled
+                                        inputRef={descriptionRef}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        multiline
+                                        minRows={5}
+                                        label="SCX Internal Comments"
+                                        value={scxInternalComments}
+                                        onChange={(event) => setScxInternalComments(event.target.value)}
+                                        disabled={mainFieldsLocked}
+                                    />
+                                </Grid>
+
+                                {!mainFieldsLocked && (
+                                    <Grid item xs={12}>
+                                        <Button type="submit" variant="contained" disabled={submitting}>
+                                            {submitting ? "Saving..." : "Save"}
                                         </Button>
                                     </Grid>
-                                </>
-                            )}
+                                )}
 
-                            <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ mt: 1 }}>Attachments</Typography>
-                                <AttachmentList attachments={vendorAttachments} onDownload={handleVendorDownload} />
+                                {mainFieldsLocked ? (
+                                    <Grid item xs={12}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            This ticket is closed - comments can no longer be added.
+                                        </Typography>
+                                    </Grid>
+                                ) : (
+                                    <>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                fullWidth
+                                                multiline
+                                                minRows={3}
+                                                label="Add Comments"
+                                                placeholder="Add additional details - this is appended below the existing description and does not overwrite it"
+                                                value={descriptionNote}
+                                                onChange={(event) => setDescriptionNote(event.target.value)}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <Button variant="outlined" component="label">
+                                                Select File
+                                                <input
+                                                    hidden
+                                                    multiple
+                                                    type="file"
+                                                    ref={fileInputRef}
+                                                    accept={ATTACHMENT_ACCEPT}
+                                                    onChange={handleFileChange}
+                                                />
+                                            </Button>
+                                            {selectedFiles.length > 0 && (
+                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                                    {selectedFiles.map((file) => file.name).join(", ")}
+                                                </Typography>
+                                            )}
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <Button
+                                                type="button"
+                                                variant="contained"
+                                                disabled={submitting || (!descriptionNote.trim() && selectedFiles.length === 0)}
+                                                onClick={handleAddComment}
+                                            >
+                                                {submitting ? "Adding..." : "Add Comment/ File"}
+                                            </Button>
+                                        </Grid>
+                                    </>
+                                )}
+
+                                <Grid item xs={12}>
+                                    <Typography variant="subtitle2" sx={{ mt: 1 }}>Attachments</Typography>
+                                    <AttachmentList attachments={attachments} onDownload={handleDownload} />
+                                </Grid>
                             </Grid>
-                        </Grid>
-                    )}
+                        )}
 
-                    {activeTab === 2 && status === "Closed" && (
+                        {activeTab === 1 && (
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField fullWidth label="Vendor Name" value={_.get(ticket, "vendor.name", "")} disabled />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField fullWidth label="Vendor Circuit ID" value={_.get(ticket, "vendorCircuitId", "")} disabled />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        fullWidth
+                                        label="Vendor Ticket Number"
+                                        value={vendorTicketId}
+                                        onChange={(event) => setVendorTicketId(event.target.value)}
+                                        disabled={mainFieldsLocked}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        fullWidth
+                                        type="date"
+                                        label="Vendor Ticket Create Date"
+                                        InputLabelProps={{ shrink: true }}
+                                        value={vendorTicketCreateDate}
+                                        onChange={(event) => setVendorTicketCreateDate(event.target.value)}
+                                        disabled={mainFieldsLocked}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        fullWidth
+                                        label="Vendor Ticket Status"
+                                        value={vendorTicketStatus}
+                                        onChange={(event) => setVendorTicketStatus(event.target.value)}
+                                        disabled={mainFieldsLocked}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        fullWidth
+                                        type="date"
+                                        label="Vendor Ticket Closure Date"
+                                        InputLabelProps={{ shrink: true }}
+                                        value={vendorTicketClosureDate}
+                                        onChange={(event) => setVendorTicketClosureDate(event.target.value)}
+                                        disabled={mainFieldsLocked}
+                                    />
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        multiline
+                                        minRows={5}
+                                        maxRows={5}
+                                        label="Description"
+                                        value={vendorDescription}
+                                        disabled
+                                        inputRef={vendorDescriptionRef}
+                                    />
+                                </Grid>
+
+                                {!mainFieldsLocked && (
+                                    <Grid item xs={12}>
+                                        <Button type="submit" variant="contained" disabled={submitting}>
+                                            {submitting ? "Saving..." : "Save"}
+                                        </Button>
+                                    </Grid>
+                                )}
+
+                                {mainFieldsLocked ? (
+                                    <Grid item xs={12}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            This ticket is closed - comments can no longer be added.
+                                        </Typography>
+                                    </Grid>
+                                ) : (
+                                    <>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                fullWidth
+                                                multiline
+                                                minRows={3}
+                                                label="Add Comments"
+                                                placeholder="Add additional details - this is appended below the existing description and does not overwrite it"
+                                                value={vendorDescriptionNote}
+                                                onChange={(event) => setVendorDescriptionNote(event.target.value)}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <Button variant="outlined" component="label">
+                                                Select File
+                                                <input
+                                                    hidden
+                                                    multiple
+                                                    type="file"
+                                                    ref={vendorFileInputRef}
+                                                    accept={ATTACHMENT_ACCEPT}
+                                                    onChange={handleVendorFileChange}
+                                                />
+                                            </Button>
+                                            {vendorSelectedFiles.length > 0 && (
+                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                                    {vendorSelectedFiles.map((file) => file.name).join(", ")}
+                                                </Typography>
+                                            )}
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <Button
+                                                type="button"
+                                                variant="contained"
+                                                disabled={submitting || (!vendorDescriptionNote.trim() && vendorSelectedFiles.length === 0)}
+                                                onClick={handleAddVendorComment}
+                                            >
+                                                {submitting ? "Adding..." : "Add Comment/ File"}
+                                            </Button>
+                                        </Grid>
+                                    </>
+                                )}
+
+                                <Grid item xs={12}>
+                                    <Typography variant="subtitle2" sx={{ mt: 1 }}>Attachments</Typography>
+                                    <AttachmentList attachments={vendorAttachments} onDownload={handleVendorDownload} />
+                                </Grid>
+                            </Grid>
+                        )}
+                    </Box>
+                )}
+
+                {activeTab === 2 && mode !== "open" && (
+                    <Box component="form" noValidate onSubmit={handleClosureSubmit}>
                         <Grid container spacing={2}>
+                            {mode === "closed" && (
+                                <Grid item xs={12} sm={4}>
+                                    <FormControl fullWidth required>
+                                        <InputLabel id={`closure-status-${ticket.id}`}>Status</InputLabel>
+                                        <Select
+                                            labelId={`closure-status-${ticket.id}`}
+                                            value={status}
+                                            label="Status"
+                                            onChange={(event) => setStatus(event.target.value)}
+                                        >
+                                            <MenuItem value="Closed">Closed</MenuItem>
+                                            <MenuItem value="Completed">Completed</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                            )}
                             <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth>
+                                <FormControl fullWidth disabled={mode === "completed"}>
                                     <InputLabel id="rfo-status-label">RFO Status</InputLabel>
                                     <Select
                                         labelId="rfo-status-label"
@@ -726,6 +792,7 @@ export default function TicketDetails({ ticket }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={ticketStartDateTime}
                                     onChange={(event) => setTicketStartDateTime(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -736,6 +803,7 @@ export default function TicketDetails({ ticket }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={actualIssueStartDateTime}
                                     onChange={(event) => setActualIssueStartDateTime(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -746,6 +814,7 @@ export default function TicketDetails({ ticket }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={reportedToSupplier}
                                     onChange={(event) => setReportedToSupplier(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -756,6 +825,7 @@ export default function TicketDetails({ ticket }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={resolvedFromSupplier}
                                     onChange={(event) => setResolvedFromSupplier(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -766,6 +836,7 @@ export default function TicketDetails({ ticket }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={issueReportedResolvedToAryaka}
                                     onChange={(event) => setIssueReportedResolvedToAryaka(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -775,6 +846,7 @@ export default function TicketDetails({ ticket }) {
                                     label="Actual Down time (Minutes)"
                                     value={actualDownTimeMinutes}
                                     onChange={(event) => setActualDownTimeMinutes(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -785,6 +857,7 @@ export default function TicketDetails({ ticket }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={issueResolvedDateTime}
                                     onChange={(event) => setIssueResolvedDateTime(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -794,19 +867,20 @@ export default function TicketDetails({ ticket }) {
                                     label="Overall Down Time"
                                     value={overallDownTime}
                                     onChange={(event) => setOverallDownTime(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="RFO" value={rfo} onChange={(event) => setRfo(event.target.value)} />
+                                <TextField fullWidth label="RFO" value={rfo} onChange={(event) => setRfo(event.target.value)} disabled={mode === "completed"} />
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} />
+                                <TextField fullWidth label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} disabled={mode === "completed"} />
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Reason Code" value={reasonCode} onChange={(event) => setReasonCode(event.target.value)} />
+                                <TextField fullWidth label="Reason Code" value={reasonCode} onChange={(event) => setReasonCode(event.target.value)} disabled={mode === "completed"} />
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Remarks" value={remarks} onChange={(event) => setRemarks(event.target.value)} />
+                                <TextField fullWidth label="Remarks" value={remarks} onChange={(event) => setRemarks(event.target.value)} disabled={mode === "completed"} />
                             </Grid>
                             <Grid item xs={12} sm={4}>
                                 <TextField
@@ -815,6 +889,7 @@ export default function TicketDetails({ ticket }) {
                                     label="Scloudx Bucket"
                                     value={scloudxBucket}
                                     onChange={(event) => setScloudxBucket(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -824,6 +899,7 @@ export default function TicketDetails({ ticket }) {
                                     label="Supplier Bucket"
                                     value={supplierBucket}
                                     onChange={(event) => setSupplierBucket(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -833,10 +909,11 @@ export default function TicketDetails({ ticket }) {
                                     label="Customer Bucket"
                                     value={customerBucket}
                                     onChange={(event) => setCustomerBucket(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Category" value={category} onChange={(event) => setCategory(event.target.value)} />
+                                <TextField fullWidth label="Category" value={category} onChange={(event) => setCategory(event.target.value)} disabled={mode === "completed"} />
                             </Grid>
                             <Grid item xs={12} sm={4}>
                                 <TextField
@@ -845,6 +922,7 @@ export default function TicketDetails({ ticket }) {
                                     label="Total Minutes"
                                     value={totalMinutes}
                                     onChange={(event) => setTotalMinutes(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -854,6 +932,7 @@ export default function TicketDetails({ ticket }) {
                                     label="Down Time Minutes"
                                     value={downTimeMinutes}
                                     onChange={(event) => setDownTimeMinutes(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -863,6 +942,7 @@ export default function TicketDetails({ ticket }) {
                                     label="Uptime %"
                                     value={uptimePercent}
                                     onChange={(event) => setUptimePercent(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -872,17 +952,20 @@ export default function TicketDetails({ ticket }) {
                                     label="Down Time Hours"
                                     value={downTimeHours}
                                     onChange={(event) => setDownTimeHours(event.target.value)}
+                                    disabled={mode === "completed"}
                                 />
                             </Grid>
 
-                            <Grid item xs={12}>
-                                <Button type="submit" variant="contained" disabled={submitting}>
-                                    {submitting ? "Saving..." : "Save"}
-                                </Button>
-                            </Grid>
+                            {mode === "closed" && (
+                                <Grid item xs={12}>
+                                    <Button type="submit" variant="contained" disabled={submitting}>
+                                        {submitting ? "Saving..." : "Save"}
+                                    </Button>
+                                </Grid>
+                            )}
                         </Grid>
-                    )}
-                </Box>
+                    </Box>
+                )}
             </Paper>
 
             {!isCustomer && (
@@ -920,4 +1003,9 @@ export default function TicketDetails({ ticket }) {
 
 TicketDetails.propTypes = {
     ticket: PropTypes.object.isRequired,
+    mode: PropTypes.oneOf(["open", "closed", "completed"]),
+}
+
+TicketDetails.defaultProps = {
+    mode: "open",
 }

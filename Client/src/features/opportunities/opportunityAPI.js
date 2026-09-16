@@ -82,3 +82,36 @@ export async function fetchPermanentlyDeleteOpportunity(opportunityId, rejectWit
         return rejectWithValue(createResponseErrorMessage(error), {})
     }
 }
+
+export async function fetchUploadSupplierCommunicationAttachment({ opportunityId, entryId, files }, rejectWithValue) {
+    try {
+        const formData = new FormData()
+        files.forEach((file) => formData.append("files", file))
+        const response = await axios.post(
+            `${baseURL}/opportunity/${opportunityId}/supplier-communications/${entryId}/attachment`,
+            formData,
+            { headers: headers() }
+        )
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
+// The attachment endpoint requires auth, so a plain <a href> can't be used -
+// fetch it as a blob with the auth header, then trigger a normal file save.
+export async function downloadSupplierCommunicationAttachment(opportunityId, entryId, attachmentId, originalName) {
+    const response = await axios.get(
+        `${baseURL}/opportunity/${opportunityId}/supplier-communications/${entryId}/attachment/${attachmentId}`,
+        { headers: headers(), responseType: "blob" }
+    )
+    const url = URL.createObjectURL(response.data)
+    const link = document.createElement("a")
+    link.href = url
+    link.setAttribute("download", originalName || attachmentId)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+}

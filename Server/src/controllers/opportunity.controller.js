@@ -1,9 +1,29 @@
 const httpStatus = require("http-status");
 const _ = require("lodash");
+const ApiError = require("../utils/ApiError");
 const pick = require("../utils/pick");
 const catchAsync = require("../utils/catchAsync");
 const { opportunityService, customerService } = require("../services");
 const { activeOnly } = require("../utils/filters");
+const { getObjectStream } = require("../utils/s3");
+
+/**
+ * Set headers and pipe an S3 object's stream as a file download - mirrors
+ * ticket.controller.js's streamAttachmentDownload.
+ * @param {import("express").Response} res
+ * @param {{Body: NodeJS.ReadableStream, ContentType?: string}} object
+ * @param {string} originalName
+ * @param {string} mimeType
+ */
+const streamAttachmentDownload = (res, object, originalName, mimeType) => {
+  const safeName = originalName.replace(/[\r\n"\\]/g, "_");
+  res.setHeader("Content-Type", mimeType || object.ContentType || "application/octet-stream");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(originalName)}`
+  );
+  object.Body.pipe(res);
+};
 
 const getRelatedCustomer = async (customerId, user) => {
   if (!customerId) {
@@ -80,6 +100,31 @@ const permanentlyDeleteOpportunity = catchAsync(async (req, res) => {
   res.status(httpStatus.NO_CONTENT).send();
 });
 
+const uploadSupplierCommunicationAttachment = catchAsync(async (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "No files uploaded");
+  }
+  const opportunity = await opportunityService.addSupplierCommunicationAttachments(
+    req.params.opportunityId,
+    req.params.entryId,
+    req.files,
+    req.user
+  );
+  res.send(opportunity);
+});
+
+const downloadSupplierCommunicationAttachment = catchAsync(async (req, res) => {
+  const { opportunityId, entryId, attachmentId } = req.params;
+  const attachment = await opportunityService.getSupplierCommunicationAttachment(
+    opportunityId,
+    entryId,
+    attachmentId
+  );
+  const object = await getObjectStream(attachment.key);
+
+  streamAttachmentDownload(res, object, attachment.originalName, attachment.mimeType);
+});
+
 module.exports = {
   createOpportunity,
   getOpportunities,
@@ -90,4 +135,6 @@ module.exports = {
   getDeletedOpportunities,
   restoreOpportunity,
   permanentlyDeleteOpportunity,
+  uploadSupplierCommunicationAttachment,
+  downloadSupplierCommunicationAttachment,
 };

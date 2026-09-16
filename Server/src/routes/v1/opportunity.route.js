@@ -1,6 +1,7 @@
 const express = require("express");
 const auth = require("../../middlewares/auth");
 const validate = require("../../middlewares/validate");
+const { uploadSupplierAttachment } = require("../../middlewares/upload");
 
 const { opportunityValidation } = require("../../validations");
 const { opportunityController } = require("../../controllers");
@@ -68,5 +69,17 @@ router
     validate(opportunityValidation.deactivateOpportunity),
     opportunityController.permanentlyDeleteOpportunity
   );
+
+router
+  .route("/:opportunityId/supplier-communications/:entryId/attachment")
+  .post(
+    auth("editOpportunities"),
+    uploadSupplierAttachment.array("files", 5),
+    opportunityController.uploadSupplierCommunicationAttachment
+  );
+
+router
+  .route("/:opportunityId/supplier-communications/:entryId/attachment/:attachmentId")
+  .get(auth("viewOpportunities"), opportunityController.downloadSupplierCommunicationAttachment);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 /* eslint-disable eqeqeq */
 const httpStatus = require("http-status");
 // const { custom } = require("joi");
+const crypto = require("crypto");
 const _ = require("lodash");
 const moment = require("moment");
 const { parse } = require("csv-parse/sync");
@@ -10,9 +11,23 @@ const { problemTypeOptions, priorityOptions, siteAccessHoursOptions } = require(
 const { Ticket, Circuit, Counter } = require("../models");
 const ApiError = require("../utils/ApiError");
 const { createCodeFromName } = require("../utils/creators");
+const { uploadBuffer } = require("../utils/s3");
 const { getVendorById } = require("./vendor.service");
 const { getCustomerByName } = require("./customer.service");
 const { getSiteByCustomerAndName } = require("./site.service");
+
+/**
+ * Build a unique S3 key for an uploaded file under a given prefix, keeping
+ * the original name (sanitized) at the end for readability in the bucket.
+ * @param {string} prefix - e.g. "tickets/<ticketId>" or "tickets/<ticketId>/vendor"
+ * @param {string} originalName
+ * @returns {string}
+ */
+const buildAttachmentKey = (prefix, originalName) => {
+  const safeName = originalName.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+  const unique = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
+  return `${prefix}/${unique}-${safeName}`;
+};
 
 /**
  * Atomically reserve the next serial for a given ticket-number prefix and
@@ -240,6 +255,7 @@ const updateTicket = async (ticketBody, user) => {
     customerReference,
     priority,
     status,
+    closureCode,
     scxInternalComments,
     vendorTicketId,
     vendorTicketCreateDate,
@@ -248,19 +264,46 @@ const updateTicket = async (ticketBody, user) => {
   } = ticketBody;
   const ticket = await getAuthorizedTicket(ticketId, user);
 
+  // Completed is final - no further edits through this endpoint at all.
+  if (ticket.status === "Completed") {
+    throw new ApiError(httpStatus.BAD_REQUEST, "This ticket is completed and can no longer be modified");
+  }
+
+  if (ticket.status === "Closed") {
+    // Once Closed, the rest of the ticket is frozen - only Ticket Closure
+    // details may still be edited, via the Closed Tickets tab, and the only
+    // status change allowed from here is on to Completed (or resaving
+    // Closure details while staying Closed).
+    if (status !== "Closed" && status !== "Completed") {
+      throw new ApiError(httpStatus.BAD_REQUEST, "A closed ticket can only stay Closed or be marked Completed");
+    }
+    CLOSURE_DETAIL_FIELDS.forEach((field) => {
+      if (ticketBody[field] !== undefined) {
+        ticket.closureDetails[field] = ticketBody[field];
+      }
+    });
+    ticket.status = status;
+    return updateAndSave(ticket, status, "", user);
+  }
+
+  // Ticket is still open - normal full edit, with the option to close it.
+  // Completed is only reachable from Closed (see above), never directly.
+  if (status === "Completed") {
+    throw new ApiError(httpStatus.BAD_REQUEST, "A ticket must be Closed before it can be marked Completed");
+  }
+  if (status === "Closed" && !closureCode) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Closure Code is required to close a ticket");
+  }
+
   if (problemType !== undefined) ticket.problemType = problemType;
   if (customerReference !== undefined) ticket.customerReference = customerReference;
   if (priority !== undefined) ticket.priority = priority;
+  if (closureCode !== undefined) ticket.closureCode = closureCode;
   if (scxInternalComments !== undefined) ticket.scxInternalComments = scxInternalComments;
   if (vendorTicketId !== undefined) ticket.vendorTicketId = vendorTicketId;
   if (vendorTicketCreateDate !== undefined) ticket.vendorTicketCreateDate = vendorTicketCreateDate;
   if (vendorTicketStatus !== undefined) ticket.vendorTicketStatus = vendorTicketStatus;
   if (vendorTicketClosureDate !== undefined) ticket.vendorTicketClosureDate = vendorTicketClosureDate;
-  CLOSURE_DETAIL_FIELDS.forEach((field) => {
-    if (ticketBody[field] !== undefined) {
-      ticket.closureDetails[field] = ticketBody[field];
-    }
-  });
 
   ticket.status = status;
   ticket.closed = status === "Closed";
@@ -332,7 +375,7 @@ const appendVendorDescription = async (ticketBody, user) => {
  * (photos, graphs, logs, etc). Available to the same roles/conditions as
  * appendTicketDescription - not allowed once the ticket is closed.
  * @param {string} ticketId
- * @param {Array} files - multer file objects (disk storage)
+ * @param {Array} files - multer file objects (memory storage - have .buffer)
  * @param {Object} user
  * @returns {Promise<Ticket>}
  */
@@ -345,14 +388,20 @@ const addTicketAttachments = async (ticketId, files, user) => {
 
   const uploadedBy = extractUserDetails(user);
   const uploadedAt = moment().toISOString();
-  const attachments = files.map((file) => ({
-    filename: file.filename,
-    originalName: file.originalname,
-    mimeType: file.mimetype,
-    size: file.size,
-    uploadedBy,
-    uploadedAt,
-  }));
+  const attachments = await Promise.all(
+    files.map(async (file) => {
+      const key = buildAttachmentKey(`tickets/${ticketId}`, file.originalname);
+      await uploadBuffer(key, file.buffer, file.mimetype);
+      return {
+        key,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        uploadedBy,
+        uploadedAt,
+      };
+    })
+  );
   ticket.attachments = _.concat(ticket.attachments, attachments);
 
   const fileNames = attachments.map((attachment) => attachment.originalName).join(", ");
@@ -363,7 +412,7 @@ const addTicketAttachments = async (ticketId, files, user) => {
  * Vendor Communication counterpart to addTicketAttachments - stored
  * separately (vendorAttachments) from the customer-facing attachments.
  * @param {string} ticketId
- * @param {Array} files - multer file objects (disk storage)
+ * @param {Array} files - multer file objects (memory storage - have .buffer)
  * @param {Object} user
  * @returns {Promise<Ticket>}
  */
@@ -376,14 +425,20 @@ const addVendorAttachments = async (ticketId, files, user) => {
 
   const uploadedBy = extractUserDetails(user);
   const uploadedAt = moment().toISOString();
-  const attachments = files.map((file) => ({
-    filename: file.filename,
-    originalName: file.originalname,
-    mimeType: file.mimetype,
-    size: file.size,
-    uploadedBy,
-    uploadedAt,
-  }));
+  const attachments = await Promise.all(
+    files.map(async (file) => {
+      const key = buildAttachmentKey(`tickets/${ticketId}/vendor`, file.originalname);
+      await uploadBuffer(key, file.buffer, file.mimetype);
+      return {
+        key,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        uploadedBy,
+        uploadedAt,
+      };
+    })
+  );
   ticket.vendorAttachments = _.concat(ticket.vendorAttachments, attachments);
 
   const fileNames = attachments.map((attachment) => attachment.originalName).join(", ");
@@ -424,15 +479,18 @@ const deactivateTicketById = async (ticketId) => {
  * Look up one attachment's stored metadata on a ticket the requesting user
  * is authorized to see, for a secure (auth-checked) download.
  * @param {string} ticketId
- * @param {string} filename - the stored (disk) filename, not the original one
+ * @param {string} attachmentId - the attachment subdocument's _id
  * @param {Object} user
  * @returns {Promise<Object>}
  */
-const getTicketAttachment = async (ticketId, filename, user) => {
+const getTicketAttachment = async (ticketId, attachmentId, user) => {
   const ticket = await getAuthorizedTicket(ticketId, user);
-  const attachment = ticket.attachments.find((item) => item.filename === filename);
+  const attachment = ticket.attachments.id(attachmentId);
   if (!attachment) {
     throw new ApiError(httpStatus.NOT_FOUND, "Attachment not found");
+  }
+  if (!attachment.key) {
+    throw new ApiError(httpStatus.NOT_FOUND, "This attachment predates S3 storage and is no longer available");
   }
   return attachment;
 };
@@ -440,15 +498,18 @@ const getTicketAttachment = async (ticketId, filename, user) => {
 /**
  * Vendor Communication counterpart to getTicketAttachment.
  * @param {string} ticketId
- * @param {string} filename
+ * @param {string} attachmentId
  * @param {Object} user
  * @returns {Promise<Object>}
  */
-const getVendorAttachment = async (ticketId, filename, user) => {
+const getVendorAttachment = async (ticketId, attachmentId, user) => {
   const ticket = await getAuthorizedTicket(ticketId, user);
-  const attachment = ticket.vendorAttachments.find((item) => item.filename === filename);
+  const attachment = ticket.vendorAttachments.id(attachmentId);
   if (!attachment) {
     throw new ApiError(httpStatus.NOT_FOUND, "Attachment not found");
+  }
+  if (!attachment.key) {
+    throw new ApiError(httpStatus.NOT_FOUND, "This attachment predates S3 storage and is no longer available");
   }
   return attachment;
 };

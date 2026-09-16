@@ -15,6 +15,10 @@ const priorityOptions = ["High", "Medium", "Low"];
 // Site Checklist - "Other" pairs with a free-text box on the client.
 const siteAccessHoursOptions = ["24x7", "Mon - Fri 9-5", "Other"];
 
+// "Completed" is a real status, but it's only reachable as a follow-on
+// transition from "Closed" (via the Ticket Closure details tab) - it's
+// deliberately left out of the Status dropdown on the main Edit Ticket form,
+// see ticket.service.js's updateTicket for the two-step enforcement.
 const statusOptions = [
   "Submitted",
   "Assigned",
@@ -22,12 +26,19 @@ const statusOptions = [
   "Onhold",
   "Waiting for Customer",
   "Verification",
+  "Closed",
   "Completed",
+];
+
+// Only meaningful once status is set to "Closed" - captures why the ticket
+// was closed. Required to close a ticket (see ticket.service.js's
+// updateTicket) and shown in place of Status on the Closed/Completed
+// Tickets lists.
+const closureCodeOptions = [
   "Rejected",
   "AutoResolved",
   "Cancelled",
   "Raised By Mistake",
-  "Closed",
 ];
 
 // RFO = Reason For Outage. Status of the RFO report itself, on the Ticket
@@ -39,5 +50,6 @@ module.exports = {
   priorityOptions,
   siteAccessHoursOptions,
   statusOptions,
+  closureCodeOptions,
   rfoStatusOptions,
 };

@@ -55,15 +55,15 @@ export async function fetchUploadTicketAttachments ({ ticketId, files }, rejectW
 
 // The attachment endpoint requires auth, so a plain <a href> can't be used -
 // fetch it as a blob with the auth header, then trigger a normal file save.
-export async function downloadTicketAttachment (ticketId, filename, originalName) {
-    const response = await axios.get(`${baseURL}/ticket/attachment/${ticketId}/${filename}`, {
+export async function downloadTicketAttachment (ticketId, attachmentId, originalName) {
+    const response = await axios.get(`${baseURL}/ticket/attachment/${ticketId}/${attachmentId}`, {
         headers: headers(),
         responseType: "blob",
     })
     const url = URL.createObjectURL(response.data)
     const link = document.createElement("a")
     link.href = url
-    link.setAttribute("download", originalName || filename)
+    link.setAttribute("download", originalName || attachmentId)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -92,15 +92,15 @@ export async function fetchUploadVendorAttachments ({ ticketId, files }, rejectW
     }
 }
 
-export async function downloadVendorAttachment (ticketId, filename, originalName) {
-    const response = await axios.get(`${baseURL}/ticket/vendor-attachment/${ticketId}/${filename}`, {
+export async function downloadVendorAttachment (ticketId, attachmentId, originalName) {
+    const response = await axios.get(`${baseURL}/ticket/vendor-attachment/${ticketId}/${attachmentId}`, {
         headers: headers(),
         responseType: "blob",
     })
     const url = URL.createObjectURL(response.data)
     const link = document.createElement("a")
     link.href = url
-    link.setAttribute("download", originalName || filename)
+    link.setAttribute("download", originalName || attachmentId)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -123,7 +123,10 @@ export async function fetchBulkUploadTickets (file, rejectWithValue) {
 
 export async function fetchGetTickets (data, rejectWithValue) {
     try {
-        const response = await axios.post(`${baseURL}/ticket/get?limit=${data.limit}&page=${data.page}`, {closed: data.closed, search: data.search || ""}, {headers: headers()})
+        const filter = { search: data.search || "" }
+        if (data.closed !== undefined) filter.closed = data.closed
+        if (data.status !== undefined) filter.status = data.status
+        const response = await axios.post(`${baseURL}/ticket/get?limit=${data.limit}&page=${data.page}`, filter, {headers: headers()})
         return response.data
     } catch (error) {
         console.error(error)

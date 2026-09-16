@@ -53,7 +53,7 @@ router
   );
 
 router
-  .route("/attachment/:ticketId/:filename")
+  .route("/attachment/:ticketId/:attachmentId")
   .get(auth("viewTickets"), ticketController.downloadAttachment);
 
 // Vendor Communication is SCX-only (not visible to customers), so every
@@ -76,7 +76,7 @@ router
   );
 
 router
-  .route("/vendor-attachment/:ticketId/:filename")
+  .route("/vendor-attachment/:ticketId/:attachmentId")
   .get(auth("updateTickets"), ticketController.downloadVendorAttachment);
 
 // router

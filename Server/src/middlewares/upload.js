@@ -1,5 +1,3 @@
-const fs = require("fs");
-const path = require("path");
 const multer = require("multer");
 const httpStatus = require("http-status");
 const ApiError = require("../utils/ApiError");
@@ -21,22 +19,6 @@ const uploadCsv = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-const TICKET_UPLOADS_ROOT = path.join(__dirname, "../../uploads/tickets");
-
-// The ticket id comes from the URL (:ticketId), not the multipart body, so
-// the destination is known before multer has parsed any body fields.
-const ticketAttachmentStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(TICKET_UPLOADS_ROOT, req.params.ticketId);
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${unique}${path.extname(file.originalname)}`);
-  },
-});
-
 const ticketAttachmentFileFilter = (req, file, cb) => {
   const isAllowed = /\.(jpe?g|png|gif|bmp|webp|pdf|docx?|xlsx?|txt|csv)$/i.test(file.originalname);
   if (!isAllowed) {
@@ -46,30 +28,28 @@ const ticketAttachmentFileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
+// Ticket attachments (customer-facing and Vendor Communication) are held in
+// memory just long enough to stream to S3 - see ticket.service.js's
+// addTicketAttachments/addVendorAttachments. Railway's local disk isn't
+// persistent across deploys, so files were never safely written there.
 const uploadTicketAttachment = multer({
-  storage: ticketAttachmentStorage,
+  storage,
   fileFilter: ticketAttachmentFileFilter,
   limits: { fileSize: 10 * 1024 * 1024, files: 5 },
-});
-
-// Vendor Communication attachments live in their own subfolder, separate
-// from the customer-facing ones, even though both are keyed by ticket id.
-const vendorAttachmentStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(TICKET_UPLOADS_ROOT, req.params.ticketId, "vendor");
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${unique}${path.extname(file.originalname)}`);
-  },
 });
 
 const uploadVendorAttachment = multer({
-  storage: vendorAttachmentStorage,
+  storage,
   fileFilter: ticketAttachmentFileFilter,
   limits: { fileSize: 10 * 1024 * 1024, files: 5 },
 });
 
-module.exports = { uploadCsv, uploadTicketAttachment, uploadVendorAttachment, TICKET_UPLOADS_ROOT };
+// Supplier Communication attachments (Sales Opportunities) - same
+// constraints as ticket attachments.
+const uploadSupplierAttachment = multer({
+  storage,
+  fileFilter: ticketAttachmentFileFilter,
+  limits: { fileSize: 10 * 1024 * 1024, files: 5 },
+});
+
+module.exports = { uploadCsv, uploadTicketAttachment, uploadVendorAttachment, uploadSupplierAttachment };

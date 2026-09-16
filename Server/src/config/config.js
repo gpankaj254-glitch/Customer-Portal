@@ -50,6 +50,10 @@ const envVarsSchema = Joi.object()
     CORS_ORIGIN: Joi.string().description(
       "comma-separated list of allowed origins for the frontend; \"*\" allows any origin (dev default)"
     ),
+    AWS_ACCESS_KEY_ID: Joi.string().allow("").description("IAM access key scoped to the attachments S3 bucket"),
+    AWS_SECRET_ACCESS_KEY: Joi.string().allow("").description("secret for AWS_ACCESS_KEY_ID"),
+    AWS_REGION: Joi.string().allow("").description("region the attachments S3 bucket lives in"),
+    AWS_S3_BUCKET: Joi.string().allow("").description("bucket name for Ticket/Supplier Communication attachments"),
   })
   .unknown();
 
@@ -108,4 +112,10 @@ module.exports = {
   apiKey: envVars.API_KEY,
   appUrl: envVars.APP_URL || "http://localhost:3000",
   corsOrigin: envVars.CORS_ORIGIN || "*",
+  aws: {
+    accessKeyId: envVars.AWS_ACCESS_KEY_ID,
+    secretAccessKey: envVars.AWS_SECRET_ACCESS_KEY,
+    region: envVars.AWS_REGION,
+    bucketName: envVars.AWS_S3_BUCKET,
+  },
 };

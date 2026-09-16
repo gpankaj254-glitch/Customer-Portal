@@ -1,9 +1,24 @@
 const httpStatus = require("http-status");
+const crypto = require("crypto");
 const _ = require("lodash");
 const moment = require("moment");
 const { Opportunity, Counter } = require("../models");
 const ApiError = require("../utils/ApiError");
 const { extractUserDetails, extractNameAndCode } = require("../utils/extractors");
+const { uploadBuffer } = require("../utils/s3");
+
+/**
+ * Build a unique S3 key for an uploaded file under a given prefix - mirrors
+ * ticket.service.js's buildAttachmentKey.
+ * @param {string} prefix
+ * @param {string} originalName
+ * @returns {string}
+ */
+const buildAttachmentKey = (prefix, originalName) => {
+  const safeName = originalName.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+  const unique = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
+  return `${prefix}/${unique}-${safeName}`;
+};
 
 /**
  * Atomically reserve the next serial for a given month and build the full
@@ -147,10 +162,11 @@ const updateOpportunityById = async (opportunityId, updateBody, actingUser, rela
 
   // supplierCommunications is saved as a whole-array replace (the client
   // always sends every entry back with only the fields it edits), so every
-  // entry's statusHistory has to be explicitly carried over here or it would
-  // be silently dropped on save - a brand new entry (no _id yet) gets seeded
-  // with its initial status, an existing entry only gets a new log line when
-  // its status actually changed, otherwise its prior history is preserved.
+  // entry's statusHistory and attachments have to be explicitly carried over
+  // here or they would be silently dropped on save - a brand new entry (no
+  // _id yet) gets seeded with its initial status and no attachments, an
+  // existing entry only gets a new log line when its status actually
+  // changed, otherwise its prior history/attachments are preserved.
   if (updateBody.supplierCommunications) {
     const existingById = _.keyBy(snapshot.supplierCommunications || [], (entry) => String(entry._id));
     updateBody.supplierCommunications = updateBody.supplierCommunications.map((entry) => {
@@ -168,6 +184,7 @@ const updateOpportunityById = async (opportunityId, updateBody, actingUser, rela
               mrc: entry.mrc ?? null,
             },
           ],
+          attachments: [],
         };
       }
       const statusChanged = entry.quoteStatus !== undefined && entry.quoteStatus !== existingEntry.quoteStatus;
@@ -180,7 +197,7 @@ const updateOpportunityById = async (opportunityId, updateBody, actingUser, rela
             mrc: entry.mrc ?? null,
           })
         : existingEntry.statusHistory || [];
-      return { ...entry, statusHistory };
+      return { ...entry, statusHistory, attachments: existingEntry.attachments || [] };
     });
   }
 
@@ -382,6 +399,65 @@ const permanentlyDeleteOpportunityById = async (opportunityId) => {
   await Opportunity.deleteOne({ _id: opportunityId });
 };
 
+/**
+ * Attach one or more uploaded files to a Supplier Communication entry.
+ * @param {string} opportunityId
+ * @param {string} entryId - the supplierCommunications subdocument's _id
+ * @param {Array} files - multer file objects (memory storage - have .buffer)
+ * @param {Object} user
+ * @returns {Promise<Opportunity>}
+ */
+const addSupplierCommunicationAttachments = async (opportunityId, entryId, files, user) => {
+  const opportunity = await getActiveOpportunityById(opportunityId);
+  const entry = opportunity.supplierCommunications.id(entryId);
+  if (!entry) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Supplier Communication entry not found");
+  }
+
+  const uploadedBy = extractUserDetails(user);
+  const uploadedAt = moment().toISOString();
+  const attachments = await Promise.all(
+    files.map(async (file) => {
+      const key = buildAttachmentKey(`opportunities/${opportunityId}/supplier/${entryId}`, file.originalname);
+      await uploadBuffer(key, file.buffer, file.mimetype);
+      return {
+        key,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        uploadedBy,
+        uploadedAt,
+      };
+    })
+  );
+  entry.attachments = _.concat(entry.attachments, attachments);
+
+  opportunity.updatedBy = extractUserDetails(user);
+  await opportunity.save();
+  return opportunity;
+};
+
+/**
+ * Look up one Supplier Communication attachment's stored metadata, for a
+ * secure (auth-checked) download.
+ * @param {string} opportunityId
+ * @param {string} entryId
+ * @param {string} attachmentId
+ * @returns {Promise<Object>}
+ */
+const getSupplierCommunicationAttachment = async (opportunityId, entryId, attachmentId) => {
+  const opportunity = await getActiveOpportunityById(opportunityId);
+  const entry = opportunity.supplierCommunications.id(entryId);
+  if (!entry) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Supplier Communication entry not found");
+  }
+  const attachment = entry.attachments.id(attachmentId);
+  if (!attachment) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Attachment not found");
+  }
+  return attachment;
+};
+
 module.exports = {
   createOpportunity,
   queryOpportunities,
@@ -389,6 +465,8 @@ module.exports = {
   getOpportunityById,
   getActiveOpportunityById,
   updateOpportunityById,
+  addSupplierCommunicationAttachments,
+  getSupplierCommunicationAttachment,
   deactivateOpportunityById,
   restoreOpportunityById,
   permanentlyDeleteOpportunityById,

@@ -1,5 +1,5 @@
 const Joi = require("joi");
-const { problemTypeOptions, priorityOptions, siteAccessHoursOptions, statusOptions, rfoStatusOptions } = require("../config/ticketOptions");
+const { problemTypeOptions, priorityOptions, siteAccessHoursOptions, statusOptions, closureCodeOptions, rfoStatusOptions } = require("../config/ticketOptions");
 
 const createTicket = {
   body: Joi.array().items(
@@ -49,6 +49,7 @@ const updateTicket = {
       status: Joi.string()
         .valid(...statusOptions)
         .required(),
+      closureCode: Joi.string().valid("", ...closureCodeOptions).allow(""),
       scxInternalComments: Joi.string().allow(""),
       vendorTicketId: Joi.string().allow(""),
       vendorTicketCreateDate: Joi.string().allow(""),

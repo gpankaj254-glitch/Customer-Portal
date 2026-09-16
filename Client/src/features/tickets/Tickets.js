@@ -54,13 +54,15 @@ function TicketsContent() {
     function toggleTabs() {
         switch (value) {
         case 1:
-            return    <TicketsTable pagination = {pagination} closed = {false}  />
+            return    <CreateTicket></CreateTicket>
         case 2:
-            return    <TicketsTable pagination = {pagination} closed = {true}  />
+            return    <TicketsTable pagination = {pagination} mode = "closed"  />
         case 3:
-            return isAdmin ? <BulkUploadTickets /> : <CreateTicket />
+            return    <TicketsTable pagination = {pagination} mode = "completed"  />
+        case 4:
+            return isAdmin ? <BulkUploadTickets /> : <TicketsTable pagination = {pagination} mode = "open"  />
         default:
-            return <CreateTicket></CreateTicket>
+            return <TicketsTable pagination = {pagination} mode = "open"  />
         }
     }
 
@@ -69,9 +71,10 @@ function TicketsContent() {
             <Grid container spacing={3}>
                 <Grid item xs={12}>
                     <Tabs value={value} onChange={handleChange} aria-label="user management">
-                        <Tab label="Create New Ticket"/>
                         <Tab label="View Open Ticket"/>
+                        <Tab label="Create New Ticket"/>
                         <Tab label="View Closed Tickets"/>
+                        <Tab label="Completed Tickets"/>
                         {isAdmin && <Tab label="Bulk Upload Tickets"/>}
 
                     </Tabs>

@@ -12,6 +12,21 @@ const { bandwidthOptions, productOptions } = require("../config/circuitOptions")
 const { currencyOptions } = require("../config/currencyOptions");
 const currencyCodes = currencyOptions.map((option) => option.code);
 
+// Same shape as Ticket's attachmentSchema (Server/src/models/ticket.model.js)
+// - files live in S3, keyed here.
+const attachmentSchema = {
+  key: { type: String, default: "" },
+  originalName: { type: String, required: true },
+  mimeType: { type: String },
+  size: { type: Number },
+  uploadedBy: {
+    id: { type: String },
+    name: { type: String },
+    email: { type: String },
+  },
+  uploadedAt: { type: String },
+};
+
 const opportunitySchema = mongoose.Schema(
   {
     // Human-friendly opportunity number shown to users, e.g. "OPP26090001" -
@@ -147,6 +162,10 @@ const opportunitySchema = mongoose.Schema(
                 mrc: { type: Number },
               },
             ],
+            default: [],
+          },
+          attachments: {
+            type: [attachmentSchema],
             default: [],
           },
         },
