@@ -12,7 +12,7 @@ function roleBasedPermissions(role) {
     case roles.CUSTOMER_USER:
         return [permisiions.SITE_MANAGEMENT, permisiions.TICKETS]
     case roles.SCLOUDX_USER:
-        return [permisiions.USER_MANAGEMENT, permisiions.CUSTOMER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.VENDOR_MANAGEMENT, permisiions.TICKETS, permisiions.SALES_OPPORTUNITIES]
+        return [permisiions.USER_MANAGEMENT, permisiions.CUSTOMER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.VENDOR_MANAGEMENT, permisiions.TICKETS]
     case roles.VENDOR_ADMIN:
         return [permisiions.USER_MANAGEMENT]
     case roles.VENDOR_USER:
