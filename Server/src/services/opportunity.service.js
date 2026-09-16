@@ -218,8 +218,9 @@ const updateOpportunityById = async (opportunityId, updateBody, actingUser, rela
  *   within the last 30 days - quotesSubmitted (all of them), quotesWon
  *   (status Won), quotesAwaitingFeedback (status Submitted).
  * - supplierQuotesPending: Supplier Communication entries (across all
- *   active opportunities) whose quoteStatus is "Submitted" - i.e. we're
- *   waiting on the supplier to respond.
+ *   active opportunities) whose quoteStatus is "Submitted" or "Pending" -
+ *   i.e. the request is out to the supplier or not yet sent, either way
+ *   still open and not yet resolved to Received/No Bid.
  * - supplierQuotesPendingOverThreeDays: of those, ones whose
  *   quoteSubmitDate is more than 3 days old.
  * - supplierLast30Days: among Supplier Communication entries whose
@@ -257,6 +258,7 @@ const getSalesDashboardSummary = async () => {
   let supplierQuotesReceivedLast30Days = 0;
   const supplierStats = {};
   const openOpportunities = [];
+  const openSupplierQuoteStatuses = ["Submitted", "Pending"];
 
   opportunities.forEach((opportunity) => {
     const customerRequest = opportunity.customerRequest || {};
@@ -290,7 +292,7 @@ const getSalesDashboardSummary = async () => {
         if (entry.quoteStatus === "Received") supplierQuotesReceivedLast30Days += 1;
       }
 
-      if (entry.quoteStatus !== "Submitted") return;
+      if (!openSupplierQuoteStatuses.includes(entry.quoteStatus)) return;
       const supplierName = entry.supplier || "Unknown";
       if (!supplierStats[supplierName]) {
         supplierStats[supplierName] = { supplier: supplierName, pending: 0, pendingOverThreeDays: 0 };
