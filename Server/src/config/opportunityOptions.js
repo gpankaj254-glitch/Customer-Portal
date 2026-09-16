@@ -9,10 +9,19 @@ const stageOptions = [
   "Lost",
 ];
 
-// Customer Communication's Order Status field.
-const orderStatusOptions = ["Pending", "Won", "Lost"];
+// Customer Request's Quote Status field.
+const quoteStatusOptions = ["Pending", "Won", "Lost"];
+
+const linkTypeOptions = ["Primary", "Secondary"];
+
+const ipRequirementOptions = ["/30", "/29", "/28"];
+
+const interfaceOptions = ["RJ45", "Fiber SMF", "Fiber MMF"];
 
 module.exports = {
   stageOptions,
-  orderStatusOptions,
+  quoteStatusOptions,
+  linkTypeOptions,
+  ipRequirementOptions,
+  interfaceOptions,
 };

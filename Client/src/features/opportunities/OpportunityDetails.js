@@ -1,8 +1,6 @@
 import * as React from "react"
 import Box from "@mui/material/Box"
 import Paper from "@mui/material/Paper"
-import Tabs from "@mui/material/Tabs"
-import Tab from "@mui/material/Tab"
 import Typography from "@mui/material/Typography"
 import Table from "@mui/material/Table"
 import TableHead from "@mui/material/TableHead"
@@ -21,44 +19,8 @@ import PropTypes from "prop-types"
 import _ from "lodash"
 import { useDispatch } from "react-redux"
 import { updateOpportunity } from "./opportunitySlice"
-import { orderStatusOptions } from "../../consts/opportunityCommOptions"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
-
-const customerCommunicationFields = [
-    { name: "customerName", label: "Customer Name" },
-    { name: "requestDate", label: "Request Date" },
-    { name: "requestRef", label: "Request Ref" },
-    { name: "linkCategory", label: "Link Category" },
-    { name: "address", label: "Address" },
-    { name: "cityTown", label: "City/Town" },
-    { name: "stateProvince", label: "State/Province" },
-    { name: "postalCode", label: "Postal Code/Zip" },
-    { name: "country", label: "Country" },
-    { name: "product", label: "Product" },
-    { name: "ip", label: "IP" },
-    { name: "interface", label: "Interface" },
-    { name: "downBandwidth", label: "Down Bandwidth" },
-    { name: "upBandwidth", label: "Up Bandwidth" },
-    { name: "termMonths", label: "Term (Months)" },
-    { name: "quoteSentToCustomer", label: "Quote Sent to Customer" },
-    {
-        name: "orderStatus",
-        label: "Order Status",
-        type: "select",
-        options: orderStatusOptions.map((option) => ({ value: option, label: option })),
-    },
-]
-const customerCommunicationNumberFields = ["downBandwidth", "upBandwidth", "termMonths"]
-
-const customerCommunicationColumns = [
-    { id: "customerName", label: "Customer Name" },
-    { id: "requestRef", label: "Request Ref" },
-    { id: "product", label: "Product" },
-    { id: "downBandwidth", label: "Down Bandwidth" },
-    { id: "upBandwidth", label: "Up Bandwidth" },
-    { id: "orderStatus", label: "Order Status" },
-]
 
 const supplierCommunicationFields = [
     { name: "supplier", label: "Supplier" },
@@ -81,14 +43,14 @@ const supplierCommunicationColumns = [
 
 function emptyValuesFor(fields) {
     return fields.reduce((acc, field) => {
-        acc[field.name] = field.name === "orderStatus" ? "Pending" : ""
+        acc[field.name] = ""
         return acc
     }, {})
 }
 
-// Shared add/edit/delete list UI for one communication tab - entries live in
-// the parent's local state (not saved until the "Save Communications"
-// button), fields/columns/numberFields differ between the two tabs.
+// Shared add/edit/delete list UI for Supplier Communication - entries live
+// in the parent's local state (not saved until the "Save Communications"
+// button).
 function CommunicationList({ entries, onChange, columns, fields, numberFields, entityLabel }) {
     const [editingIndex, setEditingIndex] = React.useState(null) // -1 = adding new
     const [deletingIndex, setDeletingIndex] = React.useState(null)
@@ -198,17 +160,14 @@ CommunicationList.propTypes = {
 
 export default function OpportunityDetails({ opportunity }) {
     const dispatch = useDispatch()
-    const [activeTab, setActiveTab] = React.useState(0)
-    const [customerCommunications, setCustomerCommunications] = React.useState(_.get(opportunity, "customerCommunications", []))
     const [supplierCommunications, setSupplierCommunications] = React.useState(_.get(opportunity, "supplierCommunications", []))
     const [saving, setSaving] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)
 
-    // Re-seed local lists whenever the underlying opportunity actually
+    // Re-seed local list whenever the underlying opportunity actually
     // changes in Redux (e.g. after a successful save gives entries their
     // real _ids) - opportunity is a stable reference otherwise.
     React.useEffect(() => {
-        setCustomerCommunications(_.get(opportunity, "customerCommunications", []))
         setSupplierCommunications(_.get(opportunity, "supplierCommunications", []))
     }, [opportunity])
 
@@ -217,7 +176,6 @@ export default function OpportunityDetails({ opportunity }) {
         try {
             await dispatch(updateOpportunity({
                 opportunityId: opportunity.id,
-                customerCommunications,
                 supplierCommunications,
             })).unwrap()
             setFeedback({ severity: "success", message: "Communications saved successfully" })
@@ -231,31 +189,16 @@ export default function OpportunityDetails({ opportunity }) {
     return (
         <Box sx={{ p: 2 }}>
             <Paper sx={{ p: 2 }}>
-                <Tabs value={activeTab} onChange={(event, newValue) => setActiveTab(newValue)} sx={{ mb: 2 }}>
-                    <Tab label="Customer Communication" />
-                    <Tab label="Supplier Communication" />
-                </Tabs>
+                <Typography variant="subtitle1" sx={{ mb: 2 }}>Supplier Communication</Typography>
 
-                {activeTab === 0 && (
-                    <CommunicationList
-                        entries={customerCommunications}
-                        onChange={setCustomerCommunications}
-                        columns={customerCommunicationColumns}
-                        fields={customerCommunicationFields}
-                        numberFields={customerCommunicationNumberFields}
-                        entityLabel="Customer Communication"
-                    />
-                )}
-                {activeTab === 1 && (
-                    <CommunicationList
-                        entries={supplierCommunications}
-                        onChange={setSupplierCommunications}
-                        columns={supplierCommunicationColumns}
-                        fields={supplierCommunicationFields}
-                        numberFields={supplierCommunicationNumberFields}
-                        entityLabel="Supplier Communication"
-                    />
-                )}
+                <CommunicationList
+                    entries={supplierCommunications}
+                    onChange={setSupplierCommunications}
+                    columns={supplierCommunicationColumns}
+                    fields={supplierCommunicationFields}
+                    numberFields={supplierCommunicationNumberFields}
+                    entityLabel="Supplier Communication"
+                />
 
                 <Box sx={{ mt: 2 }}>
                     <Button variant="contained" onClick={handleSave} disabled={saving}>

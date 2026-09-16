@@ -48,6 +48,7 @@ const createOpportunity = async (reqBody, user, relatedCustomer = null) => {
     "stage",
     "expectedCloseDate",
     "description",
+    "customerRequest",
   ]);
   opportunityToCreate.opportunityId = await generateOpportunityNumber();
   if (relatedCustomer) {

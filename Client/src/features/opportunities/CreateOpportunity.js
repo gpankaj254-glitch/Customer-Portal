@@ -13,10 +13,18 @@ import MenuItem from "@mui/material/MenuItem"
 import FormControl from "@mui/material/FormControl"
 import FormHelperText from "@mui/material/FormHelperText"
 import Select from "@mui/material/Select"
+import Divider from "@mui/material/Divider"
 import PropTypes from "prop-types"
 import { useDispatch, useSelector } from "react-redux"
 import { createOpportunity, getOpportunities, selectPagination } from "./opportunitySlice"
 import { selectCustomerList } from "../customers/customerSlice"
+import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
+import {
+    quoteStatusOptions,
+    linkTypeOptions,
+    ipRequirementOptions,
+    interfaceOptions,
+} from "../../consts/opportunityCommOptions"
 
 export default function CreateOpportunity({ onCreated }) {
     const dispatch = useDispatch()
@@ -24,6 +32,13 @@ export default function CreateOpportunity({ onCreated }) {
     const customerList = useSelector(selectCustomerList)
     const [feedback, setFeedback] = React.useState(null)
     const [selectedCustomer, setSelectedCustomer] = React.useState("")
+    const [linkType, setLinkType] = React.useState("")
+    const [product, setProduct] = React.useState("")
+    const [ipRequirement, setIpRequirement] = React.useState("")
+    const [interfaceType, setInterfaceType] = React.useState("")
+    const [downBandwidth, setDownBandwidth] = React.useState("")
+    const [upBandwidth, setUpBandwidth] = React.useState("")
+    const [quoteStatus, setQuoteStatus] = React.useState("Pending")
 
     const handleSubmit = async (event) => {
         event.preventDefault()
@@ -34,16 +49,41 @@ export default function CreateOpportunity({ onCreated }) {
             customerId: selectedCustomer || undefined,
             prospectName: selectedCustomer ? "" : data.get("prospectName"),
             description: data.get("description"),
+            customerRequest: {
+                requestId: data.get("requestId"),
+                requestDate: data.get("requestDate"),
+                linkType,
+                siteAddress: data.get("siteAddress"),
+                city: data.get("city"),
+                state: data.get("state"),
+                zipCode: data.get("zipCode"),
+                country: data.get("country"),
+                product,
+                ipRequirement,
+                interface: interfaceType,
+                downBandwidth,
+                upBandwidth,
+                contractTerm: data.get("contractTerm"),
+                quoteSubmitDate: data.get("quoteSubmitDate"),
+                quoteStatus,
+            },
         }
         try {
             const created = await dispatch(createOpportunity(payload)).unwrap()
             setFeedback({ severity: "success", message: "Opportunity created successfully" })
             form.reset()
             setSelectedCustomer("")
+            setLinkType("")
+            setProduct("")
+            setIpRequirement("")
+            setInterfaceType("")
+            setDownBandwidth("")
+            setUpBandwidth("")
+            setQuoteStatus("Pending")
             dispatch(getOpportunities({ limit: pagination.limit, page: pagination.page + 1 }))
-            // Jump to the list and expand the new row so its Customer/Supplier
-            // Communication tabs are immediately visible - those tabs live on
-            // the list row (a repeatable list needs the opportunity to exist
+            // Jump to the list and expand the new row so its Supplier
+            // Communication tab is immediately visible - it lives on the
+            // list row (a repeatable list needs the opportunity to exist
             // first), not on this create form, which isn't obvious otherwise.
             if (onCreated) onCreated(created.id)
         } catch (err) {
@@ -57,7 +97,7 @@ export default function CreateOpportunity({ onCreated }) {
             <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <Typography component="h1" variant="h5">Create New Opportunity</Typography>
 
-                <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 3 }}>
+                <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 3, width: "100%" }}>
                     <Grid container spacing={2}>
                         <Grid item xs={12}>
                             <TextField
@@ -111,6 +151,184 @@ export default function CreateOpportunity({ onCreated }) {
                                 label="Description"
                                 id="description"
                             />
+                        </Grid>
+
+                        <Grid item xs={12}>
+                            <Divider sx={{ my: 1 }} />
+                            <Typography variant="subtitle1">Customer Request</Typography>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth name="requestId" label="Request ID" />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                type="date"
+                                name="requestDate"
+                                label="Request Date"
+                                InputLabelProps={{ shrink: true }}
+                            />
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel id="linkType-label">Link Type</InputLabel>
+                                <Select
+                                    labelId="linkType-label"
+                                    value={linkType}
+                                    label="Link Type"
+                                    onChange={(event) => setLinkType(event.target.value)}
+                                >
+                                    <MenuItem value="">
+                                        <em>None</em>
+                                    </MenuItem>
+                                    {linkTypeOptions.map((option) => (
+                                        <MenuItem key={option} value={option}>{option}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth name="siteAddress" label="Site Address" />
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth name="city" label="City" />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth name="state" label="State" />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth name="zipCode" label="ZIP Code" />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth name="country" label="Country" />
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel id="product-label">Product</InputLabel>
+                                <Select
+                                    labelId="product-label"
+                                    value={product}
+                                    label="Product"
+                                    onChange={(event) => setProduct(event.target.value)}
+                                >
+                                    <MenuItem value="">
+                                        <em>None</em>
+                                    </MenuItem>
+                                    {productOptions.map((option) => (
+                                        <MenuItem key={option} value={option}>{option}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel id="ipRequirement-label">IP Requirement</InputLabel>
+                                <Select
+                                    labelId="ipRequirement-label"
+                                    value={ipRequirement}
+                                    label="IP Requirement"
+                                    onChange={(event) => setIpRequirement(event.target.value)}
+                                >
+                                    <MenuItem value="">
+                                        <em>None</em>
+                                    </MenuItem>
+                                    {ipRequirementOptions.map((option) => (
+                                        <MenuItem key={option} value={option}>{option}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel id="interface-label">Interface</InputLabel>
+                                <Select
+                                    labelId="interface-label"
+                                    value={interfaceType}
+                                    label="Interface"
+                                    onChange={(event) => setInterfaceType(event.target.value)}
+                                >
+                                    <MenuItem value="">
+                                        <em>None</em>
+                                    </MenuItem>
+                                    {interfaceOptions.map((option) => (
+                                        <MenuItem key={option} value={option}>{option}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel id="downBandwidth-label">Down Bandwidth</InputLabel>
+                                <Select
+                                    labelId="downBandwidth-label"
+                                    value={downBandwidth}
+                                    label="Down Bandwidth"
+                                    onChange={(event) => setDownBandwidth(event.target.value)}
+                                >
+                                    <MenuItem value="">
+                                        <em>None</em>
+                                    </MenuItem>
+                                    {bandwidthOptions.map((option) => (
+                                        <MenuItem key={option} value={option}>{option}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel id="upBandwidth-label">Up Bandwidth</InputLabel>
+                                <Select
+                                    labelId="upBandwidth-label"
+                                    value={upBandwidth}
+                                    label="Up Bandwidth"
+                                    onChange={(event) => setUpBandwidth(event.target.value)}
+                                >
+                                    <MenuItem value="">
+                                        <em>None</em>
+                                    </MenuItem>
+                                    {bandwidthOptions.map((option) => (
+                                        <MenuItem key={option} value={option}>{option}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth name="contractTerm" label="Contract Term" placeholder="e.g. 12 Months" />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                type="date"
+                                name="quoteSubmitDate"
+                                label="Quote Submit Date"
+                                InputLabelProps={{ shrink: true }}
+                            />
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel id="quoteStatus-label">Quote Status</InputLabel>
+                                <Select
+                                    labelId="quoteStatus-label"
+                                    value={quoteStatus}
+                                    label="Quote Status"
+                                    onChange={(event) => setQuoteStatus(event.target.value)}
+                                >
+                                    {quoteStatusOptions.map((option) => (
+                                        <MenuItem key={option} value={option}>{option}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
                         </Grid>
 
                         <Grid item xs={12}>

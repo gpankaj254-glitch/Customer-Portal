@@ -1,25 +1,30 @@
 const Joi = require("joi");
-const { stageOptions, orderStatusOptions } = require("../config/opportunityOptions");
+const {
+  stageOptions,
+  quoteStatusOptions,
+  linkTypeOptions,
+  ipRequirementOptions,
+  interfaceOptions,
+} = require("../config/opportunityOptions");
+const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
 
-const customerCommunicationItem = Joi.object().keys({
-  _id: Joi.string(),
-  customerName: Joi.string().allow(""),
+const customerRequestSchema = Joi.object().keys({
+  requestId: Joi.string().allow(""),
   requestDate: Joi.string().allow(""),
-  requestRef: Joi.string().allow(""),
-  linkCategory: Joi.string().allow(""),
-  address: Joi.string().allow(""),
-  cityTown: Joi.string().allow(""),
-  stateProvince: Joi.string().allow(""),
-  postalCode: Joi.string().allow(""),
+  linkType: Joi.string().valid("", ...linkTypeOptions),
+  siteAddress: Joi.string().allow(""),
+  city: Joi.string().allow(""),
+  state: Joi.string().allow(""),
+  zipCode: Joi.string().allow(""),
   country: Joi.string().allow(""),
-  product: Joi.string().allow(""),
-  ip: Joi.string().allow(""),
-  interface: Joi.string().allow(""),
-  downBandwidth: Joi.number().allow(null),
-  upBandwidth: Joi.number().allow(null),
-  termMonths: Joi.number().allow(null),
-  quoteSentToCustomer: Joi.string().allow(""),
-  orderStatus: Joi.string().valid(...orderStatusOptions),
+  product: Joi.string().valid("", ...productOptions),
+  ipRequirement: Joi.string().valid("", ...ipRequirementOptions),
+  interface: Joi.string().valid("", ...interfaceOptions),
+  downBandwidth: Joi.string().valid("", ...bandwidthOptions),
+  upBandwidth: Joi.string().valid("", ...bandwidthOptions),
+  contractTerm: Joi.string().allow(""),
+  quoteSubmitDate: Joi.string().allow(""),
+  quoteStatus: Joi.string().valid(...quoteStatusOptions),
 });
 
 const supplierCommunicationItem = Joi.object().keys({
@@ -43,6 +48,7 @@ const createOpportunity = {
       stage: Joi.string().valid(...stageOptions),
       expectedCloseDate: Joi.string().allow(""),
       description: Joi.string().allow(""),
+      customerRequest: customerRequestSchema,
     })
   ),
 };
@@ -83,7 +89,7 @@ const updateOpportunity = {
         orderNumber: Joi.string().allow(""),
         orderValue: Joi.number(),
       }),
-      customerCommunications: Joi.array().items(customerCommunicationItem),
+      customerRequest: customerRequestSchema,
       supplierCommunications: Joi.array().items(supplierCommunicationItem),
     })
     .min(1),

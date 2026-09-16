@@ -1,6 +1,13 @@
 const mongoose = require("mongoose");
 const { toJSON, paginate } = require("./plugins");
-const { stageOptions, orderStatusOptions } = require("../config/opportunityOptions");
+const {
+  stageOptions,
+  quoteStatusOptions,
+  linkTypeOptions,
+  ipRequirementOptions,
+  interfaceOptions,
+} = require("../config/opportunityOptions");
+const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
 
 const opportunitySchema = mongoose.Schema(
   {
@@ -71,32 +78,27 @@ const opportunitySchema = mongoose.Schema(
       type: Array,
       default: [],
     },
-    // Sales Portal Template 15Sep26.xlsx - each opportunity can have several
-    // customer requests and several supplier quotes over its lifetime, so
-    // both are repeatable lists rather than a single fixed set of fields.
-    customerCommunications: {
-      type: [
-        {
-          customerName: { type: String, default: "" },
-          requestDate: { type: String, default: "" },
-          requestRef: { type: String, default: "" },
-          linkCategory: { type: String, default: "" },
-          address: { type: String, default: "" },
-          cityTown: { type: String, default: "" },
-          stateProvince: { type: String, default: "" },
-          postalCode: { type: String, default: "" },
-          country: { type: String, default: "" },
-          product: { type: String, default: "" },
-          ip: { type: String, default: "" },
-          interface: { type: String, default: "" },
-          downBandwidth: { type: Number, default: null },
-          upBandwidth: { type: Number, default: null },
-          termMonths: { type: Number, default: null },
-          quoteSentToCustomer: { type: String, default: "" },
-          orderStatus: { type: String, enum: orderStatusOptions, default: "Pending" },
-        },
-      ],
-      default: [],
+    // Sales Portal Template 15Sep26.xlsx - captured once, at creation time
+    // (fixed fields, not a repeatable list, same shape as convertedOrder
+    // below). Supplier quotes remain a repeatable list since a customer
+    // request can go out to several suppliers over its lifetime.
+    customerRequest: {
+      requestId: { type: String, default: "" },
+      requestDate: { type: String, default: "" },
+      linkType: { type: String, enum: ["", ...linkTypeOptions], default: "" },
+      siteAddress: { type: String, default: "" },
+      city: { type: String, default: "" },
+      state: { type: String, default: "" },
+      zipCode: { type: String, default: "" },
+      country: { type: String, default: "" },
+      product: { type: String, enum: ["", ...productOptions], default: "" },
+      ipRequirement: { type: String, enum: ["", ...ipRequirementOptions], default: "" },
+      interface: { type: String, enum: ["", ...interfaceOptions], default: "" },
+      downBandwidth: { type: String, enum: ["", ...bandwidthOptions], default: "" },
+      upBandwidth: { type: String, enum: ["", ...bandwidthOptions], default: "" },
+      contractTerm: { type: String, default: "" },
+      quoteSubmitDate: { type: String, default: "" },
+      quoteStatus: { type: String, enum: quoteStatusOptions, default: "Pending" },
     },
     supplierCommunications: {
       type: [
