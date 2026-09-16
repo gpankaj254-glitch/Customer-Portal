@@ -17,33 +17,51 @@ import Snackbar from "@mui/material/Snackbar"
 import Alert from "@mui/material/Alert"
 import PropTypes from "prop-types"
 import _ from "lodash"
-import { useDispatch } from "react-redux"
+import { useDispatch, useSelector } from "react-redux"
 import { updateOpportunity } from "./opportunitySlice"
+import { quoteStatusOptions } from "../../consts/opportunityCommOptions"
+import { currencyOptions } from "../../consts/currencyOptions"
+import { selectVendorList } from "../vendors/vendorSlice"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
 
-const supplierCommunicationFields = [
-    { name: "supplier", label: "Supplier" },
-    { name: "quoteRequestDate", label: "Quote Request Date" },
-    { name: "quoteReceivedDate", label: "Quote Received Date" },
-    { name: "lec", label: "LEC" },
-    { name: "currency", label: "Currency" },
-    { name: "nrc", label: "NRC" },
-    { name: "mrc", label: "MRC" },
-]
+const currencySelectOptions = currencyOptions.map((option) => ({
+    value: option.code,
+    label: `${option.code} - ${option.name}`,
+}))
+
+function buildSupplierCommunicationFields(vendorOptions) {
+    return [
+        { name: "supplier", label: "Supplier", type: "autocomplete", options: vendorOptions },
+        { name: "quoteRequestDate", label: "Quote Request Date", type: "date" },
+        { name: "currency", label: "Currency", type: "autocomplete", options: currencySelectOptions },
+        { name: "lec", label: "LEC" },
+        { name: "nrc", label: "NRC" },
+        { name: "mrc", label: "MRC" },
+        { name: "quoteSubmitDate", label: "Quote Submit Date", type: "date" },
+        {
+            name: "quoteStatus",
+            label: "Quote Status",
+            type: "select",
+            options: quoteStatusOptions.map((status) => ({ value: status, label: status })),
+        },
+    ]
+}
 const supplierCommunicationNumberFields = ["nrc", "mrc"]
 
 const supplierCommunicationColumns = [
     { id: "supplier", label: "Supplier" },
     { id: "quoteRequestDate", label: "Quote Request Date" },
-    { id: "quoteReceivedDate", label: "Quote Received Date" },
+    { id: "currency", label: "Currency" },
     { id: "nrc", label: "NRC" },
     { id: "mrc", label: "MRC" },
+    { id: "quoteSubmitDate", label: "Quote Submit Date" },
+    { id: "quoteStatus", label: "Quote Status" },
 ]
 
 function emptyValuesFor(fields) {
     return fields.reduce((acc, field) => {
-        acc[field.name] = ""
+        acc[field.name] = field.name === "quoteStatus" ? "Pending" : ""
         return acc
     }, {})
 }
@@ -160,6 +178,9 @@ CommunicationList.propTypes = {
 
 export default function OpportunityDetails({ opportunity }) {
     const dispatch = useDispatch()
+    const vendorList = useSelector(selectVendorList)
+    const vendorOptions = vendorList.map((vendor) => ({ value: vendor.name, label: vendor.name }))
+    const supplierCommunicationFields = buildSupplierCommunicationFields(vendorOptions)
     const [supplierCommunications, setSupplierCommunications] = React.useState(_.get(opportunity, "supplierCommunications", []))
     const [saving, setSaving] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)

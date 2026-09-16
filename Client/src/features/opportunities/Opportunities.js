@@ -16,6 +16,7 @@ import {
 import { useSelector, useDispatch } from "react-redux"
 import CreateOpportunity from "./CreateOpportunity"
 import { getCustomers } from "../customers/customerSlice"
+import { getVendors } from "../vendors/vendorSlice"
 import { fetchDeletedOpportunities, fetchRestoreOpportunity, fetchPermanentlyDeleteOpportunity } from "./opportunityAPI"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
@@ -56,9 +57,12 @@ function OpportunitiesContent() {
         setValue(newValue)
     }
 
-    // Populate the customer dropdown used by CreateOpportunity once on mount.
+    // Populate the customer dropdown used by CreateOpportunity, and the
+    // vendor list used by Supplier Communication's Supplier picker, once on
+    // mount.
     React.useEffect(() => {
         dispatch(getCustomers({ limit: 200, page: 1 }))
+        dispatch(getVendors({ limit: 200, page: 1 }))
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 

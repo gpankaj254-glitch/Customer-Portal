@@ -8,6 +8,8 @@ const {
   interfaceOptions,
 } = require("../config/opportunityOptions");
 const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
+const { currencyOptions } = require("../config/currencyOptions");
+const currencyCodes = currencyOptions.map((option) => option.code);
 
 const opportunitySchema = mongoose.Schema(
   {
@@ -99,17 +101,22 @@ const opportunitySchema = mongoose.Schema(
       contractTerm: { type: String, default: "" },
       quoteSubmitDate: { type: String, default: "" },
       quoteStatus: { type: String, enum: quoteStatusOptions, default: "Pending" },
+      // Stamped server-side whenever quoteStatus actually changes - see
+      // opportunity.service.js's updateOpportunityById.
+      quoteStatusUpdatedAt: { type: String, default: "" },
     },
     supplierCommunications: {
       type: [
         {
           supplier: { type: String, default: "" },
           quoteRequestDate: { type: String, default: "" },
-          quoteReceivedDate: { type: String, default: "" },
+          currency: { type: String, enum: ["", ...currencyCodes], default: "" },
           lec: { type: String, default: "" },
-          currency: { type: String, default: "" },
           nrc: { type: Number, default: null },
           mrc: { type: Number, default: null },
+          quoteSubmitDate: { type: String, default: "" },
+          quoteStatus: { type: String, enum: quoteStatusOptions, default: "Pending" },
+          quoteStatusUpdatedAt: { type: String, default: "" },
         },
       ],
       default: [],

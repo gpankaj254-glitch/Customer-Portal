@@ -14,17 +14,18 @@ import FormControl from "@mui/material/FormControl"
 import FormHelperText from "@mui/material/FormHelperText"
 import Select from "@mui/material/Select"
 import Divider from "@mui/material/Divider"
+import Autocomplete from "@mui/material/Autocomplete"
 import PropTypes from "prop-types"
 import { useDispatch, useSelector } from "react-redux"
 import { createOpportunity, getOpportunities, selectPagination } from "./opportunitySlice"
 import { selectCustomerList } from "../customers/customerSlice"
 import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
 import {
-    quoteStatusOptions,
     linkTypeOptions,
     ipRequirementOptions,
     interfaceOptions,
 } from "../../consts/opportunityCommOptions"
+import { countryOptions } from "../../consts/countryOptions"
 
 export default function CreateOpportunity({ onCreated }) {
     const dispatch = useDispatch()
@@ -33,12 +34,12 @@ export default function CreateOpportunity({ onCreated }) {
     const [feedback, setFeedback] = React.useState(null)
     const [selectedCustomer, setSelectedCustomer] = React.useState("")
     const [linkType, setLinkType] = React.useState("")
+    const [country, setCountry] = React.useState("")
     const [product, setProduct] = React.useState("")
     const [ipRequirement, setIpRequirement] = React.useState("")
     const [interfaceType, setInterfaceType] = React.useState("")
     const [downBandwidth, setDownBandwidth] = React.useState("")
     const [upBandwidth, setUpBandwidth] = React.useState("")
-    const [quoteStatus, setQuoteStatus] = React.useState("Pending")
 
     const handleSubmit = async (event) => {
         event.preventDefault()
@@ -57,15 +58,13 @@ export default function CreateOpportunity({ onCreated }) {
                 city: data.get("city"),
                 state: data.get("state"),
                 zipCode: data.get("zipCode"),
-                country: data.get("country"),
+                country,
                 product,
                 ipRequirement,
                 interface: interfaceType,
                 downBandwidth,
                 upBandwidth,
                 contractTerm: data.get("contractTerm"),
-                quoteSubmitDate: data.get("quoteSubmitDate"),
-                quoteStatus,
             },
         }
         try {
@@ -74,12 +73,12 @@ export default function CreateOpportunity({ onCreated }) {
             form.reset()
             setSelectedCustomer("")
             setLinkType("")
+            setCountry("")
             setProduct("")
             setIpRequirement("")
             setInterfaceType("")
             setDownBandwidth("")
             setUpBandwidth("")
-            setQuoteStatus("Pending")
             dispatch(getOpportunities({ limit: pagination.limit, page: pagination.page + 1 }))
             // Jump to the list and expand the new row so its Supplier
             // Communication tab is immediately visible - it lives on the
@@ -204,7 +203,13 @@ export default function CreateOpportunity({ onCreated }) {
                             <TextField fullWidth name="zipCode" label="ZIP Code" />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth name="country" label="Country" />
+                            <Autocomplete
+                                fullWidth
+                                options={countryOptions}
+                                value={country || null}
+                                onChange={(event, newValue) => setCountry(newValue || "")}
+                                renderInput={(params) => <TextField {...params} label="Country" />}
+                            />
                         </Grid>
 
                         <Grid item xs={12} sm={6}>
@@ -304,31 +309,6 @@ export default function CreateOpportunity({ onCreated }) {
 
                         <Grid item xs={12} sm={6}>
                             <TextField fullWidth name="contractTerm" label="Contract Term" placeholder="e.g. 12 Months" />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                type="date"
-                                name="quoteSubmitDate"
-                                label="Quote Submit Date"
-                                InputLabelProps={{ shrink: true }}
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
-                                <InputLabel id="quoteStatus-label">Quote Status</InputLabel>
-                                <Select
-                                    labelId="quoteStatus-label"
-                                    value={quoteStatus}
-                                    label="Quote Status"
-                                    onChange={(event) => setQuoteStatus(event.target.value)}
-                                >
-                                    {quoteStatusOptions.map((option) => (
-                                        <MenuItem key={option} value={option}>{option}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
                         </Grid>
 
                         <Grid item xs={12}>

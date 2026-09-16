@@ -7,6 +7,9 @@ const {
   interfaceOptions,
 } = require("../config/opportunityOptions");
 const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
+const { currencyOptions } = require("../config/currencyOptions");
+
+const currencyCodes = currencyOptions.map((option) => option.code);
 
 const customerRequestSchema = Joi.object().keys({
   requestId: Joi.string().allow(""),
@@ -25,17 +28,20 @@ const customerRequestSchema = Joi.object().keys({
   contractTerm: Joi.string().allow(""),
   quoteSubmitDate: Joi.string().allow(""),
   quoteStatus: Joi.string().valid(...quoteStatusOptions),
+  quoteStatusUpdatedAt: Joi.string().allow(""),
 });
 
 const supplierCommunicationItem = Joi.object().keys({
   _id: Joi.string(),
   supplier: Joi.string().allow(""),
   quoteRequestDate: Joi.string().allow(""),
-  quoteReceivedDate: Joi.string().allow(""),
+  currency: Joi.string().valid("", ...currencyCodes),
   lec: Joi.string().allow(""),
-  currency: Joi.string().allow(""),
   nrc: Joi.number().allow(null),
   mrc: Joi.number().allow(null),
+  quoteSubmitDate: Joi.string().allow(""),
+  quoteStatus: Joi.string().valid(...quoteStatusOptions),
+  quoteStatusUpdatedAt: Joi.string().allow(""),
 });
 
 const createOpportunity = {

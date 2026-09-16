@@ -6,6 +6,7 @@ import DialogActions from "@mui/material/DialogActions"
 import Button from "@mui/material/Button"
 import TextField from "@mui/material/TextField"
 import MenuItem from "@mui/material/MenuItem"
+import Autocomplete from "@mui/material/Autocomplete"
 import Typography from "@mui/material/Typography"
 import PropTypes from "prop-types"
 import _ from "lodash"
@@ -38,22 +39,46 @@ export default function EditDialog({ open, title, fields, initialValues, lastEdi
                         {lastEditedNote}
                     </Typography>
                 )}
-                {resolvedFields.map((field) => (
-                    <TextField
-                        key={field.name}
-                        select={field.type === "select"}
-                        fullWidth
-                        margin="dense"
-                        label={field.label}
-                        value={_.get(values, field.name, "")}
-                        onChange={handleChange(field.name)}
-                        disabled={loading}
-                    >
-                        {field.type === "select" && field.options.map((option) => (
-                            <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
-                        ))}
-                    </TextField>
-                ))}
+                {resolvedFields.map((field) => {
+                    if (field.type === "autocomplete") {
+                        const currentValue = _.get(values, field.name, "")
+                        const selectedOption = field.options.find((option) => option.value === currentValue) || null
+                        return (
+                            <Autocomplete
+                                key={field.name}
+                                options={field.options}
+                                getOptionLabel={(option) => option.label}
+                                isOptionEqualToValue={(option, value) => option.value === value.value}
+                                value={selectedOption}
+                                onChange={(event, newValue) => {
+                                    setValues((prev) => ({ ...prev, [field.name]: newValue ? newValue.value : "" }))
+                                }}
+                                disabled={loading || field.disabled}
+                                renderInput={(params) => (
+                                    <TextField {...params} label={field.label} margin="dense" fullWidth />
+                                )}
+                            />
+                        )
+                    }
+                    return (
+                        <TextField
+                            key={field.name}
+                            select={field.type === "select"}
+                            type={field.type === "date" ? "date" : "text"}
+                            InputLabelProps={field.type === "date" ? { shrink: true } : undefined}
+                            fullWidth
+                            margin="dense"
+                            label={field.label}
+                            value={_.get(values, field.name, "")}
+                            onChange={handleChange(field.name)}
+                            disabled={loading || field.disabled}
+                        >
+                            {field.type === "select" && field.options.map((option) => (
+                                <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                            ))}
+                        </TextField>
+                    )
+                })}
             </DialogContent>
             <DialogActions>
                 <Button onClick={onCancel} disabled={loading}>Cancel</Button>

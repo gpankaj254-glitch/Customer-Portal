@@ -19,6 +19,7 @@ import PropTypes from "prop-types"
 // eslint-disable-next-line no-unused-vars
 import { changeLimit, changePage, getOpportunities, selectGetOpportunitiesError, selectOpportunityList, deactivateOpportunity, updateOpportunity } from "./opportunitySlice"
 import { stageOptions } from "./utils"
+import { quoteStatusOptions } from "../../consts/opportunityCommOptions"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
 import { useSelector, useDispatch } from "react-redux"
@@ -97,11 +98,17 @@ export default function OpportunityTable(props) {
         try {
             const payload = {
                 opportunityId: opportunityToEdit.id,
-                name: values.name,
                 value: values.value !== "" ? Number(values.value) : undefined,
                 stage: values.stage,
                 expectedCloseDate: values.expectedCloseDate,
                 description: values.description,
+                // customerRequest is merged server-side, not replaced, so
+                // sending just these two fields doesn't wipe out the rest of
+                // customerRequest that Create Opportunity captured.
+                customerRequest: {
+                    quoteSubmitDate: values.quoteSubmitDate,
+                    quoteStatus: values.quoteStatus,
+                },
             }
             if (values.stage === "Converted") {
                 payload.convertedOrder = {
@@ -123,7 +130,7 @@ export default function OpportunityTable(props) {
 
     const editFields = (values) => {
         const fields = [
-            { name: "name", label: "Opportunity Name" },
+            { name: "name", label: "Opportunity Name", disabled: true },
             {
                 name: "stage",
                 label: "Stage",
@@ -133,6 +140,13 @@ export default function OpportunityTable(props) {
             { name: "value", label: "Estimated Value" },
             { name: "expectedCloseDate", label: "Expected Close Date" },
             { name: "description", label: "Description" },
+            { name: "quoteSubmitDate", label: "Quote Submit Date", type: "date" },
+            {
+                name: "quoteStatus",
+                label: "Quote Status",
+                type: "select",
+                options: quoteStatusOptions.map((status) => ({ value: status, label: status })),
+            },
         ]
         if (_.get(values, "stage") === "Converted") {
             fields.push(
@@ -238,6 +252,8 @@ export default function OpportunityTable(props) {
                         description: opportunityToEdit ? opportunityToEdit.description : "",
                         orderNumber: _.get(opportunityToEdit, "convertedOrder.orderNumber") || "",
                         orderValue: _.get(opportunityToEdit, "convertedOrder.orderValue") || "",
+                        quoteSubmitDate: _.get(opportunityToEdit, "customerRequest.quoteSubmitDate") || "",
+                        quoteStatus: _.get(opportunityToEdit, "customerRequest.quoteStatus") || "Pending",
                     }}
                     onSave={handleSaveEdit}
                     onCancel={() => setOpportunityToEdit(null)}

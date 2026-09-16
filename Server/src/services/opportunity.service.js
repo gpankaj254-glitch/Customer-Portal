@@ -105,6 +105,42 @@ const getActiveOpportunityById = async (opportunityId) => {
 const updateOpportunityById = async (opportunityId, updateBody, actingUser, relatedCustomer = null) => {
   const opportunity = await getActiveOpportunityById(opportunityId);
   const stageChanging = updateBody.stage !== undefined && updateBody.stage !== opportunity.stage;
+  const snapshot = opportunity.toObject();
+
+  // customerRequest is a single nested object, not an array - a PATCH that
+  // only sends a couple of fields (e.g. Edit Opportunity's Quote Submit
+  // Date/Quote Status) must merge into the existing object rather than
+  // wholesale-replace it via Object.assign, or the other fields captured at
+  // creation would be wiped out.
+  if (updateBody.customerRequest) {
+    const existingCustomerRequest = snapshot.customerRequest || {};
+    const mergedCustomerRequest = { ...existingCustomerRequest, ...updateBody.customerRequest };
+    if (
+      updateBody.customerRequest.quoteStatus !== undefined &&
+      updateBody.customerRequest.quoteStatus !== existingCustomerRequest.quoteStatus
+    ) {
+      mergedCustomerRequest.quoteStatusUpdatedAt = new Date().toISOString();
+    }
+    updateBody.customerRequest = mergedCustomerRequest;
+  }
+
+  // supplierCommunications is saved as a whole-array replace (the client
+  // always sends every entry back), so only the per-entry status-change
+  // timestamp needs stamping here - matched by _id against the prior array.
+  if (updateBody.supplierCommunications) {
+    const existingById = _.keyBy(snapshot.supplierCommunications || [], (entry) => String(entry._id));
+    updateBody.supplierCommunications = updateBody.supplierCommunications.map((entry) => {
+      const existingEntry = entry._id && existingById[String(entry._id)];
+      if (
+        existingEntry &&
+        entry.quoteStatus !== undefined &&
+        entry.quoteStatus !== existingEntry.quoteStatus
+      ) {
+        return { ...entry, quoteStatusUpdatedAt: new Date().toISOString() };
+      }
+      return entry;
+    });
+  }
 
   Object.assign(opportunity, _.omit(updateBody, ["customerId"]));
   if (relatedCustomer) {

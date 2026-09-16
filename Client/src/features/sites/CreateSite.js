@@ -10,11 +10,13 @@ import InputLabel from "@mui/material/InputLabel"
 import MenuItem from "@mui/material/MenuItem"
 import FormControl from "@mui/material/FormControl"
 import Select from "@mui/material/Select"
+import Autocomplete from "@mui/material/Autocomplete"
 import Snackbar from "@mui/material/Snackbar"
 import Alert from "@mui/material/Alert"
 import { useDispatch, useSelector } from "react-redux"
 import { createSite, getSites, selectPagination, selectSearch } from "./siteSlice"
 import { selectCustomerList } from "../customers/customerSlice"
+import { countryOptions } from "../../consts/countryOptions"
 
 export default function CreateSite() {
     const dispatch = useDispatch()
@@ -22,6 +24,7 @@ export default function CreateSite() {
     const pagination = useSelector(selectPagination)
     const search = useSelector(selectSearch)
     const [selectedCustomer, setSelectedCustomer] = React.useState("")
+    const [country, setCountry] = React.useState("")
     const [feedback, setFeedback] = React.useState(null)
 
     const handleCustomerChange = (event) => {
@@ -49,7 +52,7 @@ export default function CreateSite() {
             address: data.get("address"),
             postalCode: data.get("postalCode"),
             town: data.get("town"),
-            country: data.get("country"),
+            country,
             endUser: data.get("endUser"),
         }
 
@@ -58,6 +61,7 @@ export default function CreateSite() {
             setFeedback({ severity: "success", message: "Site created successfully" })
             form.reset()
             setSelectedCustomer("")
+            setCountry("")
             // page + 1: pagination.page is 0-indexed (matches MUI's
             // TablePagination), the backend is 1-indexed. search is included
             // so the refreshed list respects whatever filter is active.
@@ -108,7 +112,13 @@ export default function CreateSite() {
                             <TextField fullWidth name="postalCode" label="Postal Code" />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth name="country" label="Country" />
+                            <Autocomplete
+                                fullWidth
+                                options={countryOptions}
+                                value={country || null}
+                                onChange={(event, newValue) => setCountry(newValue || "")}
+                                renderInput={(params) => <TextField {...params} label="Country" />}
+                            />
                         </Grid>
 
                         <Grid item xs={12} sm={12}>
