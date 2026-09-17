@@ -125,6 +125,22 @@ const downloadSupplierCommunicationAttachment = catchAsync(async (req, res) => {
   streamAttachmentDownload(res, object, attachment.originalName, attachment.mimeType);
 });
 
+const bulkUploadOpportunities = catchAsync(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "No file uploaded");
+  }
+  const result = await opportunityService.bulkUploadOpportunities(req.file.buffer, req.user);
+  res.send(result);
+});
+
+const bulkUploadSupplierResponses = catchAsync(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "No file uploaded");
+  }
+  const result = await opportunityService.bulkUploadSupplierResponses(req.file.buffer, req.user);
+  res.send(result);
+});
+
 module.exports = {
   createOpportunity,
   getOpportunities,
@@ -137,4 +153,6 @@ module.exports = {
   permanentlyDeleteOpportunity,
   uploadSupplierCommunicationAttachment,
   downloadSupplierCommunicationAttachment,
+  bulkUploadOpportunities,
+  bulkUploadSupplierResponses,
 };

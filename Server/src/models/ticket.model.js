@@ -225,6 +225,16 @@ const ticketSchema = mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      id: { type: String },
+      name: { type: String },
+      email: { type: String },
+      role: { type: String },
+    },
     closed: {
       type: Boolean,
       default: false,

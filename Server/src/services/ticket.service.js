@@ -461,18 +461,51 @@ const addContact = async (ticketId, contactId) => {
 /**
  * Deactivate ticket by id
  * @param {ObjectId} ticketId
+ * @param {Object} actingUser
  * @returns {Promise<Ticket>}
  */
-const deactivateTicketById = async (ticketId) => {
+const deactivateTicketById = async (ticketId, actingUser) => {
+  const ticket = await getActiveTicketById(ticketId);
+  ticket.active = false;
+  ticket.deletedAt = new Date();
+  ticket.deletedBy = extractUserDetails(actingUser);
+  await ticket.save();
+  return ticket;
+};
+
+/**
+ * Restore a deleted ticket by id
+ * @param {ObjectId} ticketId
+ * @returns {Promise<Ticket>}
+ */
+const restoreTicketById = async (ticketId) => {
   const ticket = await getTicketById(ticketId);
   if (!ticket) {
     throw new ApiError(httpStatus.NOT_FOUND, "Ticket not found");
-  } else if (!ticket.active) {
-    throw new ApiError(httpStatus.NOT_ACCEPTABLE, "Ticket is not active");
+  } else if (ticket.active) {
+    throw new ApiError(httpStatus.NOT_ACCEPTABLE, "Ticket is already active");
   }
-  ticket.active = false;
+  ticket.active = true;
+  ticket.deletedAt = null;
+  ticket.deletedBy = null;
   await ticket.save();
   return ticket;
+};
+
+/**
+ * Permanently remove a soft-deleted ticket from the database.
+ * @param {ObjectId} ticketId
+ * @returns {Promise<void>}
+ */
+const permanentlyDeleteTicketById = async (ticketId) => {
+  const ticket = await getTicketById(ticketId);
+  if (!ticket) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Ticket not found");
+  }
+  if (ticket.active) {
+    throw new ApiError(httpStatus.NOT_ACCEPTABLE, "Ticket must be deleted before it can be permanently removed");
+  }
+  await Ticket.deleteOne({ _id: ticketId });
 };
 
 /**
@@ -708,6 +741,8 @@ module.exports = {
   addVendorAttachments,
   getVendorAttachment,
   deactivateTicketById,
+  restoreTicketById,
+  permanentlyDeleteTicketById,
   getActiveTicketById,
   addContact,
   // createTicketBySite,

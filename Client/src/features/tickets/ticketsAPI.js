@@ -133,3 +133,43 @@ export async function fetchGetTickets (data, rejectWithValue) {
         return rejectWithValue(createResponseErrorMessage(error), {})
     }
 }
+
+export async function fetchDeactivateTicket (ticketId, rejectWithValue) {
+    try {
+        const response = await axios.delete(`${baseURL}/ticket/${ticketId}`, {headers: headers()})
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
+export async function fetchDeletedTickets (data, rejectWithValue) {
+    try {
+        const response = await axios.post(`${baseURL}/ticket/deleted?limit=${data.limit}&page=${data.page}`, {}, {headers: headers()})
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
+export async function fetchRestoreTicket (ticketId, rejectWithValue) {
+    try {
+        const response = await axios.patch(`${baseURL}/ticket/${ticketId}/restore`, {}, {headers: headers()})
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
+export async function fetchPermanentlyDeleteTicket (ticketId, rejectWithValue) {
+    try {
+        const response = await axios.delete(`${baseURL}/ticket/${ticketId}/permanent`, {headers: headers()})
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}

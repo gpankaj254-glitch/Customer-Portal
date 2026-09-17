@@ -99,6 +99,34 @@ export async function fetchUploadSupplierCommunicationAttachment({ opportunityId
     }
 }
 
+export async function fetchBulkUploadOpportunities(file, rejectWithValue) {
+    try {
+        const formData = new FormData()
+        formData.append("file", file)
+        const response = await axios.post(`${baseURL}/opportunity/bulk-upload`, formData, {
+            headers: { ...headers(), "Content-Type": "multipart/form-data" },
+        })
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
+export async function fetchBulkUploadSupplierResponses(file, rejectWithValue) {
+    try {
+        const formData = new FormData()
+        formData.append("file", file)
+        const response = await axios.post(`${baseURL}/opportunity/bulk-upload-supplier-responses`, formData, {
+            headers: { ...headers(), "Content-Type": "multipart/form-data" },
+        })
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
 // The attachment endpoint requires auth, so a plain <a href> can't be used -
 // fetch it as a blob with the auth header, then trigger a normal file save.
 export async function downloadSupplierCommunicationAttachment(opportunityId, entryId, attachmentId, originalName) {

@@ -2,10 +2,32 @@ const httpStatus = require("http-status");
 const crypto = require("crypto");
 const _ = require("lodash");
 const moment = require("moment");
+const { parse } = require("csv-parse/sync");
 const { Opportunity, Counter } = require("../models");
 const ApiError = require("../utils/ApiError");
 const { extractUserDetails, extractNameAndCode } = require("../utils/extractors");
 const { uploadBuffer } = require("../utils/s3");
+const { getCustomerByName } = require("./customer.service");
+const {
+  linkTypeOptions,
+  ipRequirementOptions,
+  interfaceOptions,
+  supplierQuoteStatusOptions,
+} = require("../config/opportunityOptions");
+const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
+const { currencyOptions } = require("../config/currencyOptions");
+
+const currencyCodes = currencyOptions.map((option) => option.code);
+
+// Natural key the sales team identifies a Customer Request by, used both to
+// reject duplicate opportunities on bulk create and to link a Supplier
+// Response upload row back to the right opportunity - see
+// bulkUploadOpportunities/bulkUploadSupplierResponses below.
+function buildCustomerRequestKey(customerLabel, requestDate, requestId, linkType, siteAddress) {
+  return [customerLabel, requestDate, requestId, linkType, siteAddress]
+    .map((part) => (part || "").trim().toLowerCase())
+    .join("|");
+}
 
 /**
  * Build a unique S3 key for an uploaded file under a given prefix - mirrors
@@ -458,6 +480,374 @@ const getSupplierCommunicationAttachment = async (opportunityId, entryId, attach
   return attachment;
 };
 
+const OPPORTUNITY_BULK_UPLOAD_COLUMNS = [
+  "Opportunity Name",
+  "Customer Name",
+  "Prospect Name",
+  "Description",
+  "Request ID",
+  "Request Date",
+  "Link Type",
+  "Site Address",
+  "City",
+  "State",
+  "Zip Code",
+  "Country",
+  "Product",
+  "IP Requirement",
+  "Interface",
+  "Down Bandwidth",
+  "Up Bandwidth",
+  "Contract Term",
+];
+
+/**
+ * Bulk-create Sales Opportunities from an uploaded CSV buffer. Each row's
+ * Customer Name + Request Date + Request ID + Link Type + Site Address is
+ * treated as a natural key - a row that matches an already-existing active
+ * opportunity, or another row in the same file, is rejected as a duplicate
+ * rather than creating a second Customer Request for the same thing. Only
+ * inserts anything if every row passes (all-or-nothing), same convention as
+ * ticket.service.js's bulkUploadTickets.
+ * @param {Buffer} fileBuffer
+ * @param {Object} actingUser
+ * @returns {Promise<{success: boolean, totalRows: number, insertedCount: number, failedRows: Array}>}
+ */
+const bulkUploadOpportunities = async (fileBuffer, actingUser) => {
+  let records;
+  try {
+    records = parse(fileBuffer, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+      bom: true,
+    });
+  } catch (err) {
+    throw new ApiError(httpStatus.BAD_REQUEST, `Could not parse CSV file: ${err.message}`);
+  }
+
+  if (records.length === 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "CSV file has no data rows");
+  }
+
+  const missingColumns = OPPORTUNITY_BULK_UPLOAD_COLUMNS.filter((column) => !(column in records[0]));
+  if (missingColumns.length > 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, `CSV is missing required column(s): ${missingColumns.join(", ")}`);
+  }
+
+  // Existing active opportunities' keys, to reject duplicates against what's
+  // already in the database (not just duplicates within this file).
+  const existingOpportunities = await Opportunity.find({ active: true })
+    .select("opportunityId customer.name prospectName customerRequest.requestDate customerRequest.requestId customerRequest.linkType customerRequest.siteAddress")
+    .lean();
+  const existingKeyToOpportunityId = new Map();
+  existingOpportunities.forEach((opportunity) => {
+    const customerLabel = _.get(opportunity, "customer.name") || opportunity.prospectName || "";
+    const key = buildCustomerRequestKey(
+      customerLabel,
+      _.get(opportunity, "customerRequest.requestDate", ""),
+      _.get(opportunity, "customerRequest.requestId", ""),
+      _.get(opportunity, "customerRequest.linkType", ""),
+      _.get(opportunity, "customerRequest.siteAddress", "")
+    );
+    existingKeyToOpportunityId.set(key, opportunity.opportunityId);
+  });
+
+  const seenKeysInFile = new Map();
+  const failedRows = [];
+  const validRows = [];
+
+  for (let i = 0; i < records.length; i += 1) {
+    const record = records[i];
+    const rowNumber = i + 2; // account for the header row, 1-indexed
+    const errors = [];
+
+    const name = _.get(record, "Opportunity Name", "").trim();
+    const customerName = _.get(record, "Customer Name", "").trim();
+    const prospectName = _.get(record, "Prospect Name", "").trim();
+    const description = _.get(record, "Description", "").trim();
+    const requestId = _.get(record, "Request ID", "").trim();
+    const requestDate = _.get(record, "Request Date", "").trim();
+    const linkType = _.get(record, "Link Type", "").trim();
+    const siteAddress = _.get(record, "Site Address", "").trim();
+    const city = _.get(record, "City", "").trim();
+    const state = _.get(record, "State", "").trim();
+    const zipCode = _.get(record, "Zip Code", "").trim();
+    const country = _.get(record, "Country", "").trim();
+    const product = _.get(record, "Product", "").trim();
+    const ipRequirement = _.get(record, "IP Requirement", "").trim();
+    const interfaceType = _.get(record, "Interface", "").trim();
+    const downBandwidth = _.get(record, "Down Bandwidth", "").trim();
+    const upBandwidth = _.get(record, "Up Bandwidth", "").trim();
+    const contractTerm = _.get(record, "Contract Term", "").trim();
+
+    if (!name) errors.push("Opportunity Name is required");
+    if (linkType && !linkTypeOptions.includes(linkType)) errors.push(`Link Type "${linkType}" is not a valid option`);
+    if (product && !productOptions.includes(product)) errors.push(`Product "${product}" is not a valid option`);
+    if (ipRequirement && !ipRequirementOptions.includes(ipRequirement)) errors.push(`IP Requirement "${ipRequirement}" is not a valid option`);
+    if (interfaceType && !interfaceOptions.includes(interfaceType)) errors.push(`Interface "${interfaceType}" is not a valid option`);
+    if (downBandwidth && !bandwidthOptions.includes(downBandwidth)) errors.push(`Down Bandwidth "${downBandwidth}" is not a valid option`);
+    if (upBandwidth && !bandwidthOptions.includes(upBandwidth)) errors.push(`Up Bandwidth "${upBandwidth}" is not a valid option`);
+
+    let relatedCustomer = null;
+    if (customerName) {
+      // eslint-disable-next-line no-await-in-loop
+      const customer = await getCustomerByName(customerName);
+      if (!customer || !customer.active) {
+        errors.push("Customer not found or inactive");
+      } else {
+        relatedCustomer = customer;
+      }
+    } else if (!prospectName) {
+      errors.push("Either Customer Name or Prospect Name is required");
+    }
+
+    const customerLabel = customerName || prospectName;
+    const key = buildCustomerRequestKey(customerLabel, requestDate, requestId, linkType, siteAddress);
+    if (existingKeyToOpportunityId.has(key)) {
+      errors.push(
+        `Duplicate: an opportunity with this Customer Name/Request Date/Request ID/Link Type/Site Address already exists (${existingKeyToOpportunityId.get(key)})`
+      );
+    } else if (seenKeysInFile.has(key)) {
+      errors.push(`Duplicate of row ${seenKeysInFile.get(key)} in this file (same Customer Name/Request Date/Request ID/Link Type/Site Address)`);
+    } else {
+      seenKeysInFile.set(key, rowNumber);
+    }
+
+    if (errors.length > 0) {
+      failedRows.push({ row: rowNumber, name, customerName: customerLabel, requestId, errors: errors.join("; ") });
+    } else {
+      validRows.push({
+        relatedCustomer,
+        opportunityBody: {
+          name,
+          prospectName: relatedCustomer ? "" : prospectName,
+          description,
+          customerRequest: {
+            requestId,
+            requestDate,
+            linkType,
+            siteAddress,
+            city,
+            state,
+            zipCode,
+            country,
+            product,
+            ipRequirement,
+            interface: interfaceType,
+            downBandwidth,
+            upBandwidth,
+            contractTerm,
+          },
+        },
+      });
+    }
+  }
+
+  if (failedRows.length > 0) {
+    return { success: false, totalRows: records.length, insertedCount: 0, failedRows };
+  }
+
+  const created = [];
+  for (let i = 0; i < validRows.length; i += 1) {
+    const { relatedCustomer, opportunityBody } = validRows[i];
+    // eslint-disable-next-line no-await-in-loop
+    const opportunity = await createOpportunity(opportunityBody, actingUser, relatedCustomer);
+    created.push(opportunity);
+  }
+
+  return { success: true, totalRows: records.length, insertedCount: created.length, failedRows: [] };
+};
+
+function parseOptionalNumber(rawValue, label, errors) {
+  const value = (rawValue || "").trim();
+  if (!value) return null;
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) {
+    errors.push(`${label} must be a number`);
+    return null;
+  }
+  return parsed;
+}
+
+const SUPPLIER_RESPONSE_BULK_UPLOAD_COLUMNS = [
+  "Customer Name",
+  "Request Date",
+  "Request Ref",
+  "Link Category",
+  "Address",
+  "Supplier",
+  "Quote Request Date",
+  "LEC",
+  "Currency",
+  "NRC",
+  "MRC",
+  "Quote Submit Date",
+  "Quote Status",
+];
+
+/**
+ * Bulk-add/update Supplier Communication entries on existing opportunities
+ * from an uploaded CSV buffer. Each row is linked back to its opportunity
+ * by Customer Name + Request Date + Request Ref (Request ID) + Link
+ * Category (Link Type) + Address (Site Address) - the same natural key
+ * bulkUploadOpportunities enforces as unique on create, so it uniquely
+ * identifies one opportunity here too. Within an opportunity, a row whose
+ * Supplier matches an existing Supplier Communication entry (case
+ * insensitive) updates that entry in place (logging a new status history
+ * line only if the status actually changed); otherwise a new entry is
+ * added. All-or-nothing per file, like bulkUploadOpportunities.
+ * @param {Buffer} fileBuffer
+ * @param {Object} actingUser
+ * @returns {Promise<{success: boolean, totalRows: number, updatedCount: number, opportunitiesAffected: number, failedRows: Array}>}
+ */
+const bulkUploadSupplierResponses = async (fileBuffer, actingUser) => {
+  let records;
+  try {
+    records = parse(fileBuffer, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+      bom: true,
+    });
+  } catch (err) {
+    throw new ApiError(httpStatus.BAD_REQUEST, `Could not parse CSV file: ${err.message}`);
+  }
+
+  if (records.length === 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "CSV file has no data rows");
+  }
+
+  const missingColumns = SUPPLIER_RESPONSE_BULK_UPLOAD_COLUMNS.filter((column) => !(column in records[0]));
+  if (missingColumns.length > 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, `CSV is missing required column(s): ${missingColumns.join(", ")}`);
+  }
+
+  const activeOpportunities = await Opportunity.find({ active: true });
+  const keyToOpportunity = new Map();
+  const ambiguousKeys = new Set();
+  activeOpportunities.forEach((opportunity) => {
+    const customerLabel = _.get(opportunity, "customer.name") || opportunity.prospectName || "";
+    const key = buildCustomerRequestKey(
+      customerLabel,
+      _.get(opportunity, "customerRequest.requestDate", ""),
+      _.get(opportunity, "customerRequest.requestId", ""),
+      _.get(opportunity, "customerRequest.linkType", ""),
+      _.get(opportunity, "customerRequest.siteAddress", "")
+    );
+    if (keyToOpportunity.has(key)) {
+      ambiguousKeys.add(key);
+    } else {
+      keyToOpportunity.set(key, opportunity);
+    }
+  });
+
+  const failedRows = [];
+  const groupsByOpportunityId = new Map();
+
+  for (let i = 0; i < records.length; i += 1) {
+    const record = records[i];
+    const rowNumber = i + 2;
+    const errors = [];
+
+    const customerName = _.get(record, "Customer Name", "").trim();
+    const requestDate = _.get(record, "Request Date", "").trim();
+    const requestRef = _.get(record, "Request Ref", "").trim();
+    const linkCategory = _.get(record, "Link Category", "").trim();
+    const address = _.get(record, "Address", "").trim();
+    const supplier = _.get(record, "Supplier", "").trim();
+    const quoteRequestDate = _.get(record, "Quote Request Date", "").trim();
+    const lec = _.get(record, "LEC", "").trim();
+    const currency = _.get(record, "Currency", "").trim();
+    const quoteSubmitDate = _.get(record, "Quote Submit Date", "").trim();
+    const quoteStatus = _.get(record, "Quote Status", "").trim() || "Pending";
+
+    if (!supplier) errors.push("Supplier is required");
+    if (currency && !currencyCodes.includes(currency)) errors.push(`Currency "${currency}" is not a valid option`);
+    if (!supplierQuoteStatusOptions.includes(quoteStatus)) errors.push(`Quote Status "${quoteStatus}" is not a valid option`);
+    const nrc = parseOptionalNumber(_.get(record, "NRC", ""), "NRC", errors);
+    const mrc = parseOptionalNumber(_.get(record, "MRC", ""), "MRC", errors);
+
+    const key = buildCustomerRequestKey(customerName, requestDate, requestRef, linkCategory, address);
+    let matchedOpportunity = null;
+    if (ambiguousKeys.has(key)) {
+      errors.push(
+        "Multiple opportunities match this Customer Name/Request Date/Request Ref/Link Category/Address combination - cannot determine which one to update"
+      );
+    } else {
+      matchedOpportunity = keyToOpportunity.get(key);
+      if (!matchedOpportunity) {
+        errors.push("No matching opportunity found for this Customer Name/Request Date/Request Ref/Link Category/Address combination");
+      }
+    }
+
+    if (errors.length > 0) {
+      failedRows.push({ row: rowNumber, customerName, requestRef, supplier, errors: errors.join("; ") });
+    } else {
+      const opportunityKey = String(matchedOpportunity._id);
+      if (!groupsByOpportunityId.has(opportunityKey)) {
+        groupsByOpportunityId.set(opportunityKey, { opportunity: matchedOpportunity, rows: [] });
+      }
+      groupsByOpportunityId.get(opportunityKey).rows.push({ supplier, quoteRequestDate, currency, lec, nrc, mrc, quoteSubmitDate, quoteStatus });
+    }
+  }
+
+  if (failedRows.length > 0) {
+    return { success: false, totalRows: records.length, updatedCount: 0, opportunitiesAffected: 0, failedRows };
+  }
+
+  let updatedCount = 0;
+  const groups = Array.from(groupsByOpportunityId.values());
+  for (let i = 0; i < groups.length; i += 1) {
+    const { opportunity, rows } = groups[i];
+    const now = new Date().toISOString();
+    rows.forEach((row) => {
+      const matchIndex = opportunity.supplierCommunications.findIndex(
+        (entry) => (entry.supplier || "").trim().toLowerCase() === row.supplier.trim().toLowerCase()
+      );
+      if (matchIndex === -1) {
+        opportunity.supplierCommunications.push({
+          supplier: row.supplier,
+          quoteRequestDate: row.quoteRequestDate,
+          currency: row.currency,
+          lec: row.lec,
+          nrc: row.nrc,
+          mrc: row.mrc,
+          quoteSubmitDate: row.quoteSubmitDate,
+          quoteStatus: row.quoteStatus,
+          statusHistory: [{ status: row.quoteStatus, changedAt: now, currency: row.currency || "", nrc: row.nrc ?? null, mrc: row.mrc ?? null }],
+        });
+      } else {
+        const existing = opportunity.supplierCommunications[matchIndex];
+        const statusChanged = row.quoteStatus !== existing.quoteStatus;
+        existing.supplier = row.supplier;
+        existing.quoteRequestDate = row.quoteRequestDate;
+        existing.currency = row.currency;
+        existing.lec = row.lec;
+        existing.nrc = row.nrc;
+        existing.mrc = row.mrc;
+        existing.quoteSubmitDate = row.quoteSubmitDate;
+        existing.quoteStatus = row.quoteStatus;
+        if (statusChanged) {
+          existing.statusHistory = _.concat(existing.statusHistory || [], {
+            status: row.quoteStatus,
+            changedAt: now,
+            currency: row.currency || "",
+            nrc: row.nrc ?? null,
+            mrc: row.mrc ?? null,
+          });
+        }
+      }
+      updatedCount += 1;
+    });
+    opportunity.updatedBy = extractUserDetails(actingUser);
+    // eslint-disable-next-line no-await-in-loop
+    await opportunity.save();
+  }
+
+  return { success: true, totalRows: records.length, updatedCount, opportunitiesAffected: groups.length, failedRows: [] };
+};
+
 module.exports = {
   createOpportunity,
   queryOpportunities,
@@ -470,4 +860,6 @@ module.exports = {
   deactivateOpportunityById,
   restoreOpportunityById,
   permanentlyDeleteOpportunityById,
+  bulkUploadOpportunities,
+  bulkUploadSupplierResponses,
 };

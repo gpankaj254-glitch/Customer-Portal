@@ -5,7 +5,7 @@ const ApiError = require("../utils/ApiError");
 const catchAsync = require("../utils/catchAsync");
 const { ticketService, circuitService, alertService } = require("../services");
 // const logger = require("../config/logger");
-const { filterByCustomerId } = require("../utils/filters");
+const { filterByCustomerId, activeOnly } = require("../utils/filters");
 const { getObjectStream } = require("../utils/s3");
 
 // const { isTicket } = require("../config/roles");
@@ -55,7 +55,7 @@ const getTickets = catchAsync(async (req, res) => {
   // it isn't itself a Ticket field, so leaving it in would require every
   // document to literally have a "search" field matching the term.
   const search = _.trim(_.get(req.body, "search", ""));
-  const baseFilter = _.omit(req.body, "search");
+  const baseFilter = activeOnly(_.omit(req.body, "search"));
   const filter = filterByCustomerId(req.user, baseFilter);
 
   if (search) {
@@ -137,7 +137,23 @@ const downloadVendorAttachment = catchAsync(async (req, res) => {
 });
 
 const deactivateTicket = catchAsync(async (req, res) => {
-  await ticketService.deactivateTicketById(req.params.ticketId);
+  await ticketService.deactivateTicketById(req.params.ticketId, req.user);
+  res.status(httpStatus.NO_CONTENT).send();
+});
+
+const getDeletedTickets = catchAsync(async (req, res) => {
+  const options = pick(req.query, ["sortBy", "limit", "page"]);
+  const result = await ticketService.queryTickets({ active: false }, options);
+  res.send(result);
+});
+
+const restoreTicket = catchAsync(async (req, res) => {
+  const ticket = await ticketService.restoreTicketById(req.params.ticketId);
+  res.send(ticket);
+});
+
+const permanentlyDeleteTicket = catchAsync(async (req, res) => {
+  await ticketService.permanentlyDeleteTicketById(req.params.ticketId);
   res.status(httpStatus.NO_CONTENT).send();
 });
 
@@ -154,4 +170,7 @@ module.exports = {
   uploadVendorAttachment,
   downloadVendorAttachment,
   deactivateTicket,
+  getDeletedTickets,
+  restoreTicket,
+  permanentlyDeleteTicket,
 };

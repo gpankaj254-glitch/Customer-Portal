@@ -14,9 +14,19 @@ import CreateTicket from "./CreateTicket"
 import BulkUploadTickets from "./BulkUploadTickets"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
+import DeletedRecordsPanel from "../../components/DeletedRecordsPanel"
+import { fetchDeletedTickets, fetchRestoreTicket, fetchPermanentlyDeleteTicket } from "./ticketsAPI"
 // import CreateTickets from "./CreateTickets"
 // import { Collapse } from "@mui/material"
 // import { pageStatusVals } from "./utils"
+
+const deletedTicketColumns = [
+    { id: "ticketId", label: "Ticket ID" },
+    { id: "customerReference", label: "Customer Reference" },
+    { id: "problemType", label: "Problem Type" },
+    { id: "priority", label: "Priority" },
+    { id: "status", label: "Status" },
+]
 
 function TicketsContent() {
 
@@ -60,6 +70,16 @@ function TicketsContent() {
         case 3:
             return    <TicketsTable pagination = {pagination} mode = "completed"  />
         case 4:
+            return isAdmin ? (
+                <DeletedRecordsPanel
+                    columns={deletedTicketColumns}
+                    fetchDeleted={fetchDeletedTickets}
+                    restoreRecord={fetchRestoreTicket}
+                    permanentlyDeleteRecord={fetchPermanentlyDeleteTicket}
+                    entityLabel="ticket"
+                />
+            ) : <TicketsTable pagination = {pagination} mode = "open"  />
+        case 5:
             return isAdmin ? <BulkUploadTickets /> : <TicketsTable pagination = {pagination} mode = "open"  />
         default:
             return <TicketsTable pagination = {pagination} mode = "open"  />
@@ -75,6 +95,7 @@ function TicketsContent() {
                         <Tab label="Create New Ticket"/>
                         <Tab label="View Closed Tickets"/>
                         <Tab label="Completed Tickets"/>
+                        {isAdmin && <Tab label="Deleted Tickets"/>}
                         {isAdmin && <Tab label="Bulk Upload Tickets"/>}
 
                     </Tabs>

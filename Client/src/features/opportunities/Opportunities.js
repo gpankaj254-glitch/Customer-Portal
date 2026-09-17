@@ -15,6 +15,7 @@ import {
 } from "./opportunitySlice"
 import { useSelector, useDispatch } from "react-redux"
 import CreateOpportunity from "./CreateOpportunity"
+import BulkUploadOpportunities from "./BulkUploadOpportunities"
 import { getCustomers } from "../customers/customerSlice"
 import { getVendors } from "../vendors/vendorSlice"
 import { fetchDeletedOpportunities, fetchRestoreOpportunity, fetchPermanentlyDeleteOpportunity } from "./opportunityAPI"
@@ -124,6 +125,7 @@ function OpportunitiesContent() {
                 />
             ),
         })
+        tabs.push({ label: "Bulk Upload", content: <BulkUploadOpportunities /> })
     }
 
     return (

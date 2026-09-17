@@ -79,20 +79,37 @@ router
   .route("/vendor-attachment/:ticketId/:attachmentId")
   .get(auth("updateTickets"), ticketController.downloadVendorAttachment);
 
-// router
-//   .route("/getDetails")
-//   .post(
-//     validate(ticketValidation.getTicket),
-//     ticketController.getTicket
-//   );
+router
+  .route("/deleted")
+  .post(
+    auth("deleteTickets"),
+    validate(ticketValidation.getTickets),
+    ticketController.getDeletedTickets
+  );
 
-// router
-//   .route("/update")
-//   .post(validate(ticketValidation.updateTicket), ticketController.updateTicket);
+router
+  .route("/:ticketId")
+  .delete(
+    auth("deleteTickets"),
+    validate(ticketValidation.deactivateTicket),
+    ticketController.deactivateTicket
+  );
 
-// router
-//   .route("/deactivate")
-//   .post(validate(ticketValidation.deactivateTicket), ticketController.deactivateTicket);
+router
+  .route("/:ticketId/restore")
+  .patch(
+    auth("deleteTickets"),
+    validate(ticketValidation.deactivateTicket),
+    ticketController.restoreTicket
+  );
+
+router
+  .route("/:ticketId/permanent")
+  .delete(
+    auth("permanentlyDeleteTickets"),
+    validate(ticketValidation.deactivateTicket),
+    ticketController.permanentlyDeleteTicket
+  );
 
 module.exports = router;
 

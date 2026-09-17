@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit"
-import {fetchGetTickets, fetchCreateTicket, fetchUpdateTicket, fetchAppendTicketDescription, fetchUploadTicketAttachments, fetchAppendVendorDescription, fetchUploadVendorAttachments, fetchBulkUploadTickets} from "./ticketsAPI"
+import {fetchGetTickets, fetchCreateTicket, fetchUpdateTicket, fetchAppendTicketDescription, fetchUploadTicketAttachments, fetchAppendVendorDescription, fetchUploadVendorAttachments, fetchBulkUploadTickets, fetchDeactivateTicket} from "./ticketsAPI"
 import { pageStatusVals} from "./utils"
 
 const initialState = {
@@ -110,6 +110,14 @@ export const uploadVendorAttachments = createAsyncThunk(
     "tickets/fetchUploadVendorAttachments",
     async (data, { rejectWithValue }) => {
         const response = await fetchUploadVendorAttachments(data, rejectWithValue)
+        return response
+    }
+)
+
+export const deactivateTicket = createAsyncThunk(
+    "tickets/fetchDeactivateTicket",
+    async (ticketId, { rejectWithValue }) => {
+        const response = await fetchDeactivateTicket(ticketId, rejectWithValue)
         return response
     }
 )
@@ -275,6 +283,17 @@ export const ticketSlice = createSlice({
             .addCase(uploadVendorAttachments.fulfilled, (state) => {
                 state.uploadVendorAttachmentMessage = "Vendor attachment(s) uploaded"
                 state.uploadVendorAttachmentError = null
+            })
+            .addCase(deactivateTicket.fulfilled, (state, action) => {
+                state.pageStatus = pageStatusVals.fetched
+                const deletedId = action.meta.arg
+                state.openTicketList = state.openTicketList.filter((t) => t.id !== deletedId)
+                state.closedTicketList = state.closedTicketList.filter((t) => t.id !== deletedId)
+                state.completedTicketList = state.completedTicketList.filter((t) => t.id !== deletedId)
+                state.pagination.totalResults = Math.max(0, state.pagination.totalResults - 1)
+            })
+            .addCase(deactivateTicket.rejected, (state) => {
+                state.pageStatus = pageStatusVals.error
             })
             .addCase(bulkUploadTickets.fulfilled, (state) => {
                 state.pageStatus = pageStatusVals.fetched

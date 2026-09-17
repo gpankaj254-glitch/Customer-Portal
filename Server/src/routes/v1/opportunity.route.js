@@ -1,7 +1,7 @@
 const express = require("express");
 const auth = require("../../middlewares/auth");
 const validate = require("../../middlewares/validate");
-const { uploadSupplierAttachment } = require("../../middlewares/upload");
+const { uploadSupplierAttachment, uploadCsv } = require("../../middlewares/upload");
 
 const { opportunityValidation } = require("../../validations");
 const { opportunityController } = require("../../controllers");
@@ -27,6 +27,22 @@ router
 router
   .route("/dashboard-summary")
   .post(auth("viewDashboard"), opportunityController.getSalesDashboardSummary);
+
+router
+  .route("/bulk-upload")
+  .post(
+    auth("bulkUploadOpportunities"),
+    uploadCsv.single("file"),
+    opportunityController.bulkUploadOpportunities
+  );
+
+router
+  .route("/bulk-upload-supplier-responses")
+  .post(
+    auth("bulkUploadOpportunities"),
+    uploadCsv.single("file"),
+    opportunityController.bulkUploadSupplierResponses
+  );
 
 router
   .route("/deleted")

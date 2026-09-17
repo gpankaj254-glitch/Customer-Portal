@@ -89,11 +89,11 @@ const appendDescription = {
   ),
 };
 
-// const deactivateTicket = {
-//   params: Joi.object().keys({
-//     ticketId: Joi.string().required(),
-//   }),
-// };
+const deactivateTicket = {
+  params: Joi.object().keys({
+    ticketId: Joi.string().required(),
+  }),
+};
 
 module.exports = {
   createTicket,
@@ -101,5 +101,5 @@ module.exports = {
   // getTicket,
   updateTicket,
   appendDescription,
-  // deactivateTicket,
+  deactivateTicket,
 };

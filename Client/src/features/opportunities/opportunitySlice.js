@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit"
-import { fetchGetOpportunities, fetchCreateOpportunity, fetchDeactivateOpportunity, fetchUpdateOpportunity, fetchSalesDashboardSummary, fetchUploadSupplierCommunicationAttachment } from "./opportunityAPI"
+import { fetchGetOpportunities, fetchCreateOpportunity, fetchDeactivateOpportunity, fetchUpdateOpportunity, fetchSalesDashboardSummary, fetchUploadSupplierCommunicationAttachment, fetchBulkUploadOpportunities, fetchBulkUploadSupplierResponses } from "./opportunityAPI"
 import { pageStatusVals } from "./utils"
 
 const initialState = {
@@ -54,6 +54,22 @@ export const uploadSupplierCommunicationAttachment = createAsyncThunk(
     "opportunities/fetchUploadSupplierCommunicationAttachment",
     async (data, { rejectWithValue }) => {
         const response = await fetchUploadSupplierCommunicationAttachment(data, rejectWithValue)
+        return response
+    }
+)
+
+export const bulkUploadOpportunities = createAsyncThunk(
+    "opportunities/fetchBulkUploadOpportunities",
+    async (file, { rejectWithValue }) => {
+        const response = await fetchBulkUploadOpportunities(file, rejectWithValue)
+        return response
+    }
+)
+
+export const bulkUploadSupplierResponses = createAsyncThunk(
+    "opportunities/fetchBulkUploadSupplierResponses",
+    async (file, { rejectWithValue }) => {
+        const response = await fetchBulkUploadSupplierResponses(file, rejectWithValue)
         return response
     }
 )
@@ -126,6 +142,21 @@ export const opportunitySlice = createSlice({
                 if (index !== -1) {
                     state.opportunityList[index] = payload
                 }
+            })
+            .addCase(bulkUploadOpportunities.fulfilled, (state) => {
+                state.pageStatus = pageStatusVals.fetched
+            })
+            .addCase(bulkUploadOpportunities.rejected, (state) => {
+                // Failures (including "some rows invalid") surface via the
+                // uploader component's own UI - must not touch
+                // getOpportunitiesError.
+                state.pageStatus = pageStatusVals.error
+            })
+            .addCase(bulkUploadSupplierResponses.fulfilled, (state) => {
+                state.pageStatus = pageStatusVals.fetched
+            })
+            .addCase(bulkUploadSupplierResponses.rejected, (state) => {
+                state.pageStatus = pageStatusVals.error
             })
             .addCase(getSalesDashboardSummary.pending, (state) => {
                 state.salesDashboardSummaryStatus = pageStatusVals.loading

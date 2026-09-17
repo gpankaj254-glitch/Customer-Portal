@@ -10,12 +10,14 @@ import TableRow from "@mui/material/TableRow"
 import TextField from "@mui/material/TextField"
 import InputAdornment from "@mui/material/InputAdornment"
 import SearchIcon from "@mui/icons-material/Search"
+import DeleteIcon from "@mui/icons-material/Delete"
 import IconButton from "@mui/material/IconButton"
 import Chip from "@mui/material/Chip"
+import Snackbar from "@mui/material/Snackbar"
 
 import PropTypes from "prop-types"
 
-import {changeLimit, changePage, getClosedTickets, getCompletedTickets, selectGetTicketError, selectPageStatus, getOpenTickets, selectClosedTicketList, selectCompletedTicketList, selectOpenTicketList, selectSearch, setSearch} from "./ticketSlice"
+import {changeLimit, changePage, getClosedTickets, getCompletedTickets, selectGetTicketError, selectPageStatus, getOpenTickets, selectClosedTicketList, selectCompletedTicketList, selectOpenTicketList, selectSearch, setSearch, deactivateTicket} from "./ticketSlice"
 import { useSelector, useDispatch } from "react-redux"
 import { Alert, Collapse, Typography} from "@mui/material"
 import { pageStatusVals} from "./utils"
@@ -24,6 +26,9 @@ import { KeyboardArrowDown, KeyboardArrowUp } from "@mui/icons-material"
 import _ from "lodash"
 import TicketDetails from "./TicketDetails"
 import { getFormattedDateTimeGMT } from "../../utils/dates"
+import { selectUser } from "../auth/authSlice"
+import { roles } from "../../consts"
+import ConfirmDialog from "../../components/ConfirmDialog"
 
 const PRIORITY_COLORS = { High: "error", Medium: "info", Low: "default" }
 
@@ -60,6 +65,8 @@ export default function TicketsTable(props) {
     const closedTicketList = useSelector(selectClosedTicketList)
     const completedTicketList = useSelector(selectCompletedTicketList)
     const search = useSelector(selectSearch)
+    const currentUser = useSelector(selectUser)
+    const canDelete = currentUser.role === roles.SCLOUDX_ADMIN
 
     const pagination = props.pagination
     const mode = props.mode
@@ -67,8 +74,24 @@ export default function TicketsTable(props) {
 
     const [open, setOpen] = React.useState(false)
     const [searchInput, setSearchInput] = React.useState(search)
+    const [ticketToDelete, setTicketToDelete] = React.useState(null)
+    const [deleting, setDeleting] = React.useState(false)
+    const [feedback, setFeedback] = React.useState(null)
 
     const dispatch = useDispatch()
+
+    const handleConfirmDelete = async () => {
+        setDeleting(true)
+        try {
+            await dispatch(deactivateTicket(ticketToDelete.id)).unwrap()
+            setFeedback({ severity: "success", message: `Ticket "${ticketToDelete.ticketId}" deleted successfully` })
+        } catch (err) {
+            setFeedback({ severity: "error", message: err || "Failed to delete ticket" })
+        } finally {
+            setDeleting(false)
+            setTicketToDelete(null)
+        }
+    }
 
     const handleChangePage = (event, newPage) => {
         dispatch(changePage(newPage))
@@ -101,6 +124,14 @@ export default function TicketsTable(props) {
                         </TableCell>
                     ))}
                 <TableCell align="right">
+                    {canDelete && (
+                        <IconButton
+                            aria-label={`delete ${row.ticketId}`}
+                            onClick={() => setTicketToDelete(row)}
+                        >
+                            <DeleteIcon />
+                        </IconButton>
+                    )}
                     <IconButton onClick={(event) => handleRowClick(event, row.id)}
                     >
                         {open === row.id ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
@@ -206,6 +237,17 @@ export default function TicketsTable(props) {
                     onPageChange={handleChangePage}
                     onRowsPerPageChange={handleChangeRowsPerPage}
                 />
+                <ConfirmDialog
+                    open={!!ticketToDelete}
+                    title="Delete ticket"
+                    message={`Are you sure you want to delete "${ticketToDelete && ticketToDelete.ticketId}"? This cannot be undone.`}
+                    onConfirm={handleConfirmDelete}
+                    onCancel={() => setTicketToDelete(null)}
+                    loading={deleting}
+                />
+                <Snackbar open={!!feedback} autoHideDuration={4000} onClose={() => setFeedback(null)}>
+                    {feedback && <Alert severity={feedback.severity} onClose={() => setFeedback(null)}>{feedback.message}</Alert>}
+                </Snackbar>
             </Paper>
         )
     }
