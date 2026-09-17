@@ -81,7 +81,7 @@ function InventoryContent() {
                     <TextField
                         fullWidth
                         label="Search inventory"
-                        placeholder="Search by site name, customer, or town"
+                        placeholder="Search any site or circuit field - name, address, Vendor Circuit ID, SCloudX Order Reference, etc."
                         value={searchInput}
                         onChange={(event) => setSearchInput(event.target.value)}
                         sx={{ mb: 2 }}

@@ -1,6 +1,7 @@
 /* eslint-disable eqeqeq */
 const httpStatus = require("http-status");
 // const { custom } = require("joi");
+const mongoose = require("mongoose");
 const _ = require("lodash");
 const moment = require("moment");
 const { parse } = require("csv-parse/sync");
@@ -630,9 +631,45 @@ const bulkCreateCircuitsBySite = async (validRows) => {
   return createdCircuits;
 };
 
+/**
+ * Find the distinct Site ids of active Circuits whose own fields match a
+ * search term - lets Site search (site.controller.js's getSites) also
+ * catch circuit-level identifiers like Vendor Circuit ID or SCloudX Order
+ * Reference, not just the site's own name/customer/town.
+ * @param {string} search
+ * @returns {Promise<mongoose.Types.ObjectId[]>}
+ */
+const findSiteIdsMatchingSearch = async (search) => {
+  const regex = { $regex: search, $options: "i" };
+  const siteIds = await Circuit.find({
+    active: true,
+    $or: [
+      { code: regex },
+      { customerCircuitId: regex },
+      { vendorCircuitId: regex },
+      { scloudxOrderReference: regex },
+      { vendorOrderReference: regex },
+      { customerOrderReference: regex },
+      { customerCircuitBillStartDate: regex },
+      { customerCircuitContractTerm: regex },
+      { vendorCircuitBillStartDate: regex },
+      { vendorCircuitContractTerm: regex },
+      { vendorLECName: regex },
+      { bandwidth: regex },
+      { product: regex },
+      { vendorUptime: regex },
+      { vendorMTTR: regex },
+    ],
+  }).distinct("site.id");
+  return siteIds
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+};
+
 module.exports = {
   // createCircuit,
   queryCircuits,
+  findSiteIdsMatchingSearch,
   validateBulkUploadCircuits,
   bulkCreateCircuitsBySite,
   // createOrUpdateCircuitByVendorId,

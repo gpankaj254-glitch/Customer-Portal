@@ -53,13 +53,30 @@ const getSites = catchAsync(async (req, res) => {
   const filter = activeOnly(filterByCustomerId(req.user, baseFilter));
 
   if (search) {
-    _.assign(filter, {
-      $or: [
-        { name: { $regex: search, $options: "i" } },
-        { "customer.name": { $regex: search, $options: "i" } },
-        { "location.town": { $regex: search, $options: "i" } },
-      ],
-    });
+    const regex = { $regex: search, $options: "i" };
+    // Every Site-level text field, plus (via findSiteIdsMatchingSearch) the
+    // full set of Circuit-level fields (Vendor Circuit ID, SCloudX Order
+    // Reference, etc.) - a site is included if either it or any of its
+    // circuits contains the search term.
+    const orConditions = [
+      { name: regex },
+      { code: regex },
+      { "customer.name": regex },
+      { "customer.code": regex },
+      { "region.name": regex },
+      { "region.code": regex },
+      { "location.address": regex },
+      { "location.town": regex },
+      { "location.country": regex },
+      { "location.postalCode": regex },
+      { customerSiteIdentifier: regex },
+      { category: regex },
+    ];
+    const matchingCircuitSiteIds = await circuitService.findSiteIdsMatchingSearch(search);
+    if (matchingCircuitSiteIds.length > 0) {
+      orConditions.push({ _id: { $in: matchingCircuitSiteIds } });
+    }
+    _.assign(filter, { $or: orConditions });
   }
 
   const options = pick(req.query, ["sortBy", "limit", "page"]);

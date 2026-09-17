@@ -35,25 +35,29 @@ export default function CircuitSelectList({ onSelectCircuit }) {
     const dispatch = useDispatch()
     const siteList = useSelector(selectSiteList)
 
+    // The committed search term (what's actually sent to the server) is
+    // kept separate from the text box's live value so the fetch only fires
+    // 400ms after the user stops typing - same debounce pattern as
+    // Sites.js/InventoryTable.js. The server-side search (site.controller.js)
+    // checks every Site field and every Circuit field (Vendor Circuit ID,
+    // SCloudX Order Reference, etc.), so unlike the old client-only filter
+    // this isn't limited to a handful of fields or the first 200 rows.
+    const [searchInput, setSearchInput] = React.useState("")
     const [search, setSearch] = React.useState("")
 
     React.useEffect(() => {
-        dispatch(getSites({ limit: 200, page: 1 }))
+        dispatch(getSites({ limit: 200, page: 1, search }))
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+    }, [search])
+
+    React.useEffect(() => {
+        const timeout = setTimeout(() => {
+            setSearch(searchInput)
+        }, 400)
+        return () => clearTimeout(timeout)
+    }, [searchInput])
 
     const rows = React.useMemo(() => flattenCircuits(siteList), [siteList])
-
-    const filteredRows = React.useMemo(() => {
-        if (!search) return rows
-        const term = search.toLowerCase()
-        return rows.filter((row) =>
-            (row.vendorCircuitId || row.code || "").toLowerCase().includes(term)
-            || (row.customerOrderReference || "").toLowerCase().includes(term)
-            || _.get(row, "site.name", "").toLowerCase().includes(term)
-            || _.get(row, "location.address", "").toLowerCase().includes(term)
-        )
-    }, [rows, search])
 
     return (
         <Box>
@@ -61,9 +65,9 @@ export default function CircuitSelectList({ onSelectCircuit }) {
             <TextField
                 fullWidth
                 label="Search Inventory"
-                placeholder="Search by circuit, site name, or address"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search any site or circuit field - name, address, Vendor Circuit ID, SCloudX Order Reference, etc."
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
                 sx={{ mb: 2 }}
             />
             <Paper sx={{ width: "100%", overflow: "hidden" }}>
@@ -85,7 +89,7 @@ export default function CircuitSelectList({ onSelectCircuit }) {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {filteredRows.map((row) => (
+                            {rows.map((row) => (
                                 <TableRow key={row.id}>
                                     <TableCell>
                                         <IconButton
