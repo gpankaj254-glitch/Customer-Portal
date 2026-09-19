@@ -12,6 +12,16 @@ export async function fetchDashboardSummary (rejectWithValue) {
     }
 }
 
+export async function fetchOpenTicketsAnalysis (rejectWithValue) {
+    try {
+        const response = await axios.post(`${baseURL}/dashboard/open-tickets-analysis`, {}, {headers: headers()})
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
 export async function fetchClosedTicketsAnalysis (data, rejectWithValue) {
     try {
         const response = await axios.post(`${baseURL}/dashboard/closed-tickets-analysis`, data, {headers: headers()})

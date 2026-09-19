@@ -22,6 +22,10 @@ const initialState = {
     uploadVendorAttachmentError: null,
     uploadVendorAttachmentMessage: null,
     search: "",
+    // Set when another page (e.g. the dashboard's Open Tickets list) sends
+    // the user to a specific ticket - TicketsTable expands that ticket's row
+    // once it shows up in the list, then clears this.
+    focusTicketId: "",
     pagination: {
         page: 0,
         limit: 20,
@@ -145,6 +149,14 @@ export const ticketSlice = createSlice({
         setSearch: (state, {payload}) => {
             state.search = payload
             state.pagination.page = 0
+        },
+        focusTicket: (state, {payload}) => {
+            state.search = payload
+            state.focusTicketId = payload
+            state.pagination.page = 0
+        },
+        clearFocusTicket: (state) => {
+            state.focusTicketId = ""
         },
     },
     extraReducers: (builder) => {
@@ -308,7 +320,7 @@ export const ticketSlice = createSlice({
     }
 })
 
-export const { changePage, changeLimit, setSearch } = ticketSlice.actions
+export const { changePage, changeLimit, setSearch, focusTicket, clearFocusTicket } = ticketSlice.actions
 
 export const selectTicketList = (state) => state.tickets.ticketList
 export const selectOpenTicketList = (state) => state.tickets.openTicketList
@@ -326,5 +338,6 @@ export const selectAppendDescriptionMessage = (state) => state.tickets.appendDes
 export const selectPageStatus = (state) => state.tickets.pageStatus
 export const selectPagination = (state) => state.tickets.pagination
 export const selectSearch = (state) => state.tickets.search
+export const selectFocusTicketId = (state) => state.tickets.focusTicketId
 
 export default ticketSlice.reducer

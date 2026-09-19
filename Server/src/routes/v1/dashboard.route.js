@@ -9,6 +9,8 @@ const router = express.Router();
 
 router.route("/summary").post(auth("viewDashboard"), dashboardController.getSummary);
 
+router.route("/open-tickets-analysis").post(auth("viewDashboard"), dashboardController.getOpenTicketsAnalysis);
+
 router
   .route("/closed-tickets-analysis")
   .post(

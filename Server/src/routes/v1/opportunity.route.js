@@ -26,7 +26,7 @@ router
 
 router
   .route("/dashboard-summary")
-  .post(auth("viewDashboard"), opportunityController.getSalesDashboardSummary);
+  .post(auth("viewOpportunities"), opportunityController.getSalesDashboardSummary);
 
 router
   .route("/bulk-upload")

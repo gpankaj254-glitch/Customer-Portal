@@ -6,6 +6,11 @@ const getSummary = catchAsync(async (req, res) => {
   res.send(summary);
 });
 
+const getOpenTicketsAnalysis = catchAsync(async (req, res) => {
+  const analysis = await dashboardService.getOpenTicketsAnalysis(req.user);
+  res.send(analysis);
+});
+
 const getClosedTicketsAnalysis = catchAsync(async (req, res) => {
   const analysis = await dashboardService.getClosedTicketsAnalysis(req.body, req.user);
   res.send(analysis);
@@ -13,5 +18,6 @@ const getClosedTicketsAnalysis = catchAsync(async (req, res) => {
 
 module.exports = {
   getSummary,
+  getOpenTicketsAnalysis,
   getClosedTicketsAnalysis,
 };

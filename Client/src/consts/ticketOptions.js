@@ -50,9 +50,10 @@ export const rfoStatusOptions = ["Pending", "Sent", "Closed"]
 
 // Status of the ticket on the vendor's side, on the Vendor Communication tab.
 export const vendorTicketStatusOptions = [
-    "LEC",
-    "Customer",
+    "LEC WIP",
+    "Customer Response",
     "Site Access",
     "Customer Feedback",
+    "On Hold",
     "Resolved",
 ]

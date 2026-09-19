@@ -1,11 +1,14 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit"
-import { fetchDashboardSummary, fetchClosedTicketsAnalysis } from "./dashboardAPI"
+import { fetchDashboardSummary, fetchOpenTicketsAnalysis, fetchClosedTicketsAnalysis } from "./dashboardAPI"
 import { pageStatusVals } from "../tickets/utils"
 
 const initialState = {
     summary: null,
     summaryStatus: pageStatusVals.idle,
     summaryError: null,
+    openTicketsAnalysis: null,
+    openTicketsAnalysisStatus: pageStatusVals.idle,
+    openTicketsAnalysisError: null,
     closedTicketsAnalysis: null,
     closedTicketsAnalysisStatus: pageStatusVals.idle,
     closedTicketsAnalysisError: null,
@@ -15,6 +18,14 @@ export const getDashboardSummary = createAsyncThunk(
     "dashboard/fetchSummary",
     async (data, { rejectWithValue }) => {
         const response = await fetchDashboardSummary(rejectWithValue)
+        return response
+    }
+)
+
+export const getOpenTicketsAnalysis = createAsyncThunk(
+    "dashboard/fetchOpenTicketsAnalysis",
+    async (data, { rejectWithValue }) => {
+        const response = await fetchOpenTicketsAnalysis(rejectWithValue)
         return response
     }
 )
@@ -44,6 +55,17 @@ export const dashboardSlice = createSlice({
                 state.summaryStatus = pageStatusVals.error
                 state.summaryError = payload
             })
+            .addCase(getOpenTicketsAnalysis.pending, (state) => {
+                state.openTicketsAnalysisStatus = pageStatusVals.loading
+            })
+            .addCase(getOpenTicketsAnalysis.fulfilled, (state, {payload}) => {
+                state.openTicketsAnalysisStatus = pageStatusVals.fetched
+                state.openTicketsAnalysis = payload
+            })
+            .addCase(getOpenTicketsAnalysis.rejected, (state, {payload}) => {
+                state.openTicketsAnalysisStatus = pageStatusVals.error
+                state.openTicketsAnalysisError = payload
+            })
             .addCase(getClosedTicketsAnalysis.pending, (state) => {
                 state.closedTicketsAnalysisStatus = pageStatusVals.loading
             })
@@ -61,6 +83,9 @@ export const dashboardSlice = createSlice({
 export const selectDashboardSummary = (state) => state.dashboard.summary
 export const selectDashboardSummaryStatus = (state) => state.dashboard.summaryStatus
 export const selectDashboardSummaryError = (state) => state.dashboard.summaryError
+export const selectOpenTicketsAnalysis = (state) => state.dashboard.openTicketsAnalysis
+export const selectOpenTicketsAnalysisStatus = (state) => state.dashboard.openTicketsAnalysisStatus
+export const selectOpenTicketsAnalysisError = (state) => state.dashboard.openTicketsAnalysisError
 export const selectClosedTicketsAnalysis = (state) => state.dashboard.closedTicketsAnalysis
 export const selectClosedTicketsAnalysisStatus = (state) => state.dashboard.closedTicketsAnalysisStatus
 export const selectClosedTicketsAnalysisError = (state) => state.dashboard.closedTicketsAnalysisError

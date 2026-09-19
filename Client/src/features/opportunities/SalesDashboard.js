@@ -27,16 +27,27 @@ function formatDate(value) {
     return value ? moment(value).format("MMM D, YYYY") : ""
 }
 
+// Set by SalesDashboard's `compact` prop (used when it's embedded in the SCX
+// Admin dashboard, next to the ticket tabs) so the tiles, headings and tables
+// match that dashboard's smaller fonts.
+const CompactContext = React.createContext(false)
+
+const compactTableSx = {
+    "& .MuiTableCell-root": { fontSize: "0.72rem", padding: "4px 8px" },
+    "& .MuiTypography-root": { fontSize: "0.72rem" },
+}
+
 // Smaller than dashboard/Title.js's shared tile title on purpose - this
 // dashboard packs in more tiles than the generic one, so both the label and
 // the number need to be more compact to keep everything readable at once.
 function StatTile({ title, value }) {
+    const compact = React.useContext(CompactContext)
     return (
-        <Paper sx={{ p: 1, display: "flex", flexDirection: "column", height: 74, justifyContent: "center" }}>
-            <Typography component="h2" variant="caption" color="primary" sx={{ fontWeight: 600 }}>
+        <Paper sx={{ p: 1, display: "flex", flexDirection: "column", height: compact ? 62 : 74, justifyContent: "center" }}>
+            <Typography component="h2" variant="caption" color="primary" sx={{ fontWeight: 600, fontSize: compact ? "0.7rem" : undefined }}>
                 {title}
             </Typography>
-            <Typography component="p" variant="h5" sx={{ fontSize: "1.35rem" }}>{value}</Typography>
+            <Typography component="p" variant="h5" sx={{ fontSize: compact ? "1.1rem" : "1.35rem" }}>{value}</Typography>
         </Paper>
     )
 }
@@ -47,9 +58,16 @@ StatTile.propTypes = {
 }
 
 function SectionHeading({ children }) {
+    const compact = React.useContext(CompactContext)
     return (
         <Grid item xs={12}>
-            <Typography component="h2" variant="h5" sx={{ mt: 1, fontSize: "1rem" }}>{children}</Typography>
+            <Typography
+                component="h2"
+                variant="h5"
+                sx={compact ? { mt: 0.5, fontSize: "0.85rem", fontWeight: 600 } : { mt: 1, fontSize: "1rem" }}
+            >
+                {children}
+            </Typography>
         </Grid>
     )
 }
@@ -59,9 +77,10 @@ SectionHeading.propTypes = {
 }
 
 function OpenOpportunitiesTable({ rows }) {
+    const compact = React.useContext(CompactContext)
     return (
         <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
+            <Table size="small" sx={compact ? compactTableSx : undefined}>
                 <TableHead>
                     <TableRow>
                         <TableCell><Typography variant="subtitle2">Opportunity #</Typography></TableCell>
@@ -101,9 +120,10 @@ OpenOpportunitiesTable.propTypes = {
 }
 
 function SupplierWiseReportTable({ rows }) {
+    const compact = React.useContext(CompactContext)
     return (
         <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
+            <Table size="small" sx={compact ? compactTableSx : undefined}>
                 <TableHead>
                     <TableRow>
                         <TableCell><Typography variant="subtitle2">Supplier</Typography></TableCell>
@@ -138,12 +158,18 @@ SupplierWiseReportTable.propTypes = {
     rows: PropTypes.array.isRequired,
 }
 
-export default function SalesDashboard() {
+// embeddedTab: when the host page renders the tab row itself (the SCX Admin
+// dashboard, which lists these tabs after its ticket tabs), pass the index of
+// the tab to show (0 Summary, 1 Opportunities, 2 Supplier) and this renders
+// just that tab's content, with no tab row of its own.
+export default function SalesDashboard({ embeddedTab, compact }) {
     const dispatch = useDispatch()
     const summary = useSelector(selectSalesDashboardSummary)
     const status = useSelector(selectSalesDashboardSummaryStatus)
     const error = useSelector(selectSalesDashboardSummaryError)
-    const [activeTab, setActiveTab] = React.useState(0)
+    const [ownTab, setOwnTab] = React.useState(0)
+    const embedded = embeddedTab !== undefined
+    const activeTab = embedded ? embeddedTab : ownTab
 
     React.useEffect(() => {
         dispatch(getSalesDashboardSummary())
@@ -160,14 +186,17 @@ export default function SalesDashboard() {
     const openOpportunities = _.get(summary, "openOpportunities", [])
 
     return (
+        <CompactContext.Provider value={!!compact}>
         <Grid container spacing={1.5}>
-            <Grid item xs={12}>
-                <Tabs value={activeTab} onChange={(event, newValue) => setActiveTab(newValue)}>
-                    <Tab label="Summary" />
-                    <Tab label="Opportunities" />
-                    <Tab label="Supplier" />
-                </Tabs>
-            </Grid>
+            {!embedded && (
+                <Grid item xs={12}>
+                    <Tabs value={activeTab} onChange={(event, newValue) => setOwnTab(newValue)}>
+                        <Tab label="Summary" />
+                        <Tab label="Opportunities" />
+                        <Tab label="Supplier" />
+                    </Tabs>
+                </Grid>
+            )}
 
             {activeTab === 0 && (
                 <>
@@ -257,5 +286,11 @@ export default function SalesDashboard() {
                 </>
             )}
         </Grid>
+        </CompactContext.Provider>
     )
+}
+
+SalesDashboard.propTypes = {
+    embeddedTab: PropTypes.number,
+    compact: PropTypes.bool,
 }

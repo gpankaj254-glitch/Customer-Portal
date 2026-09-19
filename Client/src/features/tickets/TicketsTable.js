@@ -17,7 +17,7 @@ import Snackbar from "@mui/material/Snackbar"
 
 import PropTypes from "prop-types"
 
-import {changeLimit, changePage, getClosedTickets, getCompletedTickets, selectGetTicketError, selectPageStatus, getOpenTickets, selectClosedTicketList, selectCompletedTicketList, selectOpenTicketList, selectSearch, setSearch, deactivateTicket} from "./ticketSlice"
+import {changeLimit, changePage, getClosedTickets, getCompletedTickets, selectGetTicketError, selectPageStatus, getOpenTickets, selectClosedTicketList, selectCompletedTicketList, selectOpenTicketList, selectSearch, setSearch, deactivateTicket, selectFocusTicketId, clearFocusTicket} from "./ticketSlice"
 import { useSelector, useDispatch } from "react-redux"
 import { Alert, Collapse, Typography} from "@mui/material"
 import { pageStatusVals} from "./utils"
@@ -65,6 +65,7 @@ export default function TicketsTable(props) {
     const closedTicketList = useSelector(selectClosedTicketList)
     const completedTicketList = useSelector(selectCompletedTicketList)
     const search = useSelector(selectSearch)
+    const focusTicketId = useSelector(selectFocusTicketId)
     const currentUser = useSelector(selectUser)
     const canDelete = currentUser.role === roles.SCLOUDX_ADMIN
 
@@ -158,6 +159,20 @@ export default function TicketsTable(props) {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pagination.page, pagination.limit, search, mode])
+
+    // Arriving from another page for a specific ticket (see focusTicket):
+    // open its details as soon as its row is in the list.
+    React.useEffect(() => {
+        if (!focusTicketId || mode !== "open") {
+            return
+        }
+        const match = opneTicketList.find((ticket) => ticket.ticketId === focusTicketId)
+        if (match) {
+            setOpen(match.id)
+            dispatch(clearFocusTicket())
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [opneTicketList, focusTicketId, mode])
 
     // Debounce the search box: only commit to Redux (and trigger the fetch
     // above) 400ms after the user stops typing.
