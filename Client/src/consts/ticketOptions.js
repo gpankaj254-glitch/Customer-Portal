@@ -7,6 +7,7 @@ export const problemTypeOptions = [
     "Latency",
     "Other",
     "Low Speed Issue",
+    "RFO Request",
 ]
 
 export const priorityOptions = ["High", "Medium", "Low"]
@@ -46,3 +47,12 @@ export const closureCodeOptions = [
 // RFO = Reason For Outage. Status of the RFO report itself, on the Ticket
 // Closure details tab - separate from the ticket's own status.
 export const rfoStatusOptions = ["Pending", "Sent", "Closed"]
+
+// Status of the ticket on the vendor's side, on the Vendor Communication tab.
+export const vendorTicketStatusOptions = [
+    "LEC",
+    "Customer",
+    "Site Access",
+    "Customer Feedback",
+    "Resolved",
+]

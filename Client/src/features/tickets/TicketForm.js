@@ -25,6 +25,7 @@ export default function TicketForm({ circuit, onDone, onBack }) {
     const dispatch = useDispatch()
 
     const [problemType, setProblemType] = React.useState("")
+    const [otherProblemDetails, setOtherProblemDetails] = React.useState("")
     const [problemStartDate, setProblemStartDate] = React.useState("")
     const [customerReference, setCustomerReference] = React.useState("")
     const [priority, setPriority] = React.useState("")
@@ -54,6 +55,7 @@ export default function TicketForm({ circuit, onDone, onBack }) {
         const payload = {
             circuitId: circuit.id,
             problemType,
+            otherProblemDetails: problemType === "Other" ? otherProblemDetails : "",
             problemStartDate,
             customerReference,
             priority,
@@ -110,6 +112,19 @@ export default function TicketForm({ circuit, onDone, onBack }) {
                             </Select>
                         </FormControl>
                     </Grid>
+                    {problemType === "Other" && (
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                multiline
+                                minRows={2}
+                                label="Additional Details"
+                                placeholder="Describe the problem"
+                                value={otherProblemDetails}
+                                onChange={(event) => setOtherProblemDetails(event.target.value)}
+                            />
+                        </Grid>
+                    )}
                     <Grid item xs={12} sm={6}>
                         <TextField
                             fullWidth

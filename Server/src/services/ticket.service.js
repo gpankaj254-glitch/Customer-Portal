@@ -115,6 +115,8 @@ const createTicket = async (ticketBody, circuit, user) => {
   // The create form has no separate "subject" field - use the problem type
   // so anything still displaying/relying on subject has something sensible.
   ticketToCreate.subject = ticketBody.problemType;
+  ticketToCreate.otherProblemDetails =
+    ticketBody.problemType === "Other" ? _.trim(ticketBody.otherProblemDetails) : "";
   ticketToCreate.status = "Submitted";
   ticketToCreate.siteChecklist = _.pick(ticketBody.siteChecklist, [
     "powerAvailable",
@@ -252,6 +254,7 @@ const updateTicket = async (ticketBody, user) => {
   const {
     ticketId,
     problemType,
+    otherProblemDetails,
     customerReference,
     priority,
     status,
@@ -312,6 +315,8 @@ const updateTicket = async (ticketBody, user) => {
   }
 
   if (problemType !== undefined) ticket.problemType = problemType;
+  if (otherProblemDetails !== undefined) ticket.otherProblemDetails = _.trim(otherProblemDetails);
+  if (ticket.problemType !== "Other") ticket.otherProblemDetails = "";
   if (customerReference !== undefined) ticket.customerReference = customerReference;
   if (priority !== undefined) ticket.priority = priority;
   if (closureCode !== undefined) ticket.closureCode = closureCode;

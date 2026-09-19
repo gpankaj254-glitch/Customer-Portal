@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 // const validator = require("validator");
 // const bcrypt = require("bcryptjs");
 const { toJSON, paginate } = require("./plugins");
-const { problemTypeOptions, priorityOptions, siteAccessHoursOptions, statusOptions, closureCodeOptions, rfoStatusOptions } = require("../config/ticketOptions");
+const { problemTypeOptions, priorityOptions, siteAccessHoursOptions, statusOptions, closureCodeOptions, rfoStatusOptions, vendorTicketStatusOptions } = require("../config/ticketOptions");
 // const { roles } = require("../config/roles");
 
 const attachmentSchema = {
@@ -119,6 +119,7 @@ const ticketSchema = mongoose.Schema(
     },
     vendorTicketStatus: {
       type: String,
+      enum: ["", ...vendorTicketStatusOptions],
       default: "",
     },
     vendorTicketClosureDate: {
@@ -138,6 +139,11 @@ const ticketSchema = mongoose.Schema(
       type: String,
       enum: problemTypeOptions,
       required: true,
+    },
+    // Free-text detail captured when problemType is "Other" (empty otherwise).
+    otherProblemDetails: {
+      type: String,
+      default: "",
     },
     problemStartDate: {
       type: String,

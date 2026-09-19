@@ -7,6 +7,7 @@ const problemTypeOptions = [
   "Latency",
   "Other",
   "Low Speed Issue",
+  "RFO Request",
 ];
 
 const priorityOptions = ["High", "Medium", "Low"];
@@ -46,6 +47,15 @@ const closureCodeOptions = [
 // Closure details tab - separate from the ticket's own status.
 const rfoStatusOptions = ["Pending", "Sent", "Closed"];
 
+// Status of the ticket on the vendor's side, on the Vendor Communication tab.
+const vendorTicketStatusOptions = [
+  "LEC",
+  "Customer",
+  "Site Access",
+  "Customer Feedback",
+  "Resolved",
+];
+
 module.exports = {
   problemTypeOptions,
   priorityOptions,
@@ -53,4 +63,5 @@ module.exports = {
   statusOptions,
   closureCodeOptions,
   rfoStatusOptions,
+  vendorTicketStatusOptions,
 };

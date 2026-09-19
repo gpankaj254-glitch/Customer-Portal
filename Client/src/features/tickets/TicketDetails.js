@@ -25,7 +25,7 @@ import { updateTicket, appendTicketDescription, uploadTicketAttachments, appendV
 import { downloadTicketAttachment, downloadVendorAttachment } from "./ticketsAPI"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
-import { problemTypeOptions, priorityOptions, statusOptions, openStatusOptions, closureCodeOptions, rfoStatusOptions } from "../../consts/ticketOptions"
+import { problemTypeOptions, priorityOptions, statusOptions, openStatusOptions, closureCodeOptions, rfoStatusOptions, vendorTicketStatusOptions } from "../../consts/ticketOptions"
 
 const ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.gif,.bmp,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
 
@@ -84,6 +84,7 @@ export default function TicketDetails({ ticket, mode }) {
     const [activeTab, setActiveTab] = React.useState(0)
 
     const [problemType, setProblemType] = React.useState(_.get(ticket, "problemType", ""))
+    const [otherProblemDetails, setOtherProblemDetails] = React.useState(_.get(ticket, "otherProblemDetails", ""))
     const [customerReference, setCustomerReference] = React.useState(_.get(ticket, "customerReference", ""))
     const [priority, setPriority] = React.useState(_.get(ticket, "priority", ""))
     const [status, setStatus] = React.useState(_.get(ticket, "status", "Submitted"))
@@ -181,6 +182,7 @@ export default function TicketDetails({ ticket, mode }) {
             await dispatch(updateTicket([{
                 ticketId: ticket.id,
                 problemType,
+                otherProblemDetails: problemType === "Other" ? otherProblemDetails : "",
                 customerReference,
                 priority,
                 status,
@@ -348,6 +350,11 @@ export default function TicketDetails({ ticket, mode }) {
                         <Grid item xs={12} sm={4}>
                             <TextField fullWidth label="Customer Reference" value={customerReference} disabled />
                         </Grid>
+                        {problemType === "Other" && (
+                            <Grid item xs={12}>
+                                <TextField fullWidth multiline label="Additional Details" value={otherProblemDetails} disabled />
+                            </Grid>
+                        )}
 
                         <Grid item xs={12} sm={4}>
                             <FormControl fullWidth disabled>
@@ -492,6 +499,19 @@ export default function TicketDetails({ ticket, mode }) {
                                         disabled={mainFieldsLocked}
                                     />
                                 </Grid>
+                                {problemType === "Other" && (
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth
+                                            multiline
+                                            minRows={2}
+                                            label="Additional Details"
+                                            value={otherProblemDetails}
+                                            onChange={(event) => setOtherProblemDetails(event.target.value)}
+                                            disabled={mainFieldsLocked}
+                                        />
+                                    </Grid>
+                                )}
 
                                 <Grid item xs={12} sm={4}>
                                     <FormControl fullWidth required disabled={mainFieldsLocked}>
@@ -674,8 +694,8 @@ export default function TicketDetails({ ticket, mode }) {
                                 <Grid item xs={12} sm={4}>
                                     <TextField
                                         fullWidth
-                                        type="date"
-                                        label="Vendor Ticket Create Date"
+                                        type="datetime-local"
+                                        label="Vendor Ticket Create Date and Time"
                                         InputLabelProps={{ shrink: true }}
                                         value={vendorTicketCreateDate}
                                         onChange={(event) => setVendorTicketCreateDate(event.target.value)}
@@ -683,19 +703,26 @@ export default function TicketDetails({ ticket, mode }) {
                                     />
                                 </Grid>
                                 <Grid item xs={12} sm={4}>
-                                    <TextField
-                                        fullWidth
-                                        label="Vendor Ticket Status"
-                                        value={vendorTicketStatus}
-                                        onChange={(event) => setVendorTicketStatus(event.target.value)}
-                                        disabled={mainFieldsLocked}
-                                    />
+                                    <FormControl fullWidth disabled={mainFieldsLocked}>
+                                        <InputLabel id={`vendor-ticket-status-${ticket.id}`}>Vendor Ticket Status</InputLabel>
+                                        <Select
+                                            labelId={`vendor-ticket-status-${ticket.id}`}
+                                            value={vendorTicketStatus}
+                                            label="Vendor Ticket Status"
+                                            onChange={(event) => setVendorTicketStatus(event.target.value)}
+                                        >
+                                            <MenuItem value=""><em>None</em></MenuItem>
+                                            {vendorTicketStatusOptions.map((option) => (
+                                                <MenuItem key={option} value={option}>{option}</MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
                                 </Grid>
                                 <Grid item xs={12} sm={4}>
                                     <TextField
                                         fullWidth
-                                        type="date"
-                                        label="Vendor Ticket Closure Date"
+                                        type="datetime-local"
+                                        label="Vendor Ticket Closure Date and Time"
                                         InputLabelProps={{ shrink: true }}
                                         value={vendorTicketClosureDate}
                                         onChange={(event) => setVendorTicketClosureDate(event.target.value)}

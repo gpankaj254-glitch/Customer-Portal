@@ -1,5 +1,5 @@
 const Joi = require("joi");
-const { problemTypeOptions, priorityOptions, siteAccessHoursOptions, statusOptions, closureCodeOptions, rfoStatusOptions } = require("../config/ticketOptions");
+const { problemTypeOptions, priorityOptions, siteAccessHoursOptions, statusOptions, closureCodeOptions, rfoStatusOptions, vendorTicketStatusOptions } = require("../config/ticketOptions");
 
 const createTicket = {
   body: Joi.array().items(
@@ -8,6 +8,7 @@ const createTicket = {
       problemType: Joi.string()
         .valid(...problemTypeOptions)
         .required(),
+      otherProblemDetails: Joi.string().allow(""),
       problemStartDate: Joi.string().allow(""),
       customerReference: Joi.string().allow(""),
       priority: Joi.string()
@@ -44,6 +45,7 @@ const updateTicket = {
     Joi.object().keys({
       ticketId: Joi.required(),
       problemType: Joi.string().valid(...problemTypeOptions),
+      otherProblemDetails: Joi.string().allow(""),
       customerReference: Joi.string().allow(""),
       priority: Joi.string().valid(...priorityOptions),
       status: Joi.string()
@@ -54,7 +56,7 @@ const updateTicket = {
       scxInternalComments: Joi.string().allow(""),
       vendorTicketId: Joi.string().allow(""),
       vendorTicketCreateDate: Joi.string().allow(""),
-      vendorTicketStatus: Joi.string().allow(""),
+      vendorTicketStatus: Joi.string().valid("", ...vendorTicketStatusOptions),
       vendorTicketClosureDate: Joi.string().allow(""),
       rfoStatus: Joi.string().valid("", ...rfoStatusOptions),
       ticketStartDateTime: Joi.string().allow(""),
