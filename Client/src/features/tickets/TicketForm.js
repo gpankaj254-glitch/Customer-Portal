@@ -113,8 +113,8 @@ export default function TicketForm({ circuit, onDone, onBack }) {
                     <Grid item xs={12} sm={6}>
                         <TextField
                             fullWidth
-                            type="date"
-                            label="Problem Start Date"
+                            type="datetime-local"
+                            label="Problem Start Date and Time"
                             InputLabelProps={{ shrink: true }}
                             value={problemStartDate}
                             onChange={(event) => setProblemStartDate(event.target.value)}

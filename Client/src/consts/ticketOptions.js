@@ -36,6 +36,7 @@ export const openStatusOptions = statusOptions.filter((option) => option !== "Co
 // was closed. Required to close a ticket, and shown in place of Status on
 // the Closed/Completed Tickets lists.
 export const closureCodeOptions = [
+    "Resolved",
     "Rejected",
     "AutoResolved",
     "Cancelled",

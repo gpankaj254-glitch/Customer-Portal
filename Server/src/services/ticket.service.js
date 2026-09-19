@@ -256,6 +256,7 @@ const updateTicket = async (ticketBody, user) => {
     priority,
     status,
     closureCode,
+    closedAt,
     scxInternalComments,
     vendorTicketId,
     vendorTicketCreateDate,
@@ -295,6 +296,21 @@ const updateTicket = async (ticketBody, user) => {
     throw new ApiError(httpStatus.BAD_REQUEST, "Closure Code is required to close a ticket");
   }
 
+  // Closed Date and Time - entered by the user when closing (defaults to
+  // now). Must not precede the ticket's creation or lie in the future
+  // (5 min of slack for clock skew between browser and server).
+  let closedAtDate = new Date();
+  if (status === "Closed" && closedAt) {
+    closedAtDate = new Date(closedAt);
+    const created = _.get(ticket, "history[0].updatedAt");
+    if (created && closedAtDate < new Date(created)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, "Closed Date and Time cannot be before the ticket was created");
+    }
+    if (closedAtDate > moment().add(5, "minutes").toDate()) {
+      throw new ApiError(httpStatus.BAD_REQUEST, "Closed Date and Time cannot be in the future");
+    }
+  }
+
   if (problemType !== undefined) ticket.problemType = problemType;
   if (customerReference !== undefined) ticket.customerReference = customerReference;
   if (priority !== undefined) ticket.priority = priority;
@@ -310,9 +326,9 @@ const updateTicket = async (ticketBody, user) => {
   if (status === "Closed" && !ticket.downTime) {
     const created = _.get(ticket, "history[0].updatedAt");
     if (created) {
-      ticket.downTime = moment.duration(moment().diff(created)).asMinutes();
+      ticket.downTime = moment.duration(moment(closedAtDate).diff(created)).asMinutes();
     }
-    ticket.closedAt = new Date();
+    ticket.closedAt = closedAtDate;
   }
 
   return updateAndSave(ticket, status, "", user);

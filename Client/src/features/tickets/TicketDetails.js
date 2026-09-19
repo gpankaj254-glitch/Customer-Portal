@@ -41,6 +41,13 @@ function numToInputValue(value) {
     return value === null || value === undefined ? "" : String(value)
 }
 
+// Current local time formatted for a datetime-local input ("YYYY-MM-DDTHH:mm").
+function nowForDateTimeInput() {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+    return now.toISOString().slice(0, 16)
+}
+
 function AttachmentList({ attachments, onDownload }) {
     if (attachments.length === 0) {
         return <Typography variant="body2" color="text.secondary">No attachments</Typography>
@@ -81,6 +88,7 @@ export default function TicketDetails({ ticket, mode }) {
     const [priority, setPriority] = React.useState(_.get(ticket, "priority", ""))
     const [status, setStatus] = React.useState(_.get(ticket, "status", "Submitted"))
     const [closureCode, setClosureCode] = React.useState(_.get(ticket, "closureCode", ""))
+    const [closedAt, setClosedAt] = React.useState("")
     const [description, setDescription] = React.useState(_.get(ticket, "description", ""))
     const [scxInternalComments, setScxInternalComments] = React.useState(_.get(ticket, "scxInternalComments", ""))
     const [descriptionNote, setDescriptionNote] = React.useState("")
@@ -164,6 +172,10 @@ export default function TicketDetails({ ticket, mode }) {
             setFeedback({ severity: "error", message: "Closure Code is required to close a ticket" })
             return
         }
+        if (closingNow && !closedAt) {
+            setFeedback({ severity: "error", message: "Closed Date and Time is required to close a ticket" })
+            return
+        }
         setSubmitting(true)
         try {
             await dispatch(updateTicket([{
@@ -173,6 +185,7 @@ export default function TicketDetails({ ticket, mode }) {
                 priority,
                 status,
                 closureCode,
+                closedAt: closingNow ? new Date(closedAt).toISOString() : undefined,
                 scxInternalComments,
                 vendorTicketId,
                 vendorTicketCreateDate,
@@ -505,7 +518,12 @@ export default function TicketDetails({ ticket, mode }) {
                                             labelId={`status-${ticket.id}`}
                                             value={status}
                                             label="Status"
-                                            onChange={(event) => setStatus(event.target.value)}
+                                            onChange={(event) => {
+                                                setStatus(event.target.value)
+                                                if (event.target.value === "Closed" && !closedAt) {
+                                                    setClosedAt(nowForDateTimeInput())
+                                                }
+                                            }}
                                         >
                                             {tab0StatusOptions.map((option) => (
                                                 <MenuItem key={option} value={option}>{option}</MenuItem>
@@ -515,11 +533,21 @@ export default function TicketDetails({ ticket, mode }) {
                                 </Grid>
                                 {mode === "open" && closingNow && (
                                     <>
-                                        {/* Two spacers push Closure Code into the same column as
-                                            Status directly above it (Priority/Created Date/Status
-                                            fill the row above, 3 x sm4). */}
+                                        {/* A spacer plus Closed Date and Time push Closure Code into
+                                            the same column as Status directly above it (Priority/
+                                            Created Date/Status fill the row above, 3 x sm4). */}
                                         <Grid item xs={false} sm={4} sx={{ display: { xs: "none", sm: "block" } }} />
-                                        <Grid item xs={false} sm={4} sx={{ display: { xs: "none", sm: "block" } }} />
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField
+                                                fullWidth
+                                                required
+                                                type="datetime-local"
+                                                label="Closed Date and Time"
+                                                InputLabelProps={{ shrink: true }}
+                                                value={closedAt}
+                                                onChange={(event) => setClosedAt(event.target.value)}
+                                            />
+                                        </Grid>
                                         <Grid item xs={12} sm={4}>
                                             <FormControl fullWidth required>
                                                 <InputLabel id={`closure-code-${ticket.id}`}>Closure Code</InputLabel>

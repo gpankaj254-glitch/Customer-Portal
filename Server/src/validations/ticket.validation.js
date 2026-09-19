@@ -50,6 +50,7 @@ const updateTicket = {
         .valid(...statusOptions)
         .required(),
       closureCode: Joi.string().valid("", ...closureCodeOptions).allow(""),
+      closedAt: Joi.string().isoDate().allow(""),
       scxInternalComments: Joi.string().allow(""),
       vendorTicketId: Joi.string().allow(""),
       vendorTicketCreateDate: Joi.string().allow(""),

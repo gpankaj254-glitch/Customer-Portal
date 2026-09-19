@@ -35,6 +35,7 @@ const statusOptions = [
 // updateTicket) and shown in place of Status on the Closed/Completed
 // Tickets lists.
 const closureCodeOptions = [
+  "Resolved",
   "Rejected",
   "AutoResolved",
   "Cancelled",
