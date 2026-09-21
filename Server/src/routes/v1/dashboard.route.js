@@ -12,6 +12,14 @@ router.route("/summary").post(auth("viewDashboard"), dashboardController.getSumm
 router.route("/open-tickets-analysis").post(auth("viewDashboard"), dashboardController.getOpenTicketsAnalysis);
 
 router
+  .route("/closed-tickets")
+  .post(
+    auth("viewDashboard"),
+    validate(dashboardValidation.getClosedTicketsAnalysis),
+    dashboardController.getClosedTicketsList
+  );
+
+router
   .route("/closed-tickets-analysis")
   .post(
     auth("viewDashboard"),

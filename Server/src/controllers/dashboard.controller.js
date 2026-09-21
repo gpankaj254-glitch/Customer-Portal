@@ -16,8 +16,14 @@ const getClosedTicketsAnalysis = catchAsync(async (req, res) => {
   res.send(analysis);
 });
 
+const getClosedTicketsList = catchAsync(async (req, res) => {
+  const list = await dashboardService.getClosedTicketsList(req.body, req.user);
+  res.send(list);
+});
+
 module.exports = {
   getSummary,
   getOpenTicketsAnalysis,
   getClosedTicketsAnalysis,
+  getClosedTicketsList,
 };

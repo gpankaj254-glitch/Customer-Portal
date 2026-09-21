@@ -25,6 +25,35 @@ const countBy = (docs, field, order, blankLabel) => {
   return [...ordered, ...others, ...blank];
 };
 
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The Mongo filter behind every "closed tickets" dashboard query: active,
+ * closed tickets whose closedAt falls within the optional Start Date/End Date
+ * (whole days). A Customer Admin/User is always forced to their own
+ * customer.id - the request's customerId (SCX's "Filter By" dropdown) is
+ * ignored for them, so one customer can never query another's ticket data.
+ * (A ticket that has since moved on to "Completed" is still closed, so it is
+ * included.)
+ * @param {Object} filters
+ * @param {Object} actingUser
+ * @returns {Object}
+ */
+const buildClosedMatch = ({ startDate, endDate, customerId } = {}, actingUser) => {
+  const match = { active: true, closed: true, closedAt: { $ne: null } };
+  if (isCustomerRole(_.get(actingUser, "role"))) {
+    match["customer.id"] = _.get(actingUser, "customer.id");
+  } else if (customerId) {
+    match["customer.id"] = customerId;
+  }
+  // A bare "YYYY-MM-DD" means that whole GMT day, whatever time zone the server
+  // runs in. A full timestamp (the customer tab sends the viewer's own local
+  // start/end of day) is used exactly as given, so "1 Sep" means the viewer's 1 Sep.
+  if (startDate) match.closedAt.$gte = DATE_ONLY.test(startDate) ? moment.utc(startDate).startOf("day").toDate() : moment(startDate).toDate();
+  if (endDate) match.closedAt.$lte = DATE_ONLY.test(endDate) ? moment.utc(endDate).endOf("day").toDate() : moment(endDate).toDate();
+  return match;
+};
+
 /**
  * Live snapshot counts for the dashboard's top stat tiles - always
  * unfiltered/current, independent of the Closed Tickets Analysis filter. A
@@ -117,15 +146,7 @@ const getOpenTicketsAnalysis = async (actingUser) => {
  * @returns {Promise<Object>}
  */
 const getClosedTicketsAnalysis = async ({ startDate, endDate, customerId } = {}, actingUser) => {
-  const customerScoped = isCustomerRole(_.get(actingUser, "role"));
-  const match = { active: true, closed: true, closedAt: { $ne: null } };
-  if (customerScoped) {
-    match["customer.id"] = _.get(actingUser, "customer.id");
-  } else if (customerId) {
-    match["customer.id"] = customerId;
-  }
-  if (startDate) match.closedAt.$gte = moment(startDate).startOf("day").toDate();
-  if (endDate) match.closedAt.$lte = moment(endDate).endOf("day").toDate();
+  const match = buildClosedMatch({ startDate, endDate, customerId }, actingUser);
 
   const docs = await Ticket.find(match)
     .select("createdAt closedAt problemType priority closureDetails.category")
@@ -149,4 +170,42 @@ const getClosedTicketsAnalysis = async ({ startDate, endDate, customerId } = {},
   };
 };
 
-module.exports = { getSummary, getOpenTicketsAnalysis, getClosedTicketsAnalysis };
+/**
+ * The tickets behind a Closed Tickets tab: every ticket closed within the
+ * optional Start Date/End Date, newest closed first. Same scoping rules as
+ * getClosedTicketsAnalysis (see buildClosedMatch).
+ * @param {Object} filters
+ * @param {string} [filters.startDate]
+ * @param {string} [filters.endDate]
+ * @param {string} [filters.customerId]
+ * @param {Object} actingUser
+ * @returns {Promise<{total: number, tickets: Object[]}>}
+ */
+const getClosedTicketsList = async ({ startDate, endDate, customerId } = {}, actingUser) => {
+  const match = buildClosedMatch({ startDate, endDate, customerId }, actingUser);
+
+  const docs = await Ticket.find(match)
+    .select("ticketId customerReference problemType priority status closureCode problemStartDate createdAt closedAt")
+    .sort({ closedAt: -1 })
+    .lean();
+
+  return {
+    total: docs.length,
+    tickets: docs.map((doc) => ({
+      id: String(doc._id),
+      ticketId: doc.ticketId,
+      customerReference: doc.customerReference || "",
+      problemType: doc.problemType,
+      priority: doc.priority,
+      status: doc.status,
+      closureCode: doc.closureCode || "",
+      // As typed when the ticket was raised ("YYYY-MM-DDTHH:mm", no time zone) - may be blank.
+      problemStartDate: doc.problemStartDate || "",
+      createdAt: doc.createdAt,
+      // The Closed Date and Time entered together with the Closure Code when the ticket was closed.
+      closedAt: doc.closedAt,
+    })),
+  };
+};
+
+module.exports = { getSummary, getOpenTicketsAnalysis, getClosedTicketsAnalysis, getClosedTicketsList };
