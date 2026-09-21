@@ -9,7 +9,10 @@ const initialState = {
     search: "",
     pagination: {
         page: 0,
-        limit: 20,
+        // The API has no "no limit" option (a missing/0 limit falls back to
+        // 10), so this is just a page size big enough that every site loads
+        // on one page - same approach as the Tickets list.
+        limit: 1000,
         totalPages: 0,
         totalResults: 0
     }

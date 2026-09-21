@@ -133,7 +133,9 @@ export default function SiteTable(props) {
                     </Button>
                 </Toolbar>
             )}
-            <TableContainer sx={{ maxHeight: 440 }}>
+            {/* Tall enough to fill the window (the whole list loads on one page
+                now) - the header row stays fixed while the rows scroll. */}
+            <TableContainer sx={{ maxHeight: "calc(100vh - 340px)", minHeight: 200 }}>
                 <Table stickyHeader aria-label="sticky table">
                     <TableHead>
                         <TableRow>

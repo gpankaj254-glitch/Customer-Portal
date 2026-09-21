@@ -29,6 +29,25 @@ const deletedSiteColumns = [
     { id: "location.country", label: "Country" },
 ]
 
+// Smaller fonts for everything on the Site Management page (tab row, search
+// box, the site list, Create, Deleted and Bulk Upload). Applied here on the
+// page container rather than in each component, same approach as the Tickets
+// and Inventory pages, so the shared ones stay untouched for other pages.
+// Menus, dialogs and snackbars render outside this container, so they keep
+// their normal size.
+const compactSx = {
+    "& .MuiTabs-root": { minHeight: 34 },
+    "& .MuiTab-root": { minHeight: 34, py: 0.5, fontSize: "0.75rem" },
+    "& .MuiTableCell-root": { fontSize: "0.75rem", padding: "6px 10px" },
+    "& .MuiTypography-body1, & .MuiTypography-body2, & .MuiTypography-subtitle1, & .MuiTypography-subtitle2, & .MuiTypography-h6, & .MuiTypography-h5": { fontSize: "0.75rem" },
+    "& .MuiInputBase-root, & .MuiInputLabel-root, & .MuiFormControlLabel-label, & .MuiButton-root, & .MuiAlert-root, & .MuiFormHelperText-root": { fontSize: "0.75rem" },
+    "& .MuiTablePagination-displayedRows, & .MuiTablePagination-selectLabel": { fontSize: "0.75rem" },
+    "& .MuiOutlinedInput-input": { padding: "8px 12px" },
+    "& .MuiChip-root": { height: 20 },
+    "& .MuiChip-label": { fontSize: "0.68rem" },
+    "& .MuiIconButton-root .MuiSvgIcon-root": { fontSize: "1.1rem" },
+}
+
 function SitesContent() {
 
     const dispatch = useDispatch()
@@ -115,7 +134,7 @@ function SitesContent() {
     }
 
     return (
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4, ...compactSx }}>
             <Grid container spacing={3}>
                 <Grid item xs={12}>
                     <Tabs value={value} onChange={handleChange} aria-label="site management">
