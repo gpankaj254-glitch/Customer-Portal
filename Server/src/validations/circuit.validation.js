@@ -63,9 +63,20 @@ const deactivateCircuit = {
   }),
 };
 
+const moveCircuit = {
+  params: Joi.object().keys({
+    circuitId: Joi.string().required(),
+  }),
+  body: Joi.object().keys({
+    siteId: Joi.string().required(),
+    updateTickets: Joi.boolean(),
+  }),
+};
+
 module.exports = {
   createCircuit,
   getCircuits,
   updateCircuit,
   deactivateCircuit,
+  moveCircuit,
 };

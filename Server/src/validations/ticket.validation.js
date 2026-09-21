@@ -53,6 +53,7 @@ const updateTicket = {
         .required(),
       closureCode: Joi.string().valid("", ...closureCodeOptions).allow(""),
       closedAt: Joi.string().isoDate().allow(""),
+      closedAtLocal: Joi.string().allow(""),
       scxInternalComments: Joi.string().allow(""),
       vendorTicketId: Joi.string().allow(""),
       vendorTicketCreateDate: Joi.string().allow(""),

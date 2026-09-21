@@ -92,7 +92,7 @@ export default function TicketForm({ circuit, onDone, onBack }) {
                         <TextField fullWidth label="Customer Name" value={_.get(circuit, "customer.name", "")} disabled />
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                        <TextField fullWidth label="Circuit Name" value={circuit.vendorCircuitId || circuit.code} disabled />
+                        <TextField fullWidth label="Circuit Name" value={circuit.customerCircuitId || circuit.vendorCircuitId || circuit.code} disabled />
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <TextField fullWidth label="Site Name" value={_.get(circuit, "site.name", "")} disabled />

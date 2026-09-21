@@ -2,10 +2,6 @@ import * as React from "react"
 import Grid from "@mui/material/Grid"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
-import Chip from "@mui/material/Chip"
-import Stepper from "@mui/material/Stepper"
-import Step from "@mui/material/Step"
-import StepLabel from "@mui/material/StepLabel"
 import TextField from "@mui/material/TextField"
 import Button from "@mui/material/Button"
 import InputLabel from "@mui/material/InputLabel"
@@ -40,6 +36,12 @@ function numOrNull(value) {
 function numToInputValue(value) {
     return value === null || value === undefined ? "" : String(value)
 }
+
+// Problem Start Date and Time is typed into a datetime-local box on Create
+// Ticket and saved as a plain "YYYY-MM-DDTHH:mm" string (no time zone).
+// Bulk-imported tickets can hold other text, so only this shape is usable
+// for comparing against the Closed Date and Time.
+const WALL_CLOCK = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
 
 // Current local time formatted for a datetime-local input ("YYYY-MM-DDTHH:mm").
 function nowForDateTimeInput() {
@@ -77,7 +79,6 @@ export default function TicketDetails({ ticket, mode }) {
     const dispatch = useDispatch()
     const currentUser = useSelector(selectUser)
     const canUpdateTicket = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_USER
-    const isCustomer = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
     const descriptionRef = React.useRef(null)
     const vendorDescriptionRef = React.useRef(null)
 
@@ -134,6 +135,8 @@ export default function TicketDetails({ ticket, mode }) {
 
     const history = _.get(ticket, "history", [])
     const createdAt = _.get(history, "[0].updatedAt", "")
+    const problemStartDate = _.get(ticket, "problemStartDate", "") || ""
+    const problemStartUsable = WALL_CLOCK.test(problemStartDate)
     const ticketStatus = _.get(ticket, "status")
     // Customer Communication / Vendor Communication (the core ticket fields
     // and their comment threads) are only editable from the Open Tickets
@@ -177,6 +180,12 @@ export default function TicketDetails({ ticket, mode }) {
             setFeedback({ severity: "error", message: "Closed Date and Time is required to close a ticket" })
             return
         }
+        // Both are wall-clock strings in the same "YYYY-MM-DDTHH:mm" shape, so a
+        // plain comparison is time-zone safe. Creation time is not a limit.
+        if (closingNow && problemStartUsable && closedAt.slice(0, 16) < problemStartDate.slice(0, 16)) {
+            setFeedback({ severity: "error", message: "Closed Date and Time cannot be before the Problem Start Date and Time" })
+            return
+        }
         setSubmitting(true)
         try {
             await dispatch(updateTicket([{
@@ -188,6 +197,7 @@ export default function TicketDetails({ ticket, mode }) {
                 status,
                 closureCode,
                 closedAt: closingNow ? new Date(closedAt).toISOString() : undefined,
+                closedAtLocal: closingNow ? closedAt : undefined,
                 scxInternalComments,
                 vendorTicketId,
                 vendorTicketCreateDate,
@@ -529,7 +539,12 @@ export default function TicketDetails({ ticket, mode }) {
                                     </FormControl>
                                 </Grid>
                                 <Grid item xs={12} sm={4}>
-                                    <TextField fullWidth label="Created Date" value={createdAt ? getFormattedDate(createdAt) : ""} disabled />
+                                    <TextField
+                                        fullWidth
+                                        label="Problem Start Date and Time"
+                                        value={problemStartUsable ? getFormattedDate(problemStartDate) : (problemStartDate || "Not provided")}
+                                        disabled
+                                    />
                                 </Grid>
                                 <Grid item xs={12} sm={4}>
                                     <FormControl fullWidth required disabled={mainFieldsLocked}>
@@ -555,7 +570,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     <>
                                         {/* A spacer plus Closed Date and Time push Closure Code into
                                             the same column as Status directly above it (Priority/
-                                            Created Date/Status fill the row above, 3 x sm4). */}
+                                            Problem Start Date/Status fill the row above, 3 x sm4). */}
                                         <Grid item xs={false} sm={4} sx={{ display: { xs: "none", sm: "block" } }} />
                                         <Grid item xs={12} sm={4}>
                                             <TextField
@@ -564,6 +579,7 @@ export default function TicketDetails({ ticket, mode }) {
                                                 type="datetime-local"
                                                 label="Closed Date and Time"
                                                 InputLabelProps={{ shrink: true }}
+                                                inputProps={{ min: problemStartUsable ? problemStartDate.slice(0, 16) : undefined }}
                                                 value={closedAt}
                                                 onChange={(event) => setClosedAt(event.target.value)}
                                             />
@@ -1028,32 +1044,6 @@ export default function TicketDetails({ ticket, mode }) {
                     </Box>
                 )}
             </Paper>
-
-            {!isCustomer && (
-                <Paper sx={{ p: 2 }}>
-                    <Typography variant="h6" gutterBottom>Activity Log</Typography>
-                    {history.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary">No activity yet</Typography>
-                    ) : (
-                        <Stepper orientation="vertical" nonLinear>
-                            {history.map((item, index) => (
-                                // eslint-disable-next-line react/no-array-index-key
-                                <Step key={index} completed active>
-                                    <StepLabel>
-                                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                            <Chip size="small" label={item.status} />
-                                            <Typography variant="caption" color="text.secondary">
-                                                {getFormattedDate(item.updatedAt)} - {_.get(item, "user.name", "")}
-                                            </Typography>
-                                        </Box>
-                                        <Typography variant="body2">{item.comment}</Typography>
-                                    </StepLabel>
-                                </Step>
-                            ))}
-                        </Stepper>
-                    )}
-                </Paper>
-            )}
 
             <Snackbar open={!!feedback} autoHideDuration={4000} onClose={() => setFeedback(null)}>
                 {feedback && <Alert severity={feedback.severity} onClose={() => setFeedback(null)}>{feedback.message}</Alert>}

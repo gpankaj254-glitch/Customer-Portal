@@ -8,7 +8,7 @@ const { parse } = require("csv-parse/sync");
 const { roleTypes } = require("../config/roles");
 const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
 const logger = require("../config/logger");
-const { Circuit, Site, Customer, Vendor } = require("../models");
+const { Circuit, Site, Customer, Vendor, Ticket } = require("../models");
 const ApiError = require("../utils/ApiError");
 const { createCodeFromName } = require("../utils/creators");
 const { extractNameAndCode, extractUserDetails } = require("../utils/extractors");
@@ -147,6 +147,76 @@ const updateCircuitById = async (circuitId, updateBody, actingUser) => {
   Object.assign(circuit, updateBody);
   circuit.updatedBy = extractUserDetails(actingUser);
   await circuit.save();
+  return circuit;
+};
+
+/**
+ * Move an active circuit to another active site of the SAME customer. A site
+ * knows its circuits through its `circuits` id list, and the circuit carries
+ * a site/region snapshot and a code built from its Vendor Circuit ID plus the
+ * site's code (see createCircuitBySite) - so all of those move together.
+ * The circuit record itself (id, every field) is kept, so nothing that points
+ * at it is lost. Optionally re-points the site on the circuit's existing
+ * tickets too (a ticket keeps its own site/circuit snapshot).
+ * @param {ObjectId} circuitId
+ * @param {Object} targetSite - active Site document
+ * @param {Object} options
+ * @param {boolean} [options.updateTickets=true]
+ * @param {Object} options.actingUser
+ * @returns {Promise<Circuit>}
+ */
+const moveCircuitToSite = async (circuitId, targetSite, { updateTickets = true, actingUser } = {}) => {
+  const circuit = await getActiveCircuitById(circuitId);
+  const circuitIdStr = String(circuit._id);
+  const fromSiteId = String(_.get(circuit, "site.id", ""));
+  const toSiteId = String(targetSite._id);
+
+  if (fromSiteId === toSiteId) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "The circuit is already at this site");
+  }
+  if (String(_.get(circuit, "customer.id")) !== String(_.get(targetSite, "customer.id"))) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "A circuit can only be moved to a site of the same customer");
+  }
+
+  // Same rule as creating a circuit: one Vendor Circuit ID per site.
+  const newCode = createCodeFromName(circuit.vendorCircuitId || "", targetSite.code);
+  if (await Circuit.isCodeTaken(newCode, circuit._id)) {
+    throw new ApiError(httpStatus.CONFLICT, "The target site already has a circuit with this Vendor Circuit ID");
+  }
+
+  // Add to the new site first, so a failure part-way can never leave the
+  // circuit on no site's list - worst case it is briefly on both.
+  await Site.updateOne({ _id: toSiteId }, { $addToSet: { circuits: circuitIdStr } });
+
+  circuit.site = extractNameAndCode(targetSite);
+  circuit.region = targetSite.region;
+  circuit.code = newCode;
+  circuit.updatedBy = extractUserDetails(actingUser);
+  await circuit.save();
+
+  if (fromSiteId) {
+    // Older records may hold the id as an ObjectId rather than a string.
+    const idForms = [circuitIdStr, new mongoose.Types.ObjectId(circuitIdStr)];
+    await Site.updateOne(
+      { _id: fromSiteId },
+      { $pull: { circuits: { $in: idForms }, cascadeDeactivatedCircuitIds: circuitIdStr } }
+    );
+  }
+
+  if (updateTickets) {
+    await Ticket.updateMany(
+      { "circuit.id": circuitIdStr },
+      {
+        $set: {
+          "site.id": toSiteId,
+          "site.name": targetSite.name,
+          "site.code": targetSite.code,
+          "circuit.code": newCode,
+        },
+      }
+    );
+  }
+
   return circuit;
 };
 
@@ -676,6 +746,7 @@ module.exports = {
   getActiveCircuitByVendorId,
   getCircuitById,
   updateCircuitById,
+  moveCircuitToSite,
   deactivateCircuitById,
   restoreCircuitById,
   permanentlyDeleteCircuitById,

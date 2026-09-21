@@ -65,7 +65,7 @@ export default function CircuitSelectList({ onSelectCircuit }) {
             <TextField
                 fullWidth
                 label="Search Inventory"
-                placeholder="Search any site or circuit field - name, address, Vendor Circuit ID, SCloudX Order Reference, etc."
+                placeholder="Search any site or circuit field - name, address, Circuit ID, SCloudX Order Reference, etc."
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
                 sx={{ mb: 2 }}
@@ -81,7 +81,7 @@ export default function CircuitSelectList({ onSelectCircuit }) {
                             <TableRow>
                                 <TableCell>Create Ticket</TableCell>
                                 <TableCell>Site Name</TableCell>
-                                <TableCell>Circuit ID</TableCell>
+                                <TableCell>Customer Circuit ID</TableCell>
                                 <TableCell>Customer Order Number</TableCell>
                                 <TableCell>Product</TableCell>
                                 <TableCell>Bandwidth</TableCell>
@@ -93,7 +93,7 @@ export default function CircuitSelectList({ onSelectCircuit }) {
                                 <TableRow key={row.id}>
                                     <TableCell>
                                         <IconButton
-                                            aria-label={`create ticket ${row.vendorCircuitId || row.code}`}
+                                            aria-label={`create ticket ${row.customerCircuitId || row.vendorCircuitId || row.code}`}
                                             color="primary"
                                             size="small"
                                             onClick={() => onSelectCircuit(row)}
@@ -102,7 +102,7 @@ export default function CircuitSelectList({ onSelectCircuit }) {
                                         </IconButton>
                                     </TableCell>
                                     <TableCell>{_.get(row, "site.name", "")}</TableCell>
-                                    <TableCell>{row.vendorCircuitId || row.code}</TableCell>
+                                    <TableCell>{row.customerCircuitId || row.vendorCircuitId || row.code}</TableCell>
                                     <TableCell>{row.customerOrderReference}</TableCell>
                                     <TableCell>{row.product}</TableCell>
                                     <TableCell>{row.bandwidth}</TableCell>

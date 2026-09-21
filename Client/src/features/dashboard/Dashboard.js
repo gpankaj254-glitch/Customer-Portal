@@ -3,28 +3,101 @@ import Container from "@mui/material/Container"
 import Grid from "@mui/material/Grid"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
-import TextField from "@mui/material/TextField"
-import Button from "@mui/material/Button"
+import Table from "@mui/material/Table"
+import TableHead from "@mui/material/TableHead"
+import TableBody from "@mui/material/TableBody"
+import TableRow from "@mui/material/TableRow"
+import TableCell from "@mui/material/TableCell"
+import TableContainer from "@mui/material/TableContainer"
+import Link from "@mui/material/Link"
 import { Alert } from "@mui/material"
+import PropTypes from "prop-types"
 import _ from "lodash"
 
-import { StatTile, CountChart } from "./DashboardWidgets"
+import { StatTile } from "./DashboardWidgets"
 import {getSites, selectGetSiteError, selectPageStatus as selectGetSiteStatus, selectSiteList} from "../inventory/inventorySlice"
 import { getCustomers, selectGetCustomersError, selectPageStatus as selectGetCustomerStatus } from "../customers/customerSlice"
 import {
     getDashboardSummary,
-    getClosedTicketsAnalysis,
+    getOpenTicketsAnalysis,
     selectDashboardSummary,
-    selectClosedTicketsAnalysis,
-    selectClosedTicketsAnalysisStatus,
+    selectOpenTicketsAnalysis,
+    selectOpenTicketsAnalysisError,
 } from "./dashboardSlice"
+import { focusTicket } from "../tickets/ticketSlice"
+import { togglePage } from "../landing/landingSlice"
 
 import { useSelector, useDispatch } from "react-redux"
 import { selectUser } from "../auth/authSlice"
-import { roles } from "../../consts"
+import { pages, roles } from "../../consts"
 import { pageStatusVals } from "../tickets/utils"
+import { getFormattedDateTimeGMT } from "../../utils/dates"
 import SalesDashboard from "../opportunities/SalesDashboard"
 import ScxDashboard from "./ScxDashboard"
+
+const openTicketColumns = [
+    "Ticket ID",
+    "Customer Reference",
+    "Problem Type",
+    "Ticket Create Date (GMT)",
+    "Ticket Status",
+]
+
+// The customer's own open tickets (the server scopes the list to their
+// customer). Same layout and Ticket ID link as the SCX dashboard's Open
+// Tickets tab, minus the vendor columns.
+function OpenTicketsTable({ rows, onOpenTicket }) {
+    return (
+        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 420 }}>
+            <Table
+                size="small"
+                stickyHeader
+                sx={{ "& .MuiTableCell-root": { fontSize: "0.72rem", padding: "4px 8px" } }}
+            >
+                <TableHead>
+                    <TableRow>
+                        {openTicketColumns.map((label) => (
+                            <TableCell key={label} sx={{ fontWeight: 600 }}>{label}</TableCell>
+                        ))}
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {rows.length === 0 && (
+                        <TableRow>
+                            <TableCell colSpan={openTicketColumns.length}>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.72rem" }}>No open tickets</Typography>
+                            </TableCell>
+                        </TableRow>
+                    )}
+                    {rows.map((row) => (
+                        <TableRow key={row.id}>
+                            <TableCell>
+                                <Link
+                                    component="button"
+                                    type="button"
+                                    underline="hover"
+                                    onClick={() => onOpenTicket(row.ticketId)}
+                                    sx={{ fontSize: "inherit", verticalAlign: "baseline" }}
+                                >
+                                    {row.ticketId}
+                                </Link>
+                            </TableCell>
+                            <TableCell>{row.customerReference}</TableCell>
+                            <TableCell>{row.problemType}</TableCell>
+                            <TableCell>{getFormattedDateTimeGMT(row.createdAt)}</TableCell>
+                            <TableCell>{row.status}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
+    )
+}
+
+OpenTicketsTable.propTypes = {
+    rows: PropTypes.array.isRequired,
+    onOpenTicket: PropTypes.func.isRequired,
+}
 
 function DashboardContent() {
     const dispatch = useDispatch()
@@ -44,11 +117,12 @@ function DashboardContent() {
     const siteList = useSelector(selectSiteList)
 
     const summary = useSelector(selectDashboardSummary)
-    const closedTicketsAnalysis = useSelector(selectClosedTicketsAnalysis)
-    const closedTicketsAnalysisStatus = useSelector(selectClosedTicketsAnalysisStatus)
-
-    const [startDate, setStartDate] = React.useState("")
-    const [endDate, setEndDate] = React.useState("")
+    const openAnalysis = useSelector(selectOpenTicketsAnalysis)
+    const openAnalysisError = useSelector(selectOpenTicketsAnalysisError)
+    // Dashboard state isn't cleared on logout, so a previous user's open
+    // tickets could still be in the store - only show the list once this
+    // visit's own request has come back.
+    const [openTicketsLoaded, setOpenTicketsLoaded] = React.useState(false)
 
     React.useEffect(() => {
         if (hasOwnDashboard) {
@@ -59,19 +133,17 @@ function DashboardContent() {
         dispatch(getCustomers(data))
         if (isCustomerRole) {
             dispatch(getDashboardSummary())
-            dispatch(getClosedTicketsAnalysis({}))
+            dispatch(getOpenTicketsAnalysis()).then(() => setOpenTicketsLoaded(true))
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const handleApplyFilter = () => {
-        dispatch(getClosedTicketsAnalysis({ startDate, endDate }))
-    }
-
-    const handleClearFilter = () => {
-        setStartDate("")
-        setEndDate("")
-        dispatch(getClosedTicketsAnalysis({}))
+    // Sends the user to Tickets > View Open Ticket with this ticket's details
+    // expanded (see ticketSlice's focusTicket and TicketsTable) - same as the
+    // SCX dashboard.
+    const handleOpenTicket = (ticketId) => {
+        dispatch(focusTicket(ticketId))
+        dispatch(togglePage(pages.TICKETS))
     }
 
     if (!hasOwnDashboard && (getSiteError || getCustomerError)) {
@@ -85,7 +157,7 @@ function DashboardContent() {
         <Container maxWidth="lg" sx={{ mt: 1.5, mb: 1.5 }}>
             <Grid container spacing={1.5}>
                 <Grid item xs={12}>
-                    <Typography component="h1" variant="h1" sx={{ fontSize: "1.5rem" }}>
+                    <Typography component="h1" variant="h1" sx={{ fontSize: isCustomerRole ? "1.1rem" : "1.5rem" }}>
                         Welcome, {user.name} !!
                     </Typography>
                 </Grid>
@@ -101,70 +173,26 @@ function DashboardContent() {
                 ) : isCustomerRole ? (
                     <>
                         <Grid item xs={12} sm={6} md={4}>
-                            <StatTile title="Active Sites" value={_.get(summary, "activeSites", 0)} />
+                            <StatTile compact title="Active Sites" value={_.get(summary, "activeSites", 0)} />
                         </Grid>
                         <Grid item xs={12} sm={6} md={4}>
-                            <StatTile title="Active Circuits" value={_.get(summary, "activeCircuits", 0)} />
+                            <StatTile compact title="Active Circuits" value={_.get(summary, "activeCircuits", 0)} />
                         </Grid>
                         <Grid item xs={12} sm={6} md={4}>
-                            <StatTile title="Open Tickets" value={_.get(summary, "openTickets", 0)} />
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={4}>
-                            <StatTile title="Tickets Open for more than 2 days" value={_.get(summary, "openTicketsOverTwoDays", 0)} />
+                            <StatTile compact title="Open Tickets" value={_.get(summary, "openTickets", 0)} />
                         </Grid>
 
                         <Grid item xs={12}>
-                            <Typography component="h2" variant="h5" sx={{ mt: 1, fontSize: "1rem" }}>Closed Tickets Analysis</Typography>
-                        </Grid>
-
-                        <Grid item xs={12} sm={6}>
-                            <StatTile title="Total Tickets Closed" value={_.get(closedTicketsAnalysis, "totalClosed", 0)} />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <CountChart title="Category Wise Tickets" data={_.get(closedTicketsAnalysis, "categoryWise", [])} />
-                        </Grid>
-
-                        <Grid item xs={12}>
-                            <Typography component="h3" variant="subtitle1" sx={{ mt: 0.5, fontSize: "1rem" }}>Filter By</Typography>
+                            <Typography component="h2" variant="h5" sx={{ mt: 0.5, fontSize: "0.85rem", fontWeight: 600 }}>Open Tickets</Typography>
                         </Grid>
                         <Grid item xs={12}>
-                            <Paper sx={{ p: 1 }}>
-                                <Grid container spacing={1} alignItems="center">
-                                    <Grid item xs={12} sm={4}>
-                                        <TextField
-                                            fullWidth
-                                            size="small"
-                                            type="date"
-                                            label="Start Date"
-                                            InputLabelProps={{ shrink: true }}
-                                            value={startDate}
-                                            onChange={(event) => setStartDate(event.target.value)}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12} sm={4}>
-                                        <TextField
-                                            fullWidth
-                                            size="small"
-                                            type="date"
-                                            label="End Date"
-                                            InputLabelProps={{ shrink: true }}
-                                            value={endDate}
-                                            onChange={(event) => setEndDate(event.target.value)}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12} sm={4} sx={{ display: "flex", gap: 1 }}>
-                                        <Button
-                                            size="small"
-                                            variant="contained"
-                                            onClick={handleApplyFilter}
-                                            disabled={closedTicketsAnalysisStatus === pageStatusVals.loading}
-                                        >
-                                            Apply
-                                        </Button>
-                                        <Button size="small" variant="text" onClick={handleClearFilter}>Clear</Button>
-                                    </Grid>
-                                </Grid>
-                            </Paper>
+                            {openAnalysisError ? (
+                                <Alert severity="error">Unable to load open tickets</Alert>
+                            ) : !openTicketsLoaded || !openAnalysis ? (
+                                <Typography variant="body2" sx={{ fontSize: "0.72rem" }}>Loading...</Typography>
+                            ) : (
+                                <OpenTicketsTable rows={_.get(openAnalysis, "tickets", [])} onOpenTicket={handleOpenTicket} />
+                            )}
                         </Grid>
                     </>
                 ) : (

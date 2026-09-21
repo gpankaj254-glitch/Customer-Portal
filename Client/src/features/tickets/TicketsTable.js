@@ -11,6 +11,7 @@ import TextField from "@mui/material/TextField"
 import InputAdornment from "@mui/material/InputAdornment"
 import SearchIcon from "@mui/icons-material/Search"
 import DeleteIcon from "@mui/icons-material/Delete"
+import HistoryIcon from "@mui/icons-material/History"
 import IconButton from "@mui/material/IconButton"
 import Chip from "@mui/material/Chip"
 import Snackbar from "@mui/material/Snackbar"
@@ -29,6 +30,7 @@ import { getFormattedDateTimeGMT } from "../../utils/dates"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
 import ConfirmDialog from "../../components/ConfirmDialog"
+import ActivityLogDialog from "./ActivityLogDialog"
 
 const PRIORITY_COLORS = { High: "error", Medium: "info", Low: "default" }
 
@@ -68,6 +70,8 @@ export default function TicketsTable(props) {
     const focusTicketId = useSelector(selectFocusTicketId)
     const currentUser = useSelector(selectUser)
     const canDelete = currentUser.role === roles.SCLOUDX_ADMIN
+    // The Activity Log is for SCX only - customers never see it.
+    const canViewLog = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_USER
 
     const pagination = props.pagination
     const mode = props.mode
@@ -76,6 +80,7 @@ export default function TicketsTable(props) {
     const [open, setOpen] = React.useState(false)
     const [searchInput, setSearchInput] = React.useState(search)
     const [ticketToDelete, setTicketToDelete] = React.useState(null)
+    const [logTicket, setLogTicket] = React.useState(null)
     const [deleting, setDeleting] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)
 
@@ -125,6 +130,21 @@ export default function TicketsTable(props) {
                         </TableCell>
                     ))}
                 <TableCell align="right">
+                    <IconButton
+                        aria-label={`${open === row.id ? "collapse" : "expand"} ${row.ticketId}`}
+                        onClick={(event) => handleRowClick(event, row.id)}
+                    >
+                        {open === row.id ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+                    </IconButton>
+                    {canViewLog && (
+                        <IconButton
+                            aria-label={`activity log ${row.ticketId}`}
+                            title="Activity Log"
+                            onClick={() => setLogTicket(row)}
+                        >
+                            <HistoryIcon />
+                        </IconButton>
+                    )}
                     {canDelete && (
                         <IconButton
                             aria-label={`delete ${row.ticketId}`}
@@ -133,10 +153,6 @@ export default function TicketsTable(props) {
                             <DeleteIcon />
                         </IconButton>
                     )}
-                    <IconButton onClick={(event) => handleRowClick(event, row.id)}
-                    >
-                        {open === row.id ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
-                    </IconButton>
                 </TableCell>
             </TableRow>)
 
@@ -251,6 +267,11 @@ export default function TicketsTable(props) {
                     page={pagination.page}
                     onPageChange={handleChangePage}
                     onRowsPerPageChange={handleChangeRowsPerPage}
+                />
+                <ActivityLogDialog
+                    open={!!logTicket}
+                    ticket={logTicket}
+                    onClose={() => setLogTicket(null)}
                 />
                 <ConfirmDialog
                     open={!!ticketToDelete}

@@ -63,6 +63,36 @@ export async function fetchPermanentlyDeleteCircuit(circuitId, rejectWithValue) 
     }
 }
 
+// Moves a circuit to another site of the same customer (SCX Admin / SCX User).
+export async function fetchMoveCircuit(data, rejectWithValue) {
+    try {
+        const { circuitId, siteId, updateTickets } = data
+        const response = await axios.patch(`${baseURL}/circuit/${circuitId}/move`, { siteId, updateTickets }, {headers: headers()})
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
+// Sites of one customer, for the "move to another site" picker. Extra keys
+// in the /site/get body are used as the Mongo filter, so "customer.id"
+// narrows the list; "search" is the usual server-side text search.
+export async function fetchSitesOfCustomer(data) {
+    try {
+        const { customerId, search } = data
+        const response = await axios.post(
+            `${baseURL}/site/get?limit=200&page=1&sortBy=name:asc`,
+            { "customer.id": customerId, search: search || "" },
+            {headers: headers()}
+        )
+        return { results: response.data.results }
+    } catch (error) {
+        console.error(error)
+        return { error: createResponseErrorMessage(error) }
+    }
+}
+
 export async function fetchBulkUploadCircuits(file, rejectWithValue) {
     try {
         const formData = new FormData()

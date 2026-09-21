@@ -1,5 +1,6 @@
 const allRoles = {
   scloudxUser: [
+    "moveCircuits",
     "createCustomers",
     "createUsers",
     "createSites",
@@ -12,6 +13,7 @@ const allRoles = {
     "viewDashboard",
   ],
   scloudxAdmin: [
+    "moveCircuits",
     "createCustomers",
     "editCustomers",
     "deleteCustomers",

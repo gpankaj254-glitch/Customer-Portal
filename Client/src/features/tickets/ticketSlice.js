@@ -28,7 +28,11 @@ const initialState = {
     focusTicketId: "",
     pagination: {
         page: 0,
-        limit: 20,
+        // The API has no "no limit" option (a missing/0 limit falls back to
+        // 10), so this is just a page size big enough that every ticket loads
+        // on one page - which also lets the dashboard's ticket link find and
+        // expand any open ticket (see TicketsTable's focusTicketId effect).
+        limit: 1000,
         totalPages: 0,
         totalResults: 0
     }

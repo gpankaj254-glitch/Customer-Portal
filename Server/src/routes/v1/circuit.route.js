@@ -50,6 +50,14 @@ router
   );
 
 router
+  .route("/:circuitId/move")
+  .patch(
+    auth("moveCircuits"),
+    validate(circuitValidation.moveCircuit),
+    circuitController.moveCircuit
+  );
+
+router
   .route("/:circuitId/restore")
   .patch(
     auth("deleteCircuits"),

@@ -16,6 +16,10 @@ const { getVendorById } = require("./vendor.service");
 const { getCustomerByName } = require("./customer.service");
 const { getSiteByCustomerAndName } = require("./site.service");
 
+// "YYYY-MM-DDTHH:mm" wall-clock shape (datetime-local) - what Problem Start Date
+// and Time is saved as, and what closedAtLocal is sent as.
+const WALL_CLOCK = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
 /**
  * Build a unique S3 key for an uploaded file under a given prefix, keeping
  * the original name (sanitized) at the end for readability in the bucket.
@@ -260,6 +264,7 @@ const updateTicket = async (ticketBody, user) => {
     status,
     closureCode,
     closedAt,
+    closedAtLocal,
     scxInternalComments,
     vendorTicketId,
     vendorTicketCreateDate,
@@ -300,14 +305,19 @@ const updateTicket = async (ticketBody, user) => {
   }
 
   // Closed Date and Time - entered by the user when closing (defaults to
-  // now). Must not precede the ticket's creation or lie in the future
-  // (5 min of slack for clock skew between browser and server).
+  // now). Must not precede the Problem Start Date and Time (the ticket's
+  // creation time is deliberately not a limit) or lie in the future (5 min
+  // of slack for clock skew between browser and server).
   let closedAtDate = new Date();
   if (status === "Closed" && closedAt) {
     closedAtDate = new Date(closedAt);
-    const created = _.get(ticket, "history[0].updatedAt");
-    if (created && closedAtDate < new Date(created)) {
-      throw new ApiError(httpStatus.BAD_REQUEST, "Closed Date and Time cannot be before the ticket was created");
+    // Problem Start is saved as a "YYYY-MM-DDTHH:mm" string with no time zone,
+    // so it is compared with the closer's own wall-clock closedAtLocal (same
+    // shape) rather than with the UTC closedAt instant. Anything else (older
+    // clients, free text from a bulk import) has no reliable frame - skipped.
+    const problemStart = _.trim(ticket.problemStartDate);
+    if (WALL_CLOCK.test(problemStart) && WALL_CLOCK.test(closedAtLocal || "") && closedAtLocal.slice(0, 16) < problemStart.slice(0, 16)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, "Closed Date and Time cannot be before the Problem Start Date and Time");
     }
     if (closedAtDate > moment().add(5, "minutes").toDate()) {
       throw new ApiError(httpStatus.BAD_REQUEST, "Closed Date and Time cannot be in the future");
@@ -331,7 +341,8 @@ const updateTicket = async (ticketBody, user) => {
   if (status === "Closed" && !ticket.downTime) {
     const created = _.get(ticket, "history[0].updatedAt");
     if (created) {
-      ticket.downTime = moment.duration(moment(closedAtDate).diff(created)).asMinutes();
+      // Closing may now be dated before creation (see above) - never store a negative downtime.
+      ticket.downTime = Math.max(0, moment.duration(moment(closedAtDate).diff(created)).asMinutes());
     }
     ticket.closedAt = closedAtDate;
   }

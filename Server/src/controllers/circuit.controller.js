@@ -74,6 +74,16 @@ const updateCircuit = catchAsync(async (req, res) => {
   res.send(circuit);
 });
 
+const moveCircuit = catchAsync(async (req, res) => {
+  const { siteId, updateTickets } = req.body;
+  const targetSite = await siteService.getActiveSiteById(siteId);
+  const circuit = await circuitService.moveCircuitToSite(req.params.circuitId, targetSite, {
+    updateTickets: updateTickets !== false,
+    actingUser: req.user,
+  });
+  res.send(circuit);
+});
+
 const deactivateCircuit = catchAsync(async (req, res) => {
   await circuitService.deactivateCircuitById(req.params.circuitId, req.user);
   res.status(httpStatus.NO_CONTENT).send();
@@ -117,6 +127,7 @@ module.exports = {
   getCircuits,
   getCircuit,
   updateCircuit,
+  moveCircuit,
   deactivateCircuit,
   getDeletedCircuits,
   restoreCircuit,

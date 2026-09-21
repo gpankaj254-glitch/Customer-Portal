@@ -9,6 +9,7 @@ import TableRow from "@mui/material/TableRow"
 import IconButton from "@mui/material/IconButton"
 import DeleteIcon from "@mui/icons-material/Delete"
 import EditIcon from "@mui/icons-material/Edit"
+import DriveFileMoveIcon from "@mui/icons-material/DriveFileMove"
 import Snackbar from "@mui/material/Snackbar"
 import { Alert, Typography } from "@mui/material"
 
@@ -23,6 +24,7 @@ import { getSites, selectPagination } from "./inventorySlice"
 import { selectVendorList } from "../vendors/vendorSlice"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
+import MoveCircuitDialog from "./MoveCircuitDialog"
 import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
 
 // customerVisible controls which columns Customer Admin/Customer User can
@@ -89,6 +91,9 @@ export default function CircuitTable(props) {
     const dispatch = useDispatch()
     const currentUser = useSelector(selectUser)
     const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    // Moving a circuit to another site is open to SCX Admin and SCX User (only
+    // the Admin can edit/delete circuits).
+    const canMove = isAdmin || currentUser.role === roles.SCLOUDX_USER
     const isCustomerRole = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
     const pagination = useSelector(selectPagination)
     const vendorList = useSelector(selectVendorList)
@@ -99,6 +104,7 @@ export default function CircuitTable(props) {
     const [circuitToDelete, setCircuitToDelete] = React.useState(null)
     const [deleting, setDeleting] = React.useState(false)
     const [circuitToEdit, setCircuitToEdit] = React.useState(null)
+    const [circuitToMove, setCircuitToMove] = React.useState(null)
     const [saving, setSaving] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)
 
@@ -118,6 +124,13 @@ export default function CircuitTable(props) {
             setDeleting(false)
             setCircuitToDelete(null)
         }
+    }
+
+    // Called when the "Circuit moved" confirmation in the dialog is closed -
+    // the dialog itself shows the success message, so just refresh the list.
+    const handleMoved = () => {
+        setCircuitToMove(null)
+        refreshInventory()
     }
 
     const handleSaveEdit = async (values) => {
@@ -147,20 +160,29 @@ export default function CircuitTable(props) {
                 ))}
             <TableCell align="right">
                 {isAdmin && (
-                    <>
-                        <IconButton
-                            aria-label={`edit ${row.vendorCircuitId || row.code}`}
-                            onClick={() => setCircuitToEdit(row)}
-                        >
-                            <EditIcon />
-                        </IconButton>
-                        <IconButton
-                            aria-label={`delete ${row.vendorCircuitId || row.code}`}
-                            onClick={() => setCircuitToDelete(row)}
-                        >
-                            <DeleteIcon />
-                        </IconButton>
-                    </>
+                    <IconButton
+                        aria-label={`edit ${row.vendorCircuitId || row.code}`}
+                        onClick={() => setCircuitToEdit(row)}
+                    >
+                        <EditIcon />
+                    </IconButton>
+                )}
+                {canMove && (
+                    <IconButton
+                        aria-label={`move ${row.vendorCircuitId || row.code}`}
+                        title="Move to another site"
+                        onClick={() => setCircuitToMove(row)}
+                    >
+                        <DriveFileMoveIcon />
+                    </IconButton>
+                )}
+                {isAdmin && (
+                    <IconButton
+                        aria-label={`delete ${row.vendorCircuitId || row.code}`}
+                        onClick={() => setCircuitToDelete(row)}
+                    >
+                        <DeleteIcon />
+                    </IconButton>
                 )}
             </TableCell>
         </TableRow>)
@@ -218,6 +240,13 @@ export default function CircuitTable(props) {
                 onCancel={() => setCircuitToEdit(null)}
                 loading={saving}
             />
+            <MoveCircuitDialog
+                open={!!circuitToMove}
+                circuit={circuitToMove}
+                site={props.site}
+                onClose={() => setCircuitToMove(null)}
+                onMoved={handleMoved}
+            />
             <Snackbar
                 open={!!feedback}
                 autoHideDuration={4000}
@@ -230,5 +259,6 @@ export default function CircuitTable(props) {
 }
 
 CircuitTable.propTypes = {
-    circuitList: PropTypes.array
+    circuitList: PropTypes.array,
+    site: PropTypes.object
 }

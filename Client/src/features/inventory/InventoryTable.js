@@ -153,7 +153,7 @@ export default function InventoryTable(props) {
                                     {details && <TableRow key={`${row.id}-collapse`} >
                                         <TableCell style={{ paddingBottom: 0, paddingTop: 0, maxWidth: 1 }} colSpan={columns.length + 1}>
                                             <Collapse in = {open === row.id}>
-                                            <CircuitTable circuitList={row.circuitList}></CircuitTable>
+                                            <CircuitTable circuitList={row.circuitList} site={row}></CircuitTable>
                                             </Collapse>
                                         </TableCell>
                                     </TableRow>}
