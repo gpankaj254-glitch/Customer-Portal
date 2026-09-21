@@ -35,17 +35,21 @@ const deletedSiteColumns = [
 // and Inventory pages, so the shared ones stay untouched for other pages.
 // Menus, dialogs and snackbars render outside this container, so they keep
 // their normal size.
+// Slightly smaller again than Tickets/Inventory (0.7rem body, 0.62rem column
+// headings) - this page is a long list, so it favours fitting more rows. The
+// Deleted Sites tab renders inside this container, so it shrinks with it.
 const compactSx = {
-    "& .MuiTabs-root": { minHeight: 34 },
-    "& .MuiTab-root": { minHeight: 34, py: 0.5, fontSize: "0.75rem" },
-    "& .MuiTableCell-root": { fontSize: "0.75rem", padding: "6px 10px" },
-    "& .MuiTypography-body1, & .MuiTypography-body2, & .MuiTypography-subtitle1, & .MuiTypography-subtitle2, & .MuiTypography-h6, & .MuiTypography-h5": { fontSize: "0.75rem" },
-    "& .MuiInputBase-root, & .MuiInputLabel-root, & .MuiFormControlLabel-label, & .MuiButton-root, & .MuiAlert-root, & .MuiFormHelperText-root": { fontSize: "0.75rem" },
-    "& .MuiTablePagination-displayedRows, & .MuiTablePagination-selectLabel": { fontSize: "0.75rem" },
-    "& .MuiOutlinedInput-input": { padding: "8px 12px" },
+    "& .MuiTabs-root": { minHeight: 32 },
+    "& .MuiTab-root": { minHeight: 32, py: 0.5, fontSize: "0.7rem" },
+    "& .MuiTableCell-root": { fontSize: "0.7rem", padding: "4px 10px" },
+    "& .MuiTypography-body1, & .MuiTypography-body2, & .MuiTypography-subtitle1, & .MuiTypography-subtitle2, & .MuiTypography-h5": { fontSize: "0.7rem" },
+    "& .MuiTypography-h6": { fontSize: "0.62rem" },
+    "& .MuiInputBase-root, & .MuiInputLabel-root, & .MuiFormControlLabel-label, & .MuiButton-root, & .MuiAlert-root, & .MuiFormHelperText-root": { fontSize: "0.7rem" },
+    "& .MuiTablePagination-displayedRows, & .MuiTablePagination-selectLabel": { fontSize: "0.7rem" },
+    "& .MuiOutlinedInput-input": { padding: "7px 12px" },
     "& .MuiChip-root": { height: 20 },
-    "& .MuiChip-label": { fontSize: "0.68rem" },
-    "& .MuiIconButton-root .MuiSvgIcon-root": { fontSize: "1.1rem" },
+    "& .MuiChip-label": { fontSize: "0.65rem" },
+    "& .MuiIconButton-root .MuiSvgIcon-root": { fontSize: "1rem" },
 }
 
 function SitesContent() {
