@@ -25,12 +25,14 @@ import { roles } from "../../consts"
 import { useSelector, useDispatch } from "react-redux"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
+import { combineAddress } from "../../utils/address"
 
+// The Site Address column shows the full address on one line: address, town
+// (city), country and postal code (zip) - same as the Inventory list.
 const columns = [
     { id: "name", label: "Site Name" },
     { id: "customer.name", label: "Customer" },
-    { id: "location.town", label: "Town" },
-    { id: "location.country", label: "Country" },
+    { id: "address", label: "Site Address", format: (row) => combineAddress(_.get(row, "location", {})) },
 ]
 
 export default function SiteTable(props) {
@@ -167,7 +169,7 @@ export default function SiteTable(props) {
                                 )}
                                 {columns.map((column) => (
                                     <TableCell key={`${row.id}${column.id}`}>
-                                        <Typography variant="body2">{_.get(row, column.id, "")}</Typography>
+                                        <Typography variant="body2">{column.format ? column.format(row) : _.get(row, column.id, "")}</Typography>
                                     </TableCell>
                                 ))}
                                 <TableCell align="right">

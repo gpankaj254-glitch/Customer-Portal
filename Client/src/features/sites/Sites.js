@@ -83,7 +83,7 @@ function SitesContent() {
                     <TextField
                         fullWidth
                         label="Search sites"
-                        placeholder="Search by site name, customer, or town"
+                        placeholder="Search by site name, customer, address, town or postal code"
                         value={searchInput}
                         onChange={(event) => setSearchInput(event.target.value)}
                         sx={{ mb: 2 }}

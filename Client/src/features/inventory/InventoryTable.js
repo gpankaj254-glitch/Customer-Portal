@@ -16,6 +16,7 @@ import { pageStatusVals} from "./utils"
 import _ from "lodash"
 import {  KeyboardArrowDown, KeyboardArrowUp } from "@mui/icons-material"
 import CircuitTable from "./CircuitTable"
+import { combineAddress } from "../../utils/address"
 
 const columns = [
     { id: "icon", label: ""},
@@ -26,20 +27,6 @@ const columns = [
     { id: "circuits", label: "Circuit Count"},
 
 ]
-
-// Some imported sites already have town/country/postal code baked into their
-// address line - only append a part if it isn't already present, so the
-// combined column doesn't show it twice.
-function combineAddress (location) {
-    const address = _.get(location, "address", "")
-    const parts = [address]
-    ;[_.get(location, "town", ""), _.get(location, "country", ""), _.get(location, "postalCode", "")].forEach((part) => {
-        if (part && !address.toLowerCase().includes(part.toLowerCase())) {
-            parts.push(part)
-        }
-    })
-    return parts.filter(Boolean).join(", ")
-}
 
 function createDisplayData (data) {
     return {
