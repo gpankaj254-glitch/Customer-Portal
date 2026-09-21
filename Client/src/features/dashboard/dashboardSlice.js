@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit"
-import { fetchDashboardSummary, fetchOpenTicketsAnalysis, fetchClosedTicketsAnalysis } from "./dashboardAPI"
+import { fetchDashboardSummary, fetchOpenTicketsAnalysis, fetchClosedTicketsAnalysis, fetchClosedTicketsList } from "./dashboardAPI"
 import { pageStatusVals } from "../tickets/utils"
 
 const initialState = {
@@ -12,6 +12,9 @@ const initialState = {
     closedTicketsAnalysis: null,
     closedTicketsAnalysisStatus: pageStatusVals.idle,
     closedTicketsAnalysisError: null,
+    closedTicketsList: null,
+    closedTicketsListStatus: pageStatusVals.idle,
+    closedTicketsListError: null,
 }
 
 export const getDashboardSummary = createAsyncThunk(
@@ -26,6 +29,14 @@ export const getOpenTicketsAnalysis = createAsyncThunk(
     "dashboard/fetchOpenTicketsAnalysis",
     async (data, { rejectWithValue }) => {
         const response = await fetchOpenTicketsAnalysis(rejectWithValue)
+        return response
+    }
+)
+
+export const getClosedTicketsList = createAsyncThunk(
+    "dashboard/fetchClosedTicketsList",
+    async (data, { rejectWithValue }) => {
+        const response = await fetchClosedTicketsList(data, rejectWithValue)
         return response
     }
 )
@@ -66,6 +77,18 @@ export const dashboardSlice = createSlice({
                 state.openTicketsAnalysisStatus = pageStatusVals.error
                 state.openTicketsAnalysisError = payload
             })
+            .addCase(getClosedTicketsList.pending, (state) => {
+                state.closedTicketsListStatus = pageStatusVals.loading
+                state.closedTicketsListError = null
+            })
+            .addCase(getClosedTicketsList.fulfilled, (state, {payload}) => {
+                state.closedTicketsListStatus = pageStatusVals.fetched
+                state.closedTicketsList = payload
+            })
+            .addCase(getClosedTicketsList.rejected, (state, {payload}) => {
+                state.closedTicketsListStatus = pageStatusVals.error
+                state.closedTicketsListError = payload
+            })
             .addCase(getClosedTicketsAnalysis.pending, (state) => {
                 state.closedTicketsAnalysisStatus = pageStatusVals.loading
             })
@@ -89,5 +112,8 @@ export const selectOpenTicketsAnalysisError = (state) => state.dashboard.openTic
 export const selectClosedTicketsAnalysis = (state) => state.dashboard.closedTicketsAnalysis
 export const selectClosedTicketsAnalysisStatus = (state) => state.dashboard.closedTicketsAnalysisStatus
 export const selectClosedTicketsAnalysisError = (state) => state.dashboard.closedTicketsAnalysisError
+export const selectClosedTicketsList = (state) => state.dashboard.closedTicketsList
+export const selectClosedTicketsListStatus = (state) => state.dashboard.closedTicketsListStatus
+export const selectClosedTicketsListError = (state) => state.dashboard.closedTicketsListError
 
 export default dashboardSlice.reducer

@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit"
 import {fetchGetTickets, fetchCreateTicket, fetchUpdateTicket, fetchAppendTicketDescription, fetchUploadTicketAttachments, fetchAppendVendorDescription, fetchUploadVendorAttachments, fetchBulkUploadTickets, fetchDeactivateTicket} from "./ticketsAPI"
 import { pageStatusVals} from "./utils"
+import { roles } from "../../consts"
 
 const initialState = {
     ticketList: [],
@@ -48,9 +49,15 @@ export const getTickets = createAsyncThunk(
 
 export const getClosedTickets = createAsyncThunk(
     "tickets/fetchGetClosedTicket",
-    async (data, { rejectWithValue }) => {
+    async (data, { rejectWithValue, getState }) => {
         data.closed = true
-        data.status = "Closed"
+        // A ticket SCX has moved on to "Completed" is still closed. Customers
+        // have no Completed tab, so their Closed list includes those as well;
+        // SCX keeps Closed and Completed apart.
+        const role = getState().auth.user.role
+        if (role !== roles.CUSTOMER_ADMIN && role !== roles.CUSTOMER_USER) {
+            data.status = "Closed"
+        }
         const response = await fetchGetTickets(data, rejectWithValue)
         return response
     }

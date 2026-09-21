@@ -10,6 +10,8 @@ import TableRow from "@mui/material/TableRow"
 import TableCell from "@mui/material/TableCell"
 import TableContainer from "@mui/material/TableContainer"
 import Link from "@mui/material/Link"
+import Tabs from "@mui/material/Tabs"
+import Tab from "@mui/material/Tab"
 import { Alert } from "@mui/material"
 import PropTypes from "prop-types"
 import _ from "lodash"
@@ -34,6 +36,7 @@ import { pageStatusVals } from "../tickets/utils"
 import { getFormattedDateTimeGMT } from "../../utils/dates"
 import SalesDashboard from "../opportunities/SalesDashboard"
 import ScxDashboard from "./ScxDashboard"
+import CustomerClosedTickets from "./CustomerClosedTickets"
 
 const openTicketColumns = [
     "Ticket ID",
@@ -123,6 +126,8 @@ function DashboardContent() {
     // tickets could still be in the store - only show the list once this
     // visit's own request has come back.
     const [openTicketsLoaded, setOpenTicketsLoaded] = React.useState(false)
+    // Customer Admin/User dashboard tabs: 0 = Main Dashboard, 1 = Closed Tickets.
+    const [customerTab, setCustomerTab] = React.useState(0)
 
     React.useEffect(() => {
         if (hasOwnDashboard) {
@@ -172,6 +177,23 @@ function DashboardContent() {
                     </Grid>
                 ) : isCustomerRole ? (
                     <>
+                        <Grid item xs={12}>
+                            <Tabs
+                                value={customerTab}
+                                onChange={(event, newValue) => setCustomerTab(newValue)}
+                                aria-label="dashboard"
+                                sx={{ minHeight: 34, "& .MuiTab-root": { minHeight: 34, py: 0.5, fontSize: "0.72rem" } }}
+                            >
+                                <Tab label="Main Dashboard" />
+                                <Tab label="Closed Tickets" />
+                            </Tabs>
+                        </Grid>
+                        {customerTab === 1 ? (
+                            <Grid item xs={12}>
+                                <CustomerClosedTickets />
+                            </Grid>
+                        ) : (
+                            <>
                         <Grid item xs={12} sm={6} md={4}>
                             <StatTile compact title="Active Sites" value={_.get(summary, "activeSites", 0)} />
                         </Grid>
@@ -194,6 +216,8 @@ function DashboardContent() {
                                 <OpenTicketsTable rows={_.get(openAnalysis, "tickets", [])} onOpenTicket={handleOpenTicket} />
                             )}
                         </Grid>
+                            </>
+                        )}
                     </>
                 ) : (
                     <Grid item xs={12} md={4} lg={3}>

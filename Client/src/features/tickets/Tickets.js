@@ -62,6 +62,10 @@ function TicketsContent() {
 
     const currentUser = useSelector(selectUser)
     const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    // Customers don't get a Completed tab - "Completed" is SCX's final
+    // bookkeeping step after a ticket is closed, so for them a completed
+    // ticket simply stays under View Closed Tickets (see getClosedTickets).
+    const isCustomer = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
 
     // function handleToggleCreateTickets(){
     // 	setOpenCreateTickets(!openCreateTickets)
@@ -114,7 +118,7 @@ function TicketsContent() {
                         <Tab label="View Open Ticket"/>
                         <Tab label="Create New Ticket"/>
                         <Tab label="View Closed Tickets"/>
-                        <Tab label="Completed Tickets"/>
+                        {!isCustomer && <Tab label="Completed Tickets"/>}
                         {isAdmin && <Tab label="Deleted Tickets"/>}
                         {isAdmin && <Tab label="Bulk Upload Tickets"/>}
 

@@ -138,6 +138,11 @@ export default function TicketDetails({ ticket, mode }) {
     const problemStartDate = _.get(ticket, "problemStartDate", "") || ""
     const problemStartUsable = WALL_CLOCK.test(problemStartDate)
     const ticketStatus = _.get(ticket, "status")
+    // The ticket's saved closing details, shown read-only in the details of a
+    // Closed/Completed ticket (customers and SCX alike). Older imported tickets
+    // may have no closed date recorded.
+    const closedAtText = _.get(ticket, "closedAt") ? getFormattedDate(ticket.closedAt) : "Not recorded"
+    const closureCodeText = _.get(ticket, "closureCode") || "Not recorded"
     // Customer Communication / Vendor Communication (the core ticket fields
     // and their comment threads) are only editable from the Open Tickets
     // view - once a ticket has moved to the Closed or Completed tab, only
@@ -389,6 +394,16 @@ export default function TicketDetails({ ticket, mode }) {
                                 </Select>
                             </FormControl>
                         </Grid>
+                        {ticketDone && (
+                            <>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField fullWidth label="Closed Date and Time" value={closedAtText} disabled />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField fullWidth label="Closure Code" value={closureCodeText} disabled />
+                                </Grid>
+                            </>
+                        )}
 
                         <Grid item xs={12}>
                             <TextField
@@ -566,6 +581,20 @@ export default function TicketDetails({ ticket, mode }) {
                                         </Select>
                                     </FormControl>
                                 </Grid>
+                                {mode !== "open" && (
+                                    <>
+                                        {/* Closed / Completed ticket: its saved closing details, read-only,
+                                            laid out like the closing inputs below (spacer, then Closed
+                                            Date and Time, then Closure Code under Status). */}
+                                        <Grid item xs={false} sm={4} sx={{ display: { xs: "none", sm: "block" } }} />
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField fullWidth label="Closed Date and Time" value={closedAtText} disabled />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField fullWidth label="Closure Code" value={closureCodeText} disabled />
+                                        </Grid>
+                                    </>
+                                )}
                                 {mode === "open" && closingNow && (
                                     <>
                                         {/* A spacer plus Closed Date and Time push Closure Code into

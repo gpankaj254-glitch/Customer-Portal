@@ -19,7 +19,9 @@ export async function fetchLogin (data, rejectWithValue) {
 export async function fetchLogout (data, rejectWithValue) {
     try {
         console.log(data)
-        const response = await axios.post(`${baseURL}/auth/login`, data)
+        // Ends the session on the server (removes the refresh token). This used
+        // to post to /auth/login by mistake, so the server never saw a logout.
+        const response = await axios.post(`${baseURL}/auth/logout`, data)
         return response.data
     } catch (error) {
         console.log(error)

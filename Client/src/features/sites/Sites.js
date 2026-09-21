@@ -35,21 +35,31 @@ const deletedSiteColumns = [
 // and Inventory pages, so the shared ones stay untouched for other pages.
 // Menus, dialogs and snackbars render outside this container, so they keep
 // their normal size.
-// Slightly smaller again than Tickets/Inventory (0.7rem body, 0.62rem column
-// headings) - this page is a long list, so it favours fitting more rows. The
-// Deleted Sites tab renders inside this container, so it shrinks with it.
+// A comfortable compact size for this long list: 0.8rem = 12.8px for the site
+// details AND the column headings (same size, so they line up). It was tried
+// smaller (0.7rem / 0.62rem) and was too hard to read. The Deleted Sites tab
+// renders inside this container, so it follows.
 const compactSx = {
-    "& .MuiTabs-root": { minHeight: 32 },
-    "& .MuiTab-root": { minHeight: 32, py: 0.5, fontSize: "0.7rem" },
-    "& .MuiTableCell-root": { fontSize: "0.7rem", padding: "4px 10px" },
-    "& .MuiTypography-body1, & .MuiTypography-body2, & .MuiTypography-subtitle1, & .MuiTypography-subtitle2, & .MuiTypography-h5": { fontSize: "0.7rem" },
-    "& .MuiTypography-h6": { fontSize: "0.62rem" },
-    "& .MuiInputBase-root, & .MuiInputLabel-root, & .MuiFormControlLabel-label, & .MuiButton-root, & .MuiAlert-root, & .MuiFormHelperText-root": { fontSize: "0.7rem" },
-    "& .MuiTablePagination-displayedRows, & .MuiTablePagination-selectLabel": { fontSize: "0.7rem" },
-    "& .MuiOutlinedInput-input": { padding: "7px 12px" },
+    "& .MuiTabs-root": { minHeight: 34 },
+    "& .MuiTab-root": { minHeight: 34, py: 0.5, fontSize: "0.75rem" },
+    "& .MuiTableCell-root": { fontSize: "0.8rem", padding: "4px 10px" },
+    "& .MuiTypography-body1, & .MuiTypography-body2, & .MuiTypography-subtitle1, & .MuiTypography-subtitle2, & .MuiTypography-h5": { fontSize: "0.8rem" },
+    // Column headings: the app-wide heading style is all-small-caps, which draws
+    // lowercase letters smaller than the row text even at the same font size -
+    // switch it off here so headings and site details match visually.
+    "& .MuiTypography-h6": { fontSize: "0.8rem", fontVariantCaps: "normal", letterSpacing: "0.01em" },
+    "& .MuiInputBase-root, & .MuiInputLabel-root, & .MuiFormControlLabel-label, & .MuiButton-root, & .MuiAlert-root, & .MuiFormHelperText-root": { fontSize: "0.8rem" },
+    "& .MuiTablePagination-displayedRows, & .MuiTablePagination-selectLabel": { fontSize: "0.8rem" },
+    "& .MuiOutlinedInput-input": { padding: "8px 12px" },
     "& .MuiChip-root": { height: 20 },
-    "& .MuiChip-label": { fontSize: "0.65rem" },
-    "& .MuiIconButton-root .MuiSvgIcon-root": { fontSize: "1rem" },
+    "& .MuiChip-label": { fontSize: "0.7rem" },
+    "& .MuiIconButton-root .MuiSvgIcon-root": { fontSize: "1.1rem" },
+    // The row's tick-box and edit/delete buttons carry most of an SCX row's
+    // height (51px vs 25px for a customer, who has none of them) - trim their
+    // padding so the rows sit close together.
+    "& .MuiCheckbox-root": { padding: "2px" },
+    "& .MuiCheckbox-root .MuiSvgIcon-root": { fontSize: "1rem" },
+    "& .MuiTableCell-root .MuiIconButton-root": { padding: "2px" },
 }
 
 function SitesContent() {
