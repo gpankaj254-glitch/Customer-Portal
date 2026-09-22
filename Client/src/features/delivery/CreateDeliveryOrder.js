@@ -42,9 +42,12 @@ const initialFormValues = {
     deliveryTimelineDays: "",
 }
 
-// Customer Name is "Dropdown (existing) or New" - an Autocomplete that both
-// lists existing Customers and (via freeSolo) accepts a name that isn't one
-// yet, same distinction Create Opportunity's Customer/Prospect Name makes.
+// "Customer Name - Just allow to select existing customer. For New
+// Customer message - Create new customer through Customer Management
+// Module" - Customer Name is existing-only here (no freeSolo/newCustomerName
+// branch, unlike Create Opportunity's Customer/Prospect Name); a customer
+// not yet in the system is created via Customer Management first, same as
+// Vendor above.
 export default function CreateDeliveryOrder() {
     const dispatch = useDispatch()
     const customerList = useSelector(selectCustomerList)
@@ -59,7 +62,6 @@ export default function CreateDeliveryOrder() {
         [openOrderList, deliveredOrderList]
     )
 
-    const [customerInput, setCustomerInput] = React.useState("")
     const [selectedCustomer, setSelectedCustomer] = React.useState(null)
     const [selectedVendor, setSelectedVendor] = React.useState(null)
     const [country, setCountry] = React.useState("")
@@ -91,7 +93,6 @@ export default function CreateDeliveryOrder() {
     }
 
     const resetForm = () => {
-        setCustomerInput("")
         setSelectedCustomer(null)
         setSelectedVendor(null)
         setCountry("")
@@ -103,9 +104,8 @@ export default function CreateDeliveryOrder() {
     const handleSubmit = async (event) => {
         event.preventDefault()
 
-        const customerName = customerInput.trim()
-        if (!customerName) {
-            setFeedback({ severity: "error", message: "Please select or type a Customer Name" })
+        if (!selectedCustomer) {
+            setFeedback({ severity: "error", message: "Please select an existing Customer. To add a new one, use the Customer Management module first." })
             return
         }
         if (!values.scloudxOrderReference) {
@@ -122,10 +122,7 @@ export default function CreateDeliveryOrder() {
         }
 
         const payload = {
-            // selectedCustomer is only set when the typed text matches an
-            // existing Customer exactly (see the Autocomplete below) -
-            // otherwise this is a new customer name, not yet in the system.
-            ...(selectedCustomer ? { customerId: selectedCustomer.id } : { newCustomerName: customerName }),
+            customerId: selectedCustomer.id,
             serialNumber: values.serialNumber,
             scloudxOrderReference: values.scloudxOrderReference,
             orderType: values.orderType,
@@ -175,23 +172,13 @@ export default function CreateDeliveryOrder() {
                         </Grid>
                         <Grid item xs={12} sm={6}>
                             <Autocomplete
-                                freeSolo
                                 options={customerOptions}
-                                getOptionLabel={(option) => (typeof option === "string" ? option : _.get(option, "name", ""))}
-                                inputValue={customerInput}
-                                onInputChange={(event, newInputValue) => {
-                                    setCustomerInput(newInputValue)
-                                    const match = customerOptions.find((customer) => customer.name === newInputValue)
-                                    setSelectedCustomer(match || null)
-                                }}
-                                onChange={(event, newValue) => {
-                                    if (newValue && typeof newValue !== "string") {
-                                        setSelectedCustomer(newValue)
-                                        setCustomerInput(newValue.name)
-                                    }
-                                }}
+                                getOptionLabel={(customer) => _.get(customer, "name", "")}
+                                value={selectedCustomer}
+                                onChange={(event, newValue) => setSelectedCustomer(newValue)}
+                                noOptionsText="No matching customer - create one via Customer Management"
                                 renderInput={(params) => (
-                                    <TextField {...params} label="Customer Name" required placeholder="Select existing, or type a new customer's name" />
+                                    <TextField {...params} label="Customer Name" required placeholder="Search existing customers" />
                                 )}
                             />
                         </Grid>
