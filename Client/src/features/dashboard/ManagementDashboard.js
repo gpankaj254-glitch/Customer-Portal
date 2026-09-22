@@ -2,31 +2,34 @@ import * as React from "react"
 import Grid from "@mui/material/Grid"
 import Tabs from "@mui/material/Tabs"
 import Tab from "@mui/material/Tab"
+import Typography from "@mui/material/Typography"
+import { useDispatch, useSelector } from "react-redux"
 import SalesDashboard from "../opportunities/SalesDashboard"
 import FinanceDashboard from "./FinanceDashboard"
 import ScxDashboard from "./ScxDashboard"
-import Customers from "../customers/Customers"
-import Sites from "../sites/Sites"
-import Inventory from "../inventory/Inventory"
-import Vendors from "../vendors/Vendors"
-import DeliveryOrders from "../delivery/DeliveryOrders"
+import DeliveryOrderTable from "../delivery/DeliveryOrderTable"
+import { getDeliveryOrders, selectOpenOrderList } from "../delivery/deliveryOrderSlice"
+import { getVendors } from "../vendors/vendorSlice"
 
 const TAB_LABELS = ["Sales", "Finance", "Delivery", "NOC"]
 
-// SCX Service Delivery has no dashboard summary of its own - it's given
-// Customer Management, Site Management, Inventory Management, Vendor
-// Management and Service Delivery Management instead (see permissions.js),
-// same five pages an SCX Service Delivery user would see in their own side
-// menu, under their own sub-tabs here.
-const DELIVERY_TAB_LABELS = ["Customers", "Sites", "Inventory", "Vendors", "Service Delivery Management"]
-
-// SCX Management's dashboard: each tab is that role's own dashboard/pages,
-// unchanged - Sales is SalesDashboard (SCX Sales), Finance is
-// FinanceDashboard (SCX Finance), NOC is ScxDashboard (SCX NOC, the renamed
-// SCX User), Delivery is SCX Service Delivery's three pages (see above).
+// SCX Management's dashboard: each tab is that role's own dashboard -
+// Sales is SalesDashboard (SCX Sales), Finance is FinanceDashboard (SCX
+// Finance), NOC is ScxDashboard (SCX NOC, the renamed SCX User), Delivery
+// is the same "View Open Orders" summary the Delivery role's own Dashboard
+// shows (see Dashboard.js) - not the full Service Delivery Management
+// module (that's reachable on its own via the side menu - see
+// permissions.js) and not Customers/Sites/Inventory/Vendors, which were
+// removed per "Delivery dashboard should have only Open Order list".
 export default function ManagementDashboard() {
+    const dispatch = useDispatch()
     const [activeTab, setActiveTab] = React.useState(0)
-    const [deliveryTab, setDeliveryTab] = React.useState(0)
+    const openOrderList = useSelector(selectOpenOrderList)
+
+    React.useEffect(() => {
+        dispatch(getDeliveryOrders({ limit: 1000, page: 1, search: "", tab: "open" }))
+        dispatch(getVendors({ limit: 1000, page: 1 }))
+    }, [dispatch])
 
     return (
         <Grid container spacing={1.5}>
@@ -48,23 +51,10 @@ export default function ManagementDashboard() {
                 {activeTab === 2 && (
                     <Grid container spacing={1.5}>
                         <Grid item xs={12}>
-                            <Tabs
-                                value={deliveryTab}
-                                onChange={(event, newValue) => setDeliveryTab(newValue)}
-                                aria-label="delivery"
-                                sx={{ minHeight: 34, "& .MuiTab-root": { minHeight: 34, py: 0.5, fontSize: "0.75rem" } }}
-                            >
-                                {DELIVERY_TAB_LABELS.map((label) => (
-                                    <Tab key={label} label={label} />
-                                ))}
-                            </Tabs>
+                            <Typography component="h2" variant="h5" sx={{ fontSize: "0.85rem", fontWeight: 600 }}>View Open Orders</Typography>
                         </Grid>
                         <Grid item xs={12}>
-                            {deliveryTab === 0 && <Customers />}
-                            {deliveryTab === 1 && <Sites />}
-                            {deliveryTab === 2 && <Inventory />}
-                            {deliveryTab === 3 && <Vendors />}
-                            {deliveryTab === 4 && <DeliveryOrders />}
+                            <DeliveryOrderTable rows={openOrderList} />
                         </Grid>
                     </Grid>
                 )}
