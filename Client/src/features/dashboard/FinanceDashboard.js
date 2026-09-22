@@ -12,6 +12,7 @@ import TableContainer from "@mui/material/TableContainer"
 import Link from "@mui/material/Link"
 import Alert from "@mui/material/Alert"
 import _ from "lodash"
+import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
 import { getCircuitsList, selectCircuitsList, selectCircuitsListStatus, selectCircuitsListError } from "../inventory/circuitSlice"
 import { getVendors, selectVendorList } from "../vendors/vendorSlice"
@@ -25,15 +26,38 @@ import { pages } from "../../consts"
 // own widest value - Vendor Circuit ID in particular is far narrower than
 // its neighbours need to be.
 const columns = [
-    { id: "siteName", label: "Site Name", width: "14%" },
-    { id: "customerName", label: "Customer Name", width: "14%" },
-    { id: "vendorName", label: "Vendor Name", width: "12%" },
-    { id: "vendorCircuitId", label: "Vendor Circuit ID", width: "10%" },
-    { id: "customerCircuitBillStartDate", label: "Customer Bill Start Date", width: "13%" },
-    { id: "vendorCircuitBillStartDate", label: "Vendor Bill Start Date", width: "13%" },
-    { id: "customerCircuitContractTerm", label: "Customer Contract Term", width: "12%" },
-    { id: "vendorCircuitContractTerm", label: "Vendor Contract Term", width: "12%" },
+    { id: "siteName", label: "Site Name", width: "12%" },
+    { id: "customerName", label: "Customer Name", width: "12%" },
+    { id: "vendorName", label: "Vendor Name", width: "11%" },
+    { id: "vendorCircuitId", label: "Vendor Circuit ID", width: "9%" },
+    { id: "customerCircuitBillStartDate", label: "Customer Bill Start Date", width: "12%" },
+    { id: "vendorCircuitBillStartDate", label: "Vendor Bill Start Date", width: "12%" },
+    { id: "customerCircuitContractTerm", label: "Customer Contract Term", width: "11%" },
+    { id: "vendorCircuitContractTerm", label: "Vendor Contract Term", width: "11%" },
+    { id: "contractPendingMonths", label: "Contract Pending (Months)", width: "10%" },
 ]
+
+// Bill Start Date is stored "DD-MM-YYYY" (see circuit.service.js's
+// BULK_DATE_FORMAT). Contract Term is mostly "NN Months" but isn't
+// consistently structured real data (blank, "Coterm", "36-Months", "36
+// mths", etc. all show up) - only the leading digit run is used, so
+// anything with no digits at all can't be computed.
+const CONTRACT_TERM_MONTHS = /(\d+)/
+
+// "Contract Pending (Months)" = (Customer Bill Start Date + Customer
+// Contract Term) - Today() - how many whole months are left before the
+// customer-side contract term ends. Negative once it's already expired.
+// Returns null when either input can't be parsed (blank/invalid date,
+// non-numeric term like "Coterm").
+function computeContractPendingMonths(billStartDate, contractTerm) {
+    const start = moment(billStartDate, "DD-MM-YYYY", true)
+    const monthsMatch = CONTRACT_TERM_MONTHS.exec(contractTerm || "")
+    if (!start.isValid() || !monthsMatch) {
+        return null
+    }
+    const endDate = start.clone().add(Number(monthsMatch[1]), "months")
+    return endDate.diff(moment(), "months")
+}
 
 // SCX Finance's dashboard: a read-only, cross-customer circuit list with
 // billing-relevant columns only (no ticket/status/inventory-management
@@ -85,18 +109,22 @@ export default function FinanceDashboard() {
         dispatch(togglePage(pages.INVENTORY))
     }
 
-    const rows = circuits.map((circuit) => ({
-        id: circuit.id,
-        siteId: _.get(circuit, "site.id", ""),
-        siteName: _.get(circuit, "site.name", ""),
-        customerName: _.get(circuit, "customer.name", ""),
-        vendorName: vendorNameById.get(circuit.vendorId) || "",
-        vendorCircuitId: circuit.vendorCircuitId || "",
-        customerCircuitBillStartDate: circuit.customerCircuitBillStartDate || "",
-        vendorCircuitBillStartDate: circuit.vendorCircuitBillStartDate || "",
-        customerCircuitContractTerm: circuit.customerCircuitContractTerm || "",
-        vendorCircuitContractTerm: circuit.vendorCircuitContractTerm || "",
-    }))
+    const rows = circuits.map((circuit) => {
+        const pendingMonths = computeContractPendingMonths(circuit.customerCircuitBillStartDate, circuit.customerCircuitContractTerm)
+        return {
+            id: circuit.id,
+            siteId: _.get(circuit, "site.id", ""),
+            siteName: _.get(circuit, "site.name", ""),
+            customerName: _.get(circuit, "customer.name", ""),
+            vendorName: vendorNameById.get(circuit.vendorId) || "",
+            vendorCircuitId: circuit.vendorCircuitId || "",
+            customerCircuitBillStartDate: circuit.customerCircuitBillStartDate || "",
+            vendorCircuitBillStartDate: circuit.vendorCircuitBillStartDate || "",
+            customerCircuitContractTerm: circuit.customerCircuitContractTerm || "",
+            vendorCircuitContractTerm: circuit.vendorCircuitContractTerm || "",
+            contractPendingMonths: pendingMonths === null ? "-" : String(pendingMonths),
+        }
+    })
 
     const loading = status === pageStatusVals.loading || status === pageStatusVals.idle
 
@@ -166,6 +194,13 @@ export default function FinanceDashboard() {
                                                         >
                                                             {row.siteName}
                                                         </Link>
+                                                    ) : column.id === "contractPendingMonths" && row[column.id] !== "-" && Number(row[column.id]) < 0 ? (
+                                                        // Already past its Customer Contract Term end date - flagged red
+                                                        // so an expired contract stands out rather than reading as just
+                                                        // another number.
+                                                        <Typography component="span" variant="inherit" color="error.main" sx={{ fontSize: "inherit" }}>
+                                                            {row[column.id]}
+                                                        </Typography>
                                                     ) : row[column.id]}
                                                 </TableCell>
                                             ))}
