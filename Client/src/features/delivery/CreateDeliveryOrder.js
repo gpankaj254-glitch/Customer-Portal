@@ -210,11 +210,17 @@ export default function CreateDeliveryOrder() {
                             <Grid item xs={12} sm={3}>
                                 <Autocomplete
                                     options={relatedOrderOptions}
-                                    getOptionLabel={(option) => _.get(option, "orderId", "")}
+                                    // "If Order Type is not New, Show SCX Order
+                                    // Reference in dropdown, not System Order
+                                    // No" - displayed/searched by
+                                    // scloudxOrderReference; relatedOrderId
+                                    // itself still stores the system orderId
+                                    // (see deliveryOrder.model.js).
+                                    getOptionLabel={(option) => _.get(option, "scloudxOrderReference", "")}
                                     value={relatedOrderOptions.find((option) => option.orderId === values.relatedOrderId) || null}
                                     onChange={(event, newValue) => setValues((prev) => ({ ...prev, relatedOrderId: newValue ? newValue.orderId : "" }))}
                                     renderInput={(params) => (
-                                        <TextField {...params} label="Existing Order Number" placeholder="Search order ID" />
+                                        <TextField {...params} label="Existing Order Number" placeholder="Search SCloudX Order Ref" />
                                     )}
                                 />
                             </Grid>
