@@ -5,6 +5,7 @@ import {
     fetchUpdateDeliveryOrder,
     fetchDeactivateDeliveryOrder,
     fetchBulkUploadDeliveryOrders,
+    fetchBulkUploadClosedDeliveryOrders,
 } from "./deliveryOrderAPI"
 import { pageStatusVals } from "./utils"
 
@@ -75,6 +76,14 @@ export const bulkUploadDeliveryOrders = createAsyncThunk(
     "deliveryOrders/fetchBulkUploadDeliveryOrders",
     async (file, { rejectWithValue }) => {
         const response = await fetchBulkUploadDeliveryOrders(file, rejectWithValue)
+        return response
+    }
+)
+
+export const bulkUploadClosedDeliveryOrders = createAsyncThunk(
+    "deliveryOrders/fetchBulkUploadClosedDeliveryOrders",
+    async (file, { rejectWithValue }) => {
+        const response = await fetchBulkUploadClosedDeliveryOrders(file, rejectWithValue)
         return response
     }
 )
@@ -151,6 +160,12 @@ export const deliveryOrderSlice = createSlice({
             .addCase(bulkUploadDeliveryOrders.rejected, (state) => {
                 // Failures (including "some rows invalid") surface via the
                 // uploader component's own UI - must not touch getOrdersError.
+                state.pageStatus = pageStatusVals.error
+            })
+            .addCase(bulkUploadClosedDeliveryOrders.fulfilled, (state) => {
+                state.pageStatus = pageStatusVals.fetched
+            })
+            .addCase(bulkUploadClosedDeliveryOrders.rejected, (state) => {
                 state.pageStatus = pageStatusVals.error
             })
     }

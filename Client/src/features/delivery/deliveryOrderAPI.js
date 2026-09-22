@@ -95,3 +95,20 @@ export async function fetchBulkUploadDeliveryOrders(file, rejectWithValue) {
         return rejectWithValue(createResponseErrorMessage(error), {})
     }
 }
+
+// Historical backfill: imports orders that are already Completed, with
+// their full completion details - see deliveryOrder.service.js's
+// validateBulkUploadClosedDeliveryOrders for the column set.
+export async function fetchBulkUploadClosedDeliveryOrders(file, rejectWithValue) {
+    try {
+        const formData = new FormData()
+        formData.append("file", file)
+        const response = await axios.post(`${baseURL}/delivery-order/bulk-upload-closed`, formData, {
+            headers: { ...headers(), "Content-Type": "multipart/form-data" },
+        })
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}

@@ -25,6 +25,7 @@ import _ from "lodash"
 import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
 import { updateDeliveryOrder, selectOpenOrderList, selectDeliveredOrderList } from "./deliveryOrderSlice"
+import { createCustomer } from "../customers/customerSlice"
 import { createSite, updateSite } from "../sites/siteSlice"
 import { fetchSitesOfCustomer } from "../inventory/circuitAPI"
 import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
@@ -57,6 +58,7 @@ function buildInitialValues(order) {
         product: _.get(order, "product", ""),
         bandwidth: _.get(order, "bandwidth", ""),
         contractTerm: _.get(order, "contractTerm", ""),
+        vendorContractTerm: _.get(order, "vendorContractTerm", ""),
         ipRequirement: _.get(order, "ipRequirement", ""),
         interface: _.get(order, "interface", ""),
         customerOrderReference: _.get(order, "customerOrderReference", ""),
@@ -154,6 +156,10 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
     // record, not a pending edit) until this is switched on - "Display ...
     // with Edit Option".
     const [editingNewSite, setEditingNewSite] = React.useState(false)
+    // "We should Create New Customer during delivery process like Site
+    // Creation" - same confirm-dialog pattern as the Site block below.
+    const [customerConfirmOpen, setCustomerConfirmOpen] = React.useState(false)
+    const [creatingCustomer, setCreatingCustomer] = React.useState(false)
 
     React.useEffect(() => {
         setValues(buildInitialValues(order))
@@ -211,6 +217,7 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
         product: values.product,
         bandwidth: values.bandwidth,
         contractTerm: values.contractTerm,
+        vendorContractTerm: values.vendorContractTerm,
         ipRequirement: values.ipRequirement,
         interface: values.interface,
         customerOrderReference: values.customerOrderReference,
@@ -256,7 +263,13 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
     // actually linked to an existing Customer - otherwise the Site
     // block's own UI already blocks selecting/creating one, so requiring
     // it here would make such orders impossible to ever complete.
+    // A real, registered Customer is required (not just a prospect's
+    // newCustomerName) - Circuit auto-creation on completion needs one (see
+    // deliveryOrder.service.js's createCircuitFromOrder). "Create Customer"
+    // on the Order Info tab resolves this the same way "Create Site" below
+    // resolves the Site requirement.
     const completeOrderMissingFields = []
+    if (!linkedCustomerId) completeOrderMissingFields.push("Customer (create/link a registered Customer on the Order Info tab)")
     if (!values.deliveryDate) completeOrderMissingFields.push("Delivery Date")
     if (!values.customerBillStartDate) completeOrderMissingFields.push("Customer Bill Start Date")
     if (!values.vendorCircuitId) completeOrderMissingFields.push("Vendor Circuit ID")
@@ -277,13 +290,44 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
         }
         setSaving(true)
         try {
-            await dispatch(updateDeliveryOrder(buildUpdatePayload("Completed"))).unwrap()
+            const result = await dispatch(updateDeliveryOrder(buildUpdatePayload("Completed"))).unwrap()
             setValues((prev) => ({ ...prev, status: "Completed" }))
-            setFeedback({ severity: "success", message: `Order "${order.orderId}" saved and marked Completed` })
+            // "We need new circuit only after Delivery process is Completed" -
+            // the server attempts this automatically as part of the same
+            // request (see createCircuitFromOrder); a failure there doesn't
+            // block the order from completing, just surfaces here instead.
+            if (result && result.circuitCreationError) {
+                setFeedback({
+                    severity: "warning",
+                    message: `Order "${order.orderId}" marked Completed, but the Circuit wasn't created automatically: ${result.circuitCreationError}. Create it manually via Inventory.`,
+                })
+            } else {
+                setFeedback({ severity: "success", message: `Order "${order.orderId}" saved and marked Completed - Circuit created` })
+            }
         } catch (err) {
             setFeedback({ severity: "error", message: err || "Failed to update order" })
         } finally {
             setSaving(false)
+        }
+    }
+
+    // "We should Create New Customer during delivery process like Site
+    // Creation" - creates the real Customer record from the order's own
+    // (prospect) name, then immediately re-links the order to it
+    // (customer.id set, newCustomerName cleared - see
+    // deliveryOrder.service.js's updateDeliveryOrderById).
+    const handleConfirmCreateCustomer = async () => {
+        setCreatingCustomer(true)
+        try {
+            const created = await dispatch(createCustomer({ name: customerName(order) })).unwrap()
+            const newCustomer = Array.isArray(created) ? created[0] : created
+            await dispatch(updateDeliveryOrder({ deliveryOrderId: order.id, customerId: newCustomer.id })).unwrap()
+            setFeedback({ severity: "success", message: `Customer "${newCustomer.name}" created and linked to this order` })
+            setCustomerConfirmOpen(false)
+        } catch (err) {
+            setFeedback({ severity: "error", message: err || "Failed to create customer" })
+        } finally {
+            setCreatingCustomer(false)
         }
     }
 
@@ -368,9 +412,19 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
                 <Grid item xs={12} sm={4}>
                     <TextField {...fieldProps} label="Serial Number" value={values.serialNumber} onChange={handleChange("serialNumber")} />
                 </Grid>
-                <Grid item xs={12} sm={4}>
+                <Grid item xs={12} sm={!linkedCustomerId && !readOnly ? 3 : 4}>
                     <TextField {...fieldProps} label="Customer Name" value={customerName(order)} disabled />
                 </Grid>
+                {/* "We should Create New Customer during delivery process like
+                    Site Creation" - only while this order is still a prospect
+                    (newCustomerName, no real Customer linked yet). */}
+                {!linkedCustomerId && !readOnly && (
+                    <Grid item xs={12} sm={2} sx={{ display: "flex", alignItems: "center" }}>
+                        <Button variant="outlined" size="small" onClick={() => setCustomerConfirmOpen(true)}>
+                            Create Customer
+                        </Button>
+                    </Grid>
+                )}
                 <Grid item xs={12} sm={4}>
                     <TextField {...fieldProps} label="Vendor" value={vendorName} disabled />
                 </Grid>
@@ -485,6 +539,9 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
                 </Grid>
                 <Grid item xs={12} sm={4}>
                     <TextField {...fieldProps} label="LEC PM Details" value={values.lecPMDetails} onChange={handleChange("lecPMDetails")} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                    <TextField {...fieldProps} label="Vendor Circuit Contract Term" value={values.vendorContractTerm} onChange={handleChange("vendorContractTerm")} />
                 </Grid>
                 <Grid item xs={12} sm={4}>
                     <FormControl {...fieldProps}>
@@ -755,6 +812,16 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
                     )}
                 </Grid>
             )}
+
+            <ConfirmDialog
+                open={customerConfirmOpen}
+                title="Create new customer"
+                message={`Create a new Customer "${customerName(order)}" and link this order to it? This can't be undone from here.`}
+                confirmLabel="Create"
+                onConfirm={handleConfirmCreateCustomer}
+                onCancel={() => setCustomerConfirmOpen(false)}
+                loading={creatingCustomer}
+            />
 
             <ConfirmDialog
                 open={siteConfirmOpen}

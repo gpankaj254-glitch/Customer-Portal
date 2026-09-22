@@ -69,7 +69,11 @@ function SitesContent() {
     const search = useSelector(selectSearch)
     const currentUser = useSelector(selectUser)
     const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
-    const canCreate = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_USER
+    // SCX NOC no longer creates sites here. SCX Admin and SCX Service
+    // Delivery both hold createSites (see roles.js) - Service Delivery gets
+    // the tab here too, on top of the inline "Create Site" it already has
+    // while completing a Delivery Order (see OrderDetails.js).
+    const canCreate = isAdmin || currentUser.role === roles.SCLOUDX_SERVICE_DELIVERY
     const [value, setValue] = React.useState(0)
     // Local, uncommitted text box value - kept separate from the Redux
     // search term so we can debounce before actually dispatching a fetch.

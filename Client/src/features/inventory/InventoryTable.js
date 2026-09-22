@@ -28,13 +28,27 @@ const columns = [
 
 ]
 
-function createDisplayData (data) {
+// A circuit with no stored status yet is "Live" (the schema default - see
+// circuit.model.js), same fallback used everywhere else this is checked
+// (CircuitTable.js's formatCircuitStatus).
+function matchesStatusFilter(circuit, statusFilter) {
+    return !statusFilter || (circuit.status || "Live") === statusFilter
+}
+
+// "Live Inventory"/"Changed Inventory"/"Ceased Inventory" - when
+// statusFilter is set, the Circuit Count shown here is that site's matching
+// circuits only, not its total (row.circuitCount), so it doesn't read as a
+// mismatch against what's actually shown once the row is expanded.
+function createDisplayData (data, statusFilter) {
+    const circuitCount = statusFilter
+        ? (data.circuitList || []).filter((circuit) => matchesStatusFilter(circuit, statusFilter)).length
+        : _.get(data, "circuitCount", "")
     return {
         customer : _.get(data, "customer.name", ""),
         region : _.get(data, "region.name", ""),
         endUser : _.get(data, "customerSiteIdentifier", ""),
         siteId : _.get(data, "name", ""),
-        circuits : _.get(data, "circuitCount", ""),
+        circuits : circuitCount,
         address : combineAddress(_.get(data, "location", {})),
 
     }
@@ -46,9 +60,22 @@ export default function InventoryTable(props) {
 
     const status = useSelector(selectPageStatus)
     const errorMessage = useSelector(selectGetSiteError)
-    const siteList = useSelector(selectSiteList)
+    const allSiteList = useSelector(selectSiteList)
     const pagination = props.pagination
     const details = props.details
+    const statusFilter = props.statusFilter
+
+    // "Live Inventory"/"Changed Inventory"/"Ceased Inventory" - reuses the
+    // same already-fetched siteList for all three (no separate fetch per
+    // tab), filtered down to sites with at least one circuit in that
+    // status, so a tab like Ceased Inventory doesn't list every site in the
+    // system with nothing to show once expanded.
+    const siteList = React.useMemo(() => {
+        if (!statusFilter) {
+            return allSiteList
+        }
+        return allSiteList.filter((site) => (site.circuitList || []).some((circuit) => matchesStatusFilter(circuit, statusFilter)))
+    }, [allSiteList, statusFilter])
 
     const [open, setOpen] = React.useState(false)
     // const [details, setDetails] = React.useState(true)
@@ -94,7 +121,7 @@ export default function InventoryTable(props) {
     }
 
     function createDataRow (row) {
-        const displayData = createDisplayData(row)
+        const displayData = createDisplayData(row, statusFilter)
         return (<TableRow key={row.id} >
              {details && (<TableCell>
                 <IconButton onClick={(event) => handleRowClick(event, row.id)}
@@ -156,7 +183,10 @@ export default function InventoryTable(props) {
                                     {details && <TableRow key={`${row.id}-collapse`} >
                                         <TableCell style={{ paddingBottom: 0, paddingTop: 0, maxWidth: 1 }} colSpan={columns.length + 1}>
                                             <Collapse in = {open === row.id}>
-                                            <CircuitTable circuitList={row.circuitList} site={row}></CircuitTable>
+                                            <CircuitTable
+                                                circuitList={statusFilter ? (row.circuitList || []).filter((circuit) => matchesStatusFilter(circuit, statusFilter)) : row.circuitList}
+                                                site={row}
+                                            ></CircuitTable>
                                             </Collapse>
                                         </TableCell>
                                     </TableRow>}
@@ -185,5 +215,9 @@ InventoryTable.propTypes = {
     pagination: PropTypes.object,
     open: PropTypes.bool,
     details: PropTypes.bool,
-    handleToggle: PropTypes.func
+    handleToggle: PropTypes.func,
+    // "Live"/"Changed"/"Ceased" - restricts both which sites are listed
+    // (only ones with a matching circuit) and which of that site's circuits
+    // show once expanded. Omitted (falsy) shows everything, unfiltered.
+    statusFilter: PropTypes.string,
 }

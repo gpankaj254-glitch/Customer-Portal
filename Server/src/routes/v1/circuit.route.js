@@ -50,6 +50,14 @@ router
   );
 
 router
+  .route("/:circuitId/status")
+  .patch(
+    auth("updateCircuitStatus"),
+    validate(circuitValidation.updateCircuitStatus),
+    circuitController.updateCircuitStatus
+  );
+
+router
   .route("/:circuitId/move")
   .patch(
     auth("moveCircuits"),

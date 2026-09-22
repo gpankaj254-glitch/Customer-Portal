@@ -106,6 +106,15 @@ const updateCircuit = catchAsync(async (req, res) => {
   res.send(circuit);
 });
 
+const updateCircuitStatus = catchAsync(async (req, res) => {
+  const circuit = await circuitService.updateCircuitStatusById(
+    req.params.circuitId,
+    req.body,
+    req.user
+  );
+  res.send(circuit);
+});
+
 const moveCircuit = catchAsync(async (req, res) => {
   const { siteId, updateTickets } = req.body;
   const targetSite = await siteService.getActiveSiteById(siteId);
@@ -159,6 +168,7 @@ module.exports = {
   getCircuits,
   getCircuit,
   updateCircuit,
+  updateCircuitStatus,
   moveCircuit,
   deactivateCircuit,
   getDeletedCircuits,

@@ -74,6 +74,10 @@ const updateDeliveryOrder = {
   }),
   body: Joi.object()
     .keys({
+      // "We should Create New Customer during delivery process like Site
+      // Creation" - resolves a real Customer and replaces newCustomerName
+      // once a prospect is formalized (see updateDeliveryOrderById).
+      customerId: Joi.string(),
       serialNumber: Joi.string().allow(""),
       scloudxOrderReference: Joi.string(),
       orderType: Joi.string().valid("", ...orderTypeOptions),
@@ -86,6 +90,7 @@ const updateDeliveryOrder = {
       product: Joi.string().valid("", ...productOptions),
       bandwidth: Joi.string().valid("", ...bandwidthOptions),
       contractTerm: Joi.string().allow(""),
+      vendorContractTerm: Joi.string().allow(""),
       ipRequirement: Joi.string().valid("", ...ipRequirementOptions),
       interface: Joi.string().valid("", ...interfaceOptions),
       customerOrderReference: Joi.string().allow(""),

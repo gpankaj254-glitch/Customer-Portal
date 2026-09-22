@@ -31,4 +31,13 @@ const bandwidthOptions = [
 
 const productOptions = ["DIA", "Pt to Pt", "BroadBand"];
 
-module.exports = { bandwidthOptions, productOptions };
+// Circuit Status (Inventory module) - "Live" needs no extra capture (it
+// reuses the circuit's own Customer Bill Start Date, already shown/edited
+// elsewhere); "Ceased" captures Bill Stop Date; "Changed" captures Change
+// Type/Change Order Number/Change Date - see circuit.service.js's
+// updateCircuitStatusById.
+const circuitStatusOptions = ["Live", "Ceased", "Changed"];
+
+const circuitChangeTypeOptions = ["Upgrade", "Downgrade", "Move", "Other"];
+
+module.exports = { bandwidthOptions, productOptions, circuitStatusOptions, circuitChangeTypeOptions };

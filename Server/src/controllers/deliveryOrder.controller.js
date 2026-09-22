@@ -96,6 +96,24 @@ const bulkUploadDeliveryOrders = catchAsync(async (req, res) => {
   res.send({ success: true, totalRows, insertedCount: created.length, failedRows: [] });
 });
 
+// Historical backfill: imports orders that are already Completed, with
+// their full completion details - see deliveryOrder.service.js's
+// validateBulkUploadClosedDeliveryOrders for the column set.
+const bulkUploadClosedDeliveryOrders = catchAsync(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "No file uploaded");
+  }
+  const { totalRows, failedRows, validRows } = await deliveryOrderService.validateBulkUploadClosedDeliveryOrders(req.file.buffer);
+
+  if (failedRows.length > 0) {
+    res.send({ success: false, totalRows, insertedCount: 0, failedRows });
+    return;
+  }
+
+  const created = await deliveryOrderService.bulkCreateClosedDeliveryOrders(validRows, req.user);
+  res.send({ success: true, totalRows, insertedCount: created.length, failedRows: [] });
+});
+
 module.exports = {
   createDeliveryOrder,
   getDeliveryOrders,
@@ -105,4 +123,5 @@ module.exports = {
   restoreDeliveryOrder,
   permanentlyDeleteDeliveryOrder,
   bulkUploadDeliveryOrders,
+  bulkUploadClosedDeliveryOrders,
 };

@@ -39,7 +39,7 @@ const secondaryListItems = [sideMenuItems.DELIVERY_ORDERS, sideMenuItems.CUSTOME
 // Management, Site Management, Inventory Management" - Tickets moves out of
 // the top mainListItems section (see managementMainListItems below) into
 // its place here, under its Management-only name (see
-// MANAGEMENT_LABEL_OVERRIDES). Every other role is unaffected - this only
+// RENAMED_ROLE_LABEL_OVERRIDES). Every other role is unaffected - this only
 // replaces the list used when the signed-in role is SCX Management.
 const managementMainListItems = [sideMenuItems.DASHBOARD]
 const managementSecondaryListItems = [
@@ -51,9 +51,26 @@ const managementSecondaryListItems = [
     sideMenuItems.INVENTORY,
 ]
 
-// SCX Management sees these two items under different names - every other
-// role keeps the default name from strings/index.js's sideMenuItemNames.
-const MANAGEMENT_LABEL_OVERRIDES = {
+// SCX Admin's own explicit order - "Replicate like SCX Management Role":
+// same treatment (Tickets/Sales Opportunities renamed and moved out of the
+// top mainListItems section), but with Admin's fuller permission set
+// (User Management, Vendor Management) included in the order too.
+const adminMainListItems = [sideMenuItems.DASHBOARD]
+const adminSecondaryListItems = [
+    sideMenuItems.CUSTOMER_MANAGEMENT,
+    sideMenuItems.USER_MANAGEMENT,
+    sideMenuItems.SITE_MANAGEMENT,
+    sideMenuItems.INVENTORY,
+    sideMenuItems.VENDOR_MANAGEMENT,
+    sideMenuItems.TICKETS,
+    sideMenuItems.DELIVERY_ORDERS,
+    sideMenuItems.SALES_OPPORTUNITIES,
+]
+
+// SCX Admin and SCX Management both see these two items under different
+// names - every other role keeps the default name from strings/index.js's
+// sideMenuItemNames.
+const RENAMED_ROLE_LABEL_OVERRIDES = {
     [sideMenuItems.SALES_OPPORTUNITIES]: "Sales Management",
     [sideMenuItems.TICKETS]: "NOC Management",
 }
@@ -101,9 +118,11 @@ export default function SideMenu(props) {
     const permissions = useSelector(selecPermissions)
     const currentUser = useSelector(selectUser)
     const isManagement = currentUser.role === roles.SCLOUDX_MANAGEMENT
-    const effectiveMainListItems = isManagement ? managementMainListItems : mainListItems
-    const effectiveSecondaryListItems = isManagement ? managementSecondaryListItems : secondaryListItems
-    const getLabel = (item) => (isManagement && MANAGEMENT_LABEL_OVERRIDES[item]) || sideMenuItemNames(item)
+    const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    const isRenamedRole = isManagement || isAdmin
+    const effectiveMainListItems = isManagement ? managementMainListItems : isAdmin ? adminMainListItems : mainListItems
+    const effectiveSecondaryListItems = isManagement ? managementSecondaryListItems : isAdmin ? adminSecondaryListItems : secondaryListItems
+    const getLabel = (item) => (isRenamedRole && RENAMED_ROLE_LABEL_OVERRIDES[item]) || sideMenuItemNames(item)
 
     // const [open, setOpen] = React.useState(true)
     // const toggleDrawer = () => {

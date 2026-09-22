@@ -199,7 +199,7 @@ OpenTicketsTable.propTypes = {
     onOpenTicket: PropTypes.func.isRequired,
 }
 
-export default function ScxDashboard() {
+export default function ScxDashboard({ embedded }) {
     const dispatch = useDispatch()
     const summary = useSelector(selectDashboardSummary)
     const summaryError = useSelector(selectDashboardSummaryError)
@@ -212,8 +212,11 @@ export default function ScxDashboard() {
     const openOrderList = useSelector(selectOpenOrderList)
     const user = useSelector(selectUser)
     // Both the Delivery tab and the Sales tabs are SCX Admin only - SCX NOC
-    // shares this same dashboard component but gets neither.
-    const isAdmin = user.role === roles.SCLOUDX_ADMIN
+    // shares this same dashboard component but gets neither. `embedded`
+    // (set when nested inside ManagementDashboard.js's own NOC tab)
+    // suppresses both, since Delivery/Sales already exist there as separate
+    // top-level tabs - showing them again here would just duplicate them.
+    const isAdmin = user.role === roles.SCLOUDX_ADMIN && !embedded
     const deliveryTabIndex = TICKET_TAB_LABELS.length
     const salesTabStartIndex = TICKET_TAB_LABELS.length + 1
     const tabLabels = isAdmin ? [...TICKET_TAB_LABELS, DELIVERY_TAB_LABEL, ...SALES_TAB_LABELS] : TICKET_TAB_LABELS
@@ -441,4 +444,12 @@ export default function ScxDashboard() {
             )}
         </Grid>
     )
+}
+
+ScxDashboard.propTypes = {
+    embedded: PropTypes.bool,
+}
+
+ScxDashboard.defaultProps = {
+    embedded: false,
 }

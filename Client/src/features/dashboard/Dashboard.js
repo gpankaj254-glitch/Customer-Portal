@@ -110,7 +110,12 @@ OpenTicketsTable.propTypes = {
 function DashboardContent() {
     const dispatch = useDispatch()
     const user = useSelector(selectUser)
-    const isScx = user.role === roles.SCLOUDX_ADMIN || user.role === roles.SCLOUDX_USER
+    // SCX NOC alone gets the plain ScxDashboard - SCX Admin now gets the
+    // same rolled-up ManagementDashboard as SCX Management ("SCX Admin
+    // Dashboard should be same as SCX Management role"), which itself
+    // embeds ScxDashboard as its own NOC tab.
+    const isNoc = user.role === roles.SCLOUDX_USER
+    const isAdmin = user.role === roles.SCLOUDX_ADMIN
     const isCustomerRole = user.role === roles.CUSTOMER_ADMIN || user.role === roles.CUSTOMER_USER
     const isSalesRole = user.role === roles.SCLOUDX_SALES_ADMIN || user.role === roles.SCLOUDX_SALES_USER
     const isFinance = user.role === roles.SCLOUDX_FINANCE
@@ -119,7 +124,7 @@ function DashboardContent() {
     // SalesDashboard, ScxDashboard, FinanceDashboard and ManagementDashboard
     // fetch their own data; every other role (Customer Admin/User, and the
     // plain fallback) uses the site/customer fetches and layout below.
-    const hasOwnDashboard = isSalesRole || isScx || isFinance || isManagement || isDeliveryRole
+    const hasOwnDashboard = isSalesRole || isNoc || isAdmin || isFinance || isManagement || isDeliveryRole
 
     const getSiteError = useSelector(selectGetSiteError)
     const getCustomerError = useSelector(selectGetCustomersError)
@@ -193,7 +198,7 @@ function DashboardContent() {
                     <Grid item xs={12}>
                         <SalesDashboard />
                     </Grid>
-                ) : isScx ? (
+                ) : isNoc ? (
                     <Grid item xs={12}>
                         <ScxDashboard />
                     </Grid>
@@ -201,7 +206,7 @@ function DashboardContent() {
                     <Grid item xs={12}>
                         <FinanceDashboard />
                     </Grid>
-                ) : isManagement ? (
+                ) : isManagement || isAdmin ? (
                     <Grid item xs={12}>
                         <ManagementDashboard />
                     </Grid>
@@ -211,7 +216,11 @@ function DashboardContent() {
                             <Typography component="h2" variant="h5" sx={{ mt: 0.5, fontSize: "0.85rem", fontWeight: 600 }}>View Open Orders</Typography>
                         </Grid>
                         <Grid item xs={12}>
-                            <DeliveryOrderTable rows={openOrderList} canEdit canDelete dashboardView />
+                            {/* "Remove Delete option for Order for Delivery User,
+                                should only with SCX Admin" - canDelete omitted here
+                                (defaults false), unlike SCX Admin's own equivalent
+                                Dashboard tab in ScxDashboard.js. */}
+                            <DeliveryOrderTable rows={openOrderList} canEdit dashboardView />
                         </Grid>
                     </>
                 ) : isCustomerRole ? (

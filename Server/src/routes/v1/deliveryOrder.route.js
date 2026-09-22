@@ -21,6 +21,10 @@ router
   .post(auth("bulkUpload"), uploadCsv.single("file"), deliveryOrderController.bulkUploadDeliveryOrders);
 
 router
+  .route("/bulk-upload-closed")
+  .post(auth("bulkUpload"), uploadCsv.single("file"), deliveryOrderController.bulkUploadClosedDeliveryOrders);
+
+router
   .route("/get")
   .post(
     auth("viewDeliveryOrders"),

@@ -92,20 +92,46 @@ function InventoryContent() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchInput])
 
+    const searchBox = (
+        <TextField
+            fullWidth
+            label="Search inventory"
+            placeholder="Search any site or circuit field - name, address, Vendor Circuit ID, SCloudX Order Reference, etc."
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            sx={{ mb: 2 }}
+        />
+    )
+
+    // "Change Inventory to Live Inventory, Add 2 more tabs - Changed
+    // Inventory / Ceased Inventory" - all three reuse the same already-
+    // fetched siteList (see InventoryTable.js's statusFilter), just each
+    // scoped to a different Circuit Status.
     const tabs = [
         {
-            label: "Inventory",
+            label: "Live Inventory",
             content: (
                 <>
-                    <TextField
-                        fullWidth
-                        label="Search inventory"
-                        placeholder="Search any site or circuit field - name, address, Vendor Circuit ID, SCloudX Order Reference, etc."
-                        value={searchInput}
-                        onChange={(event) => setSearchInput(event.target.value)}
-                        sx={{ mb: 2 }}
-                    />
-                    <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} />
+                    {searchBox}
+                    <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Live" />
+                </>
+            ),
+        },
+        {
+            label: "Changed Inventory",
+            content: (
+                <>
+                    {searchBox}
+                    <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Changed" />
+                </>
+            ),
+        },
+        {
+            label: "Ceased Inventory",
+            content: (
+                <>
+                    {searchBox}
+                    <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Ceased" />
                 </>
             ),
         },

@@ -33,3 +33,11 @@ export const productOptions = [
     "Pt to Pt",
     "BroadBand",
 ]
+
+// Circuit Status (Inventory module) - "Live" needs no extra capture (it
+// reuses the circuit's own Customer Bill Start Date); "Ceased" captures
+// Bill Stop Date; "Changed" captures Change Type/Change Order Number/
+// Change Date - see CircuitTable.js's buildStatusEditableFields.
+export const circuitStatusOptions = ["Live", "Ceased", "Changed"]
+
+export const circuitChangeTypeOptions = ["Upgrade", "Downgrade", "Move", "Other"]

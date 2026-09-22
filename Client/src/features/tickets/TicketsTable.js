@@ -61,31 +61,67 @@ const stickyActionsSx = {
 }
 
 // Same vendor columns as the NOC/Admin Dashboard's own Open Tickets listing
-// (see ScxDashboard.js) - Vendor Reference/Vendor Circuit ID/Vendor Name/
-// Vendor Status, replicated here so the Tickets module's own View Open
-// Ticket / View Closed Ticket(s) tables show the same fields. Days Pending
-// is open-tickets-only, same as the Dashboard - once a ticket is closed,
-// "days pending" no longer applies.
+// (see ScxDashboard.js) - Vendor Reference/Vendor Circuit ID/Vendor Name,
+// replicated here so the Tickets module's own View Open Ticket / View
+// Closed Ticket(s) tables show the same fields. Priority and Vendor Status
+// are open-tickets-only now - not meaningful once a ticket is closed/
+// completed, same reasoning as Days Pending. View Closed/Completed instead
+// get Problem Start Date and Ticket Close Date after Created Date.
 function buildColumns (mode) {
+    const isOpen = mode === "open"
     const columns = [
         { id: "ticketId", label: "Ticket ID" },
         { id: "customerReference", label: "Customer Reference" },
-        { id: "vendorTicketId", label: "Vendor Reference" },
+    ]
+    if (isOpen) {
+        columns.push({ id: "vendorTicketId", label: "Vendor Reference" })
+    }
+    columns.push(
         // Narrow, with word-wrap on the cell below - a long unbroken ID
         // would otherwise stretch the column (same fix as CircuitTable.js's
         // own Vendor Circuit ID column).
         { id: "vendorCircuitId", label: "Vendor Circuit ID", width: "8%" },
         { id: "vendorName", label: "Vendor Name" },
-        { id: "problemType", label: "Problem Type" },
-        { id: "priority", label: "Priority" },
-        mode === "open" ? { id: "status", label: "Status" } : { id: "closureCode", label: "Closure Code" },
-        { id: "vendorTicketStatus", label: "Vendor Status" },
-        { id: "createdDate", label: "Created Date (GMT)" },
-    ]
-    if (mode === "open") {
+        { id: "problemType", label: "Problem Type" }
+    )
+    if (isOpen) {
+        columns.push({ id: "priority", label: "Priority" })
+    }
+    columns.push(isOpen ? { id: "status", label: "Status" } : { id: "closureCode", label: "Closure Code" })
+    if (isOpen) {
+        columns.push({ id: "vendorTicketStatus", label: "Vendor Status" })
+    }
+    columns.push({ id: "createdDate", label: "Created Date (GMT)" })
+    if (isOpen) {
         columns.push({ id: "daysPending", label: "Days Pending" })
+    } else {
+        columns.push(
+            { id: "problemStartDateText", label: "Problem Start Date/Time (GMT)" },
+            { id: "closedAtText", label: "Ticket Close Date/Time (GMT)" }
+        )
     }
     return columns
+}
+
+// Problem Start Date is typed as a plain wall-clock string with no time
+// zone (see TicketDetails.js's own WALL_CLOCK) - shown as entered rather
+// than converted, unlike Created Date/Ticket Close Date, which are real UTC
+// timestamps. Formatted with the same "DD/MM/YYYY hh:mm a" pattern as
+// getFormattedDateTimeGMT (Ticket Close Date's own formatter) so the two
+// columns read consistently when a time is actually present. Some real
+// tickets only ever got a bare date ("YYYY-MM-DD", no time) - those are
+// formatted as just "DD/MM/YYYY" rather than faking a "12:00 am" that was
+// never entered. Bulk-imported tickets can hold something else entirely,
+// so anything matching none of these shapes is shown as-is instead of
+// blanked out.
+function formatProblemStartDate(value) {
+    if (!value) return ""
+    const dateOnly = moment(value, "YYYY-MM-DD", true)
+    if (dateOnly.isValid() && !value.includes("T")) {
+        return dateOnly.format("DD/MM/YYYY")
+    }
+    const withTime = moment(value, ["YYYY-MM-DDTHH:mm:ss", "YYYY-MM-DDTHH:mm"], true)
+    return withTime.isValid() ? withTime.format("DD/MM/YYYY hh:mm a") : value
 }
 
 function createDisplayData (data) {
@@ -101,6 +137,8 @@ function createDisplayData (data) {
         closureCode: _.get(data, "closureCode", ""),
         vendorTicketStatus: _.get(data, "vendorTicketStatus", ""),
         createdDate: getFormattedDateTimeGMT(_.get(data, "history[0].updatedAt", "")),
+        problemStartDateText: formatProblemStartDate(_.get(data, "problemStartDate", "")),
+        closedAtText: getFormattedDateTimeGMT(_.get(data, "closedAt", "")),
         daysPending: _.get(data, "createdAt") ? moment().diff(moment(data.createdAt), "days") : "",
     }
 }

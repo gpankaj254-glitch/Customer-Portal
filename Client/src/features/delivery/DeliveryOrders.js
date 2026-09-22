@@ -32,15 +32,18 @@ const deletedOrderColumns = [
 
 // SCX Service Delivery's own module (also reachable read-only through the
 // SCX Management dashboard's Delivery tab - see ManagementDashboard.js).
-// createDeliveryOrders/deleteDeliveryOrders/bulkUpload are only held by SCX
-// Admin and SCX Service Delivery (see roles.js) - SCX Management has none of
-// them, so New Order/Deleted Orders/Bulk Upload Orders are left out of the
-// tab list entirely for it, same pattern as Tickets.js/Opportunities.js/
-// Customers.js.
+// createDeliveryOrders/updateDeliveryOrders/bulkUpload are held by SCX Admin
+// and SCX Service Delivery (see roles.js) - SCX Management has none of them,
+// so New Order/Bulk Upload Orders are left out of the tab list entirely for
+// it, same pattern as Tickets.js/Opportunities.js/Customers.js. Deletion
+// ("Remove Delete option for Order for Delivery User, should only with SCX
+// Admin") is narrower still - SCX Admin only, so Deleted Orders and each
+// row's own Delete icon are gated separately from the rest of canManage.
 export default function DeliveryOrders() {
     const dispatch = useDispatch()
     const currentUser = useSelector(selectUser)
-    const canManage = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_SERVICE_DELIVERY
+    const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    const canManage = isAdmin || currentUser.role === roles.SCLOUDX_SERVICE_DELIVERY
 
     const openOrderList = useSelector(selectOpenOrderList)
     const deliveredOrderList = useSelector(selectDeliveredOrderList)
@@ -102,7 +105,7 @@ export default function DeliveryOrders() {
             content: (
                 <>
                     {searchBox}
-                    <DeliveryOrderTable rows={openOrderList} canEdit={canManage} canDelete={canManage} />
+                    <DeliveryOrderTable rows={openOrderList} canEdit={canManage} canDelete={isAdmin} />
                 </>
             ),
         },
@@ -117,12 +120,12 @@ export default function DeliveryOrders() {
         content: (
             <>
                 {searchBox}
-                <DeliveryOrderTable rows={deliveredOrderList} canEdit={canManage} canDelete={canManage} />
+                <DeliveryOrderTable rows={deliveredOrderList} canEdit={canManage} canDelete={isAdmin} />
             </>
         ),
     })
 
-    if (canManage) {
+    if (isAdmin) {
         tabs.push({
             label: "Deleted Orders",
             content: (
@@ -135,6 +138,9 @@ export default function DeliveryOrders() {
                 />
             ),
         })
+    }
+
+    if (canManage) {
         tabs.push({ label: "Bulk Upload Orders", content: <BulkUploadDeliveryOrders /> })
     }
 

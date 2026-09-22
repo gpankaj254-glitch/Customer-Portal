@@ -1,9 +1,11 @@
 const allRoles = {
   scloudxUser: [
     "moveCircuits",
-    "createCustomers",
     "createUsers",
-    "createSites",
+    // createSites/createCustomers removed - both now belong to SCX Admin
+    // (the general Customer/Site Management modules) and SCX Service
+    // Delivery (inline, while completing a Delivery Order - see
+    // scloudxServiceDelivery below).
     "createCircuits",
     // Vendor Management is read-only for SCX NOC - SCX Service Delivery has
     // full read/write access instead (see scloudxServiceDelivery below).
@@ -29,6 +31,7 @@ const allRoles = {
     "permanentlyDeleteSites",
     "createCircuits",
     "editCircuits",
+    "updateCircuitStatus",
     "deleteCircuits",
     "permanentlyDeleteCircuits",
     "createVendors",
@@ -77,11 +80,22 @@ const allRoles = {
     // Needed for a delivery order's "Site - New" flow (Complete Order
     // Details tab) - creating the new Site record directly from the order.
     "createSites",
+    // "We should Create New Customer during delivery process like Site
+    // Creation" - formalizes a prospect (newCustomerName) into a real
+    // Customer directly from the order (see OrderDetails.js).
+    "createCustomers",
     "createDeliveryOrders",
     "viewDeliveryOrders",
     "updateDeliveryOrders",
-    "deleteDeliveryOrders",
-    "permanentlyDeleteDeliveryOrders",
+    // deleteDeliveryOrders/permanentlyDeleteDeliveryOrders removed -
+    // "Remove Delete option for Order for Delivery User, should only with
+    // SCX Admin". Service Delivery keeps full create/edit rights on
+    // Delivery Orders, just not deletion.
+    // "Delivery Team Should able to change Circuit Status Under Inventory
+    // Module" - scoped to just Circuit Status (see
+    // circuit.service.js's updateCircuitStatusById); not the general
+    // "editCircuits" right, which stays SCX Admin only.
+    "updateCircuitStatus",
   ],
   // SCX Management's dashboard rolls up the Sales and NOC (SCX User)
   // dashboards under their own tabs, and it also gets read-only access to

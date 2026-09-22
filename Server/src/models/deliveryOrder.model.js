@@ -97,7 +97,17 @@ const deliveryOrderSchema = mongoose.Schema(
       enum: ["", ...bandwidthOptions],
       default: "",
     },
+    // The customer-side contract term - maps to Circuit's own
+    // customerCircuitContractTerm once a Circuit is created from this order
+    // (see deliveryOrder.service.js's createCircuitFromOrder).
     contractTerm: {
+      type: String,
+      default: "",
+    },
+    // The vendor-side contract term - captured on the Edit Order tab,
+    // separate from contractTerm above since Circuit itself splits the two
+    // (customerCircuitContractTerm/vendorCircuitContractTerm).
+    vendorContractTerm: {
       type: String,
       default: "",
     },
@@ -146,6 +156,15 @@ const deliveryOrderSchema = mongoose.Schema(
       type: String,
       enum: orderStatusOptions,
       default: "SCX",
+    },
+    // Set once a Circuit has been auto-created from this order (on the
+    // status transition to "Completed" - see deliveryOrder.service.js's
+    // createCircuitFromOrder). Guards against creating a second Circuit if
+    // the order is saved again after already completing, and doubles as a
+    // record of which Circuit this order became.
+    circuitId: {
+      type: String,
+      default: "",
     },
     // Fixed checklist (see deliveryOrder.service.js's MILESTONE_NAMES) -
     // always created with all of them, in order; never added to/removed

@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 // const validator = require("validator");
 // const bcrypt = require("bcryptjs");
 const { toJSON, paginate } = require("./plugins");
+const { circuitStatusOptions, circuitChangeTypeOptions } = require("../config/circuitOptions");
 // const { roles } = require("../config/roles");
 
 const circuitSchema = mongoose.Schema(
@@ -127,6 +128,36 @@ const circuitSchema = mongoose.Schema(
     vendorMTTR: {
       type: String,
       // required: true,
+    },
+    // "Every Circuit Should have following status ... Delivery Team Should
+    // able to change Circuit Status Under Inventory Module" - "Live" needs
+    // no extra capture here (it reuses customerCircuitBillStartDate above,
+    // already shown/edited elsewhere); "Ceased" captures billStopDate;
+    // "Changed" captures changeType/changeOrderNumber/changeDate. Edited
+    // through its own dedicated endpoint (see circuit.service.js's
+    // updateCircuitStatusById), open to SCX Admin and SCX Service Delivery -
+    // not the general circuit edit, which stays SCX Admin only.
+    status: {
+      type: String,
+      enum: ["", ...circuitStatusOptions],
+      default: "Live",
+    },
+    billStopDate: {
+      type: String,
+      default: "",
+    },
+    changeType: {
+      type: String,
+      enum: ["", ...circuitChangeTypeOptions],
+      default: "",
+    },
+    changeOrderNumber: {
+      type: String,
+      default: "",
+    },
+    changeDate: {
+      type: String,
+      default: "",
     },
     active: {
       type: Boolean,

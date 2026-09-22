@@ -1,5 +1,5 @@
 const Joi = require("joi");
-const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
+const { bandwidthOptions, productOptions, circuitStatusOptions, circuitChangeTypeOptions } = require("../config/circuitOptions");
 
 const createCircuit = {
   body: Joi.array().items(
@@ -57,6 +57,19 @@ const updateCircuit = {
     .min(1),
 };
 
+const updateCircuitStatus = {
+  params: Joi.object().keys({
+    circuitId: Joi.string().required(),
+  }),
+  body: Joi.object().keys({
+    status: Joi.string().valid(...circuitStatusOptions).required(),
+    billStopDate: Joi.string().allow(""),
+    changeType: Joi.string().valid("", ...circuitChangeTypeOptions),
+    changeOrderNumber: Joi.string().allow(""),
+    changeDate: Joi.string().allow(""),
+  }),
+};
+
 const deactivateCircuit = {
   params: Joi.object().keys({
     circuitId: Joi.string().required(),
@@ -77,6 +90,7 @@ module.exports = {
   createCircuit,
   getCircuits,
   updateCircuit,
+  updateCircuitStatus,
   deactivateCircuit,
   moveCircuit,
 };

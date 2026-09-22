@@ -23,6 +23,20 @@ export async function fetchUpdateCircuit(data, rejectWithValue) {
     }
 }
 
+// "Delivery Team Should able to change Circuit Status Under Inventory
+// Module" - a separate, narrower endpoint from fetchUpdateCircuit (see
+// circuit.service.js's updateCircuitStatusById).
+export async function fetchUpdateCircuitStatus(data, rejectWithValue) {
+    try {
+        const { circuitId, ...updateBody } = data
+        const response = await axios.patch(`${baseURL}/circuit/${circuitId}/status`, updateBody, {headers: headers()})
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
 export async function fetchDeactivateCircuit(circuitId, rejectWithValue) {
     try {
         const response = await axios.delete(`${baseURL}/circuit/${circuitId}`, {headers: headers()})

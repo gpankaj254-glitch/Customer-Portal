@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit"
-import { fetchCreateCircuit, fetchUpdateCircuit, fetchMoveCircuit, fetchDeactivateCircuit, fetchBulkUploadCircuits, fetchCircuitsList } from "./circuitAPI"
+import { fetchCreateCircuit, fetchUpdateCircuit, fetchUpdateCircuitStatus, fetchMoveCircuit, fetchDeactivateCircuit, fetchBulkUploadCircuits, fetchCircuitsList } from "./circuitAPI"
 import { pageStatusVals } from "./utils"
 
 const initialState = {
@@ -21,6 +21,14 @@ export const updateCircuit = createAsyncThunk(
     "circuits/fetchUpdateCircuit",
     async (data, { rejectWithValue }) => {
         const response = await fetchUpdateCircuit(data, rejectWithValue)
+        return response
+    }
+)
+
+export const updateCircuitStatus = createAsyncThunk(
+    "circuits/fetchUpdateCircuitStatus",
+    async (data, { rejectWithValue }) => {
+        const response = await fetchUpdateCircuitStatus(data, rejectWithValue)
         return response
     }
 )
@@ -89,6 +97,12 @@ export const circuitSlice = createSlice({
                 state.pageStatus = pageStatusVals.fetched
             })
             .addCase(updateCircuit.rejected, (state) => {
+                state.pageStatus = pageStatusVals.error
+            })
+            .addCase(updateCircuitStatus.fulfilled, (state) => {
+                state.pageStatus = pageStatusVals.fetched
+            })
+            .addCase(updateCircuitStatus.rejected, (state) => {
                 state.pageStatus = pageStatusVals.error
             })
             .addCase(moveCircuit.fulfilled, (state) => {

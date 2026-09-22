@@ -150,6 +150,50 @@ const updateCircuitById = async (circuitId, updateBody, actingUser) => {
   return circuit;
 };
 
+const CIRCUIT_STATUS_FIELDS = ["status", "billStopDate", "changeType", "changeOrderNumber", "changeDate"];
+
+/**
+ * Update just a circuit's Status (and whichever of Bill Stop Date/Change
+ * Type/Change Order Number/Change Date go with it) - a separate, narrower
+ * endpoint from updateCircuitById so SCX Service Delivery can be given
+ * rights to this alone (see roles.js's updateCircuitStatus) without also
+ * gaining the general "editCircuits" right. Whichever fields don't apply to
+ * the newly-set status are cleared, so old Ceased/Changed data doesn't
+ * linger once a circuit moves on to a different status (mirrors
+ * deliveryOrder.service.js's own handoverDate-on-status-change handling).
+ * @param {ObjectId} circuitId
+ * @param {Object} updateBody
+ * @param {Object} actingUser
+ * @returns {Promise<Circuit>}
+ */
+const updateCircuitStatusById = async (circuitId, updateBody, actingUser) => {
+  const circuit = await getCircuitById(circuitId);
+  if (!circuit) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Circuit not found");
+  } else if (!circuit.active) {
+    throw new ApiError(httpStatus.NOT_ACCEPTABLE, "Circuit is not active");
+  }
+
+  const update = _.pick(updateBody, CIRCUIT_STATUS_FIELDS);
+  if (update.status === "Live") {
+    update.billStopDate = "";
+    update.changeType = "";
+    update.changeOrderNumber = "";
+    update.changeDate = "";
+  } else if (update.status === "Ceased") {
+    update.changeType = "";
+    update.changeOrderNumber = "";
+    update.changeDate = "";
+  } else if (update.status === "Changed") {
+    update.billStopDate = "";
+  }
+
+  Object.assign(circuit, update);
+  circuit.updatedBy = extractUserDetails(actingUser);
+  await circuit.save();
+  return circuit;
+};
+
 /**
  * Move an active circuit to another active site of the SAME customer. A site
  * knows its circuits through its `circuits` id list, and the circuit carries
@@ -380,6 +424,15 @@ const getActiveCircuitsById = async (circuitIds) => {
           "customerCircuitId",
           "updatedAt",
           "updatedBy",
+          // Circuit Status fields - were missing entirely here, which
+          // silently broke the Inventory list's "Circuit Status" column and
+          // would have made "Changed Inventory"/"Ceased Inventory" always
+          // show empty regardless of what's actually saved.
+          "status",
+          "billStopDate",
+          "changeType",
+          "changeOrderNumber",
+          "changeDate",
         ]);
         // return circuit;
       }
@@ -746,6 +799,7 @@ module.exports = {
   getActiveCircuitByVendorId,
   getCircuitById,
   updateCircuitById,
+  updateCircuitStatusById,
   moveCircuitToSite,
   deactivateCircuitById,
   restoreCircuitById,

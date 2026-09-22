@@ -9,6 +9,7 @@ import TableRow from "@mui/material/TableRow"
 import IconButton from "@mui/material/IconButton"
 import DeleteIcon from "@mui/icons-material/Delete"
 import EditIcon from "@mui/icons-material/Edit"
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz"
 import DriveFileMoveIcon from "@mui/icons-material/DriveFileMove"
 import Snackbar from "@mui/material/Snackbar"
 import { Alert, Typography } from "@mui/material"
@@ -19,18 +20,38 @@ import moment from "moment"
 import { useSelector, useDispatch } from "react-redux"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
-import { updateCircuit, deactivateCircuit } from "./circuitSlice"
+import { updateCircuit, updateCircuitStatus, deactivateCircuit } from "./circuitSlice"
 import { getSites, selectPagination } from "./inventorySlice"
 import { selectVendorList } from "../vendors/vendorSlice"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
 import MoveCircuitDialog from "./MoveCircuitDialog"
-import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
+import { bandwidthOptions, productOptions, circuitStatusOptions, circuitChangeTypeOptions } from "../../consts/circuitOptions"
+
+// "Every Circuit Should have following status ... Live since (Bill Start
+// date) / Ceased (Capture Bill Stop date) / Changed (Captured Change -
+// Type, Change Order Number and Change Date)" - Live reuses
+// customerCircuitBillStartDate rather than a field of its own.
+function formatCircuitStatus(row) {
+    const status = row.status || "Live"
+    if (status === "Ceased") {
+        return row.billStopDate ? `Ceased ${row.billStopDate}` : "Ceased"
+    }
+    if (status === "Changed") {
+        const parts = [row.changeType, row.changeOrderNumber, row.changeDate].filter(Boolean)
+        return parts.length ? `Changed (${parts.join(" - ")})` : "Changed"
+    }
+    return row.customerCircuitBillStartDate ? `Live since ${row.customerCircuitBillStartDate}` : "Live"
+}
 
 // customerVisible controls which columns Customer Admin/Customer User can
 // see - everyone else (SCX roles) sees every column.
 const columns = [
     { id: "vendorName", label: "Vendor Name", customerVisible: false, format: (row, vendorNameById) => vendorNameById.get(row.vendorId) || "" },
+    // Not customerVisible - it surfaces customerCircuitBillStartDate (Live)
+    // and other operational detail, and that underlying field itself is
+    // already hidden from customers below.
+    { id: "status", label: "Circuit Status", customerVisible: false, format: (row) => formatCircuitStatus(row) },
     // Narrow, with word-wrap on the cell below - a long unbroken ID would
     // otherwise stretch the column and push everything else out (same fix
     // as FinanceDashboard.js's own Vendor Circuit ID column).
@@ -90,6 +111,42 @@ function buildEditableFields(circuit) {
     ]
 }
 
+// Fields shown/hidden by the live (in-progress) Status selection itself -
+// EditDialog supports `fields` as a function of values for exactly this.
+// "Live" needs nothing beyond the Status field itself (see
+// formatCircuitStatus above); plain text dates here, not HTML5 date inputs,
+// to match the dd-mm-yyyy string convention already used by
+// customerCircuitBillStartDate/vendorCircuitBillStartDate above.
+function buildStatusEditableFields(values) {
+    const status = _.get(values, "status", "Live")
+    const fields = [
+        {
+            name: "status",
+            label: "Circuit Status",
+            type: "select",
+            options: circuitStatusOptions.map((option) => ({ value: option, label: option })),
+        },
+    ]
+    if (status === "Ceased") {
+        fields.push({ name: "billStopDate", label: "Bill Stop Date (dd-mm-yyyy)" })
+    }
+    if (status === "Changed") {
+        fields.push(
+            {
+                name: "changeType",
+                label: "Change Type",
+                type: "select",
+                options: [{ value: "", label: "None" }, ...circuitChangeTypeOptions.map((option) => ({ value: option, label: option }))],
+            },
+            { name: "changeOrderNumber", label: "Change Order Number" },
+            { name: "changeDate", label: "Change Date (dd-mm-yyyy)" }
+        )
+    }
+    return fields
+}
+
+const STATUS_FIELD_NAMES = ["status", "billStopDate", "changeType", "changeOrderNumber", "changeDate"]
+
 export default function CircuitTable(props) {
     const dispatch = useDispatch()
     const currentUser = useSelector(selectUser)
@@ -97,6 +154,10 @@ export default function CircuitTable(props) {
     // Moving a circuit to another site is open to SCX Admin and SCX User (only
     // the Admin can edit/delete circuits).
     const canMove = isAdmin || currentUser.role === roles.SCLOUDX_USER
+    // "Delivery Team Should able to change Circuit Status Under Inventory
+    // Module" - SCX Service Delivery gets just this, not the full Edit
+    // dialog (still SCX Admin only).
+    const canEditStatus = isAdmin || currentUser.role === roles.SCLOUDX_SERVICE_DELIVERY
     const isCustomerRole = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
     const pagination = useSelector(selectPagination)
     const vendorList = useSelector(selectVendorList)
@@ -107,8 +168,10 @@ export default function CircuitTable(props) {
     const [circuitToDelete, setCircuitToDelete] = React.useState(null)
     const [deleting, setDeleting] = React.useState(false)
     const [circuitToEdit, setCircuitToEdit] = React.useState(null)
+    const [circuitToEditStatus, setCircuitToEditStatus] = React.useState(null)
     const [circuitToMove, setCircuitToMove] = React.useState(null)
     const [saving, setSaving] = React.useState(false)
+    const [savingStatus, setSavingStatus] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)
 
     const refreshInventory = () => {
@@ -150,6 +213,20 @@ export default function CircuitTable(props) {
         }
     }
 
+    const handleSaveStatusEdit = async (values) => {
+        setSavingStatus(true)
+        try {
+            await dispatch(updateCircuitStatus({ circuitId: circuitToEditStatus.id, ..._.pick(values, STATUS_FIELD_NAMES) })).unwrap()
+            setFeedback({ severity: "success", message: "Circuit status updated successfully" })
+            setCircuitToEditStatus(null)
+            refreshInventory()
+        } catch (err) {
+            setFeedback({ severity: "error", message: err || "Failed to update circuit status" })
+        } finally {
+            setSavingStatus(false)
+        }
+    }
+
     function createDataRow (row) {
         return (<TableRow key={row.id} >
             {
@@ -169,6 +246,15 @@ export default function CircuitTable(props) {
                         onClick={() => setCircuitToEdit(row)}
                     >
                         <EditIcon />
+                    </IconButton>
+                )}
+                {canEditStatus && (
+                    <IconButton
+                        aria-label={`edit status ${row.vendorCircuitId || row.code}`}
+                        title="Change Circuit Status"
+                        onClick={() => setCircuitToEditStatus(row)}
+                    >
+                        <SwapHorizIcon />
                     </IconButton>
                 )}
                 {canMove && (
@@ -243,6 +329,26 @@ export default function CircuitTable(props) {
                 onSave={handleSaveEdit}
                 onCancel={() => setCircuitToEdit(null)}
                 loading={saving}
+            />
+            <EditDialog
+                open={!!circuitToEditStatus}
+                title="Change Circuit Status"
+                dense
+                fields={buildStatusEditableFields}
+                initialValues={
+                    circuitToEditStatus
+                        ? {
+                            status: circuitToEditStatus.status || "Live",
+                            billStopDate: circuitToEditStatus.billStopDate || "",
+                            changeType: circuitToEditStatus.changeType || "",
+                            changeOrderNumber: circuitToEditStatus.changeOrderNumber || "",
+                            changeDate: circuitToEditStatus.changeDate || "",
+                        }
+                        : {}
+                }
+                onSave={handleSaveStatusEdit}
+                onCancel={() => setCircuitToEditStatus(null)}
+                loading={savingStatus}
             />
             <MoveCircuitDialog
                 open={!!circuitToMove}
