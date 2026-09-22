@@ -81,8 +81,8 @@ export default function CircuitSelectList({ onSelectCircuit }) {
                             <TableRow>
                                 <TableCell>Create Ticket</TableCell>
                                 <TableCell>Site Name</TableCell>
-                                <TableCell>Customer Circuit ID</TableCell>
-                                <TableCell>Customer Order Number</TableCell>
+                                <TableCell sx={{ width: "8%" }}>Customer Circuit ID</TableCell>
+                                <TableCell>SCX Order Number</TableCell>
                                 <TableCell>Product</TableCell>
                                 <TableCell>Bandwidth</TableCell>
                                 <TableCell>Site Address</TableCell>
@@ -102,8 +102,8 @@ export default function CircuitSelectList({ onSelectCircuit }) {
                                         </IconButton>
                                     </TableCell>
                                     <TableCell>{_.get(row, "site.name", "")}</TableCell>
-                                    <TableCell>{row.customerCircuitId || row.vendorCircuitId || row.code}</TableCell>
-                                    <TableCell>{row.customerOrderReference}</TableCell>
+                                    <TableCell sx={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>{row.customerCircuitId || row.vendorCircuitId || row.code}</TableCell>
+                                    <TableCell>{row.scloudxOrderReference}</TableCell>
                                     <TableCell>{row.product}</TableCell>
                                     <TableCell>{row.bandwidth}</TableCell>
                                     <TableCell>{_.get(row, "location.address", "")}</TableCell>

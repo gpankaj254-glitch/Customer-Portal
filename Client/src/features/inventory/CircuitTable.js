@@ -31,8 +31,11 @@ import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
 // see - everyone else (SCX roles) sees every column.
 const columns = [
     { id: "vendorName", label: "Vendor Name", customerVisible: false, format: (row, vendorNameById) => vendorNameById.get(row.vendorId) || "" },
-    { id: "vendorCircuitId", label: "Vendor Circuit Id", customerVisible: false },
-    { id: "customerCircuitId", label: "Customer Circuit Id", customerVisible: true },
+    // Narrow, with word-wrap on the cell below - a long unbroken ID would
+    // otherwise stretch the column and push everything else out (same fix
+    // as FinanceDashboard.js's own Vendor Circuit ID column).
+    { id: "vendorCircuitId", label: "Vendor Circuit Id", customerVisible: false, width: "7%" },
+    { id: "customerCircuitId", label: "Customer Circuit Id", customerVisible: true, width: "7%" },
     { id: "scloudxOrderReference", label: "Scloudx Order Ref", customerVisible: true },
     { id: "vendorOrderReference", label: "Vendor Order Ref", customerVisible: false },
     { id: "customerOrderReference", label: "Customer Order Ref", customerVisible: true },
@@ -153,6 +156,7 @@ export default function CircuitTable(props) {
                 visibleColumns.map((column) => (
                     <TableCell
                         key={`${row.id}${column.id}`}
+                        sx={column.width ? { wordBreak: "break-word", overflowWrap: "anywhere" } : undefined}
                     >
                         <Typography variant="body2">{column.format ? column.format(row, vendorNameById) : _.get(row, column.id, "")}
                         </Typography>
@@ -197,7 +201,7 @@ export default function CircuitTable(props) {
                             {visibleColumns.map((column) => (
                                 <TableCell
                                     key={column.id}
-                                    style={{ minWidth: column.minWidth }}
+                                    style={{ minWidth: column.minWidth, width: column.width }}
                                 >
                                     <Typography variant="h5">{column.label}
                                     </Typography>

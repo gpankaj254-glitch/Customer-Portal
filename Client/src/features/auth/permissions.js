@@ -8,7 +8,7 @@ function roleBasedPermissions(role) {
     case roles.CUSTOMER_ADMIN:
         return [permisiions.USER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.TICKETS]
     case roles.SCLOUDX_ADMIN:
-        return [permisiions.USER_MANAGEMENT, permisiions.CUSTOMER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.VENDOR_MANAGEMENT, permisiions.TICKETS, permisiions.SALES_OPPORTUNITIES]
+        return [permisiions.USER_MANAGEMENT, permisiions.CUSTOMER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.VENDOR_MANAGEMENT, permisiions.TICKETS, permisiions.SALES_OPPORTUNITIES, permisiions.DELIVERY_ORDERS]
     case roles.CUSTOMER_USER:
         return [permisiions.SITE_MANAGEMENT, permisiions.TICKETS]
     case roles.SCLOUDX_USER:
@@ -30,7 +30,7 @@ function roleBasedPermissions(role) {
     // the viewer's role is an exact match (SCX Admin, SCX Sales Admin,
     // etc.) - Management is neither, so it gets a view-only page for free.
     case roles.SCLOUDX_MANAGEMENT:
-        return [permisiions.CUSTOMER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.SALES_OPPORTUNITIES, permisiions.TICKETS]
+        return [permisiions.CUSTOMER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.SALES_OPPORTUNITIES, permisiions.TICKETS, permisiions.DELIVERY_ORDERS]
     default:
         return []
     }

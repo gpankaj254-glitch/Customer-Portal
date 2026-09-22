@@ -27,6 +27,7 @@ const statusOptions = [
   "Onhold",
   "Waiting for Customer",
   "Verification",
+  "Under Observation",
   "Closed",
   "Completed",
 ];

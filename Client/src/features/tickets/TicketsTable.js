@@ -25,6 +25,7 @@ import { pageStatusVals} from "./utils"
 import { KeyboardArrowDown, KeyboardArrowUp } from "@mui/icons-material"
 
 import _ from "lodash"
+import moment from "moment"
 import TicketDetails from "./TicketDetails"
 import { getFormattedDateTimeGMT } from "../../utils/dates"
 import { selectUser } from "../auth/authSlice"
@@ -34,28 +35,73 @@ import ActivityLogDialog from "./ActivityLogDialog"
 
 const PRIORITY_COLORS = { High: "error", Medium: "info", Low: "default" }
 
+// "Align to List Open Ticket font of Dashboard" - same fontSize/padding as
+// the NOC/Admin Dashboard's own Open Tickets listing (see ScxDashboard.js's
+// OpenTicketsTable), applied here to every list (View Open Ticket, View
+// Closed Tickets, Completed Tickets, Deleted Tickets all share this table).
+// MuiTypography-root is included since every cell's text is wrapped in a
+// Typography (variant="h6" for headers, "body2" for rows) rather than being
+// plain text like the Dashboard's own table.
+const compactSx = {
+    "& .MuiTableCell-root": { fontSize: "0.72rem", padding: "4px 8px" },
+    "& .MuiTypography-root": { fontSize: "0.72rem" },
+    "& .MuiChip-root": { height: 20, fontSize: "0.68rem" },
+}
+
+// The row's expand toggle - which is how a ticket is opened to edit it -
+// lives in this rightmost Actions cell. With the extra vendor columns above
+// the table can now run wider than the screen, which would otherwise
+// scroll the expand/Activity Log/Delete icons out of view; pinning this
+// column keeps "Edit ticket" reachable without hunting for a scrollbar.
+const stickyActionsSx = {
+    position: "sticky",
+    right: 0,
+    backgroundColor: "background.paper",
+    zIndex: 1,
+}
+
+// Same vendor columns as the NOC/Admin Dashboard's own Open Tickets listing
+// (see ScxDashboard.js) - Vendor Reference/Vendor Circuit ID/Vendor Name/
+// Vendor Status, replicated here so the Tickets module's own View Open
+// Ticket / View Closed Ticket(s) tables show the same fields. Days Pending
+// is open-tickets-only, same as the Dashboard - once a ticket is closed,
+// "days pending" no longer applies.
 function buildColumns (mode) {
-    return [
+    const columns = [
         { id: "ticketId", label: "Ticket ID" },
         { id: "customerReference", label: "Customer Reference" },
+        { id: "vendorTicketId", label: "Vendor Reference" },
+        // Narrow, with word-wrap on the cell below - a long unbroken ID
+        // would otherwise stretch the column (same fix as CircuitTable.js's
+        // own Vendor Circuit ID column).
+        { id: "vendorCircuitId", label: "Vendor Circuit ID", width: "8%" },
+        { id: "vendorName", label: "Vendor Name" },
         { id: "problemType", label: "Problem Type" },
         { id: "priority", label: "Priority" },
         mode === "open" ? { id: "status", label: "Status" } : { id: "closureCode", label: "Closure Code" },
-        { id: "createdBy", label: "Created By" },
+        { id: "vendorTicketStatus", label: "Vendor Status" },
         { id: "createdDate", label: "Created Date (GMT)" },
     ]
+    if (mode === "open") {
+        columns.push({ id: "daysPending", label: "Days Pending" })
+    }
+    return columns
 }
 
 function createDisplayData (data) {
     return {
         ticketId: _.get(data, "ticketId", ""),
         customerReference: _.get(data, "customerReference", ""),
+        vendorTicketId: _.get(data, "vendorTicketId", ""),
+        vendorCircuitId: _.get(data, "vendorCircuitId", ""),
+        vendorName: _.get(data, "vendor.name", ""),
         problemType: _.get(data, "problemType", ""),
         priority: _.get(data, "priority", ""),
         status: _.get(data, "status", ""),
         closureCode: _.get(data, "closureCode", ""),
-        createdBy: _.get(data, "history[0].user.email", ""),
+        vendorTicketStatus: _.get(data, "vendorTicketStatus", ""),
         createdDate: getFormattedDateTimeGMT(_.get(data, "history[0].updatedAt", "")),
+        daysPending: _.get(data, "createdAt") ? moment().diff(moment(data.createdAt), "days") : "",
     }
 }
 
@@ -120,6 +166,7 @@ export default function TicketsTable(props) {
                     columns.map((column) => (
                         <TableCell
                             key={`${row.id}${column.id}`}
+                            sx={column.width ? { wordBreak: "break-word", overflowWrap: "anywhere" } : undefined}
                         >
                             {column.id === "priority" && displayData.priority ? (
                                 <Chip size="small" label={displayData.priority} color={PRIORITY_COLORS[displayData.priority] || "default"} />
@@ -129,7 +176,7 @@ export default function TicketsTable(props) {
                             )}
                         </TableCell>
                     ))}
-                <TableCell align="right">
+                <TableCell align="right" sx={stickyActionsSx}>
                     <IconButton
                         aria-label={`${open === row.id ? "collapse" : "expand"} ${row.ticketId}`}
                         onClick={(event) => handleRowClick(event, row.id)}
@@ -225,19 +272,19 @@ export default function TicketsTable(props) {
                     }}
                 />
                 <TableContainer sx={{ height: 1 }}>
-                    <Table stickyHeader aria-label="sticky table">
+                    <Table stickyHeader size="small" aria-label="sticky table" sx={compactSx}>
                         <TableHead>
                             <TableRow>
                                 {columns.map((column) => (
                                     <TableCell
                                         key={column.id}
-                                        style={{ minWidth: column.minWidth }}
+                                        style={{ minWidth: column.minWidth, width: column.width }}
                                     >
                                         <Typography variant="h6">{column.label}
                                         </Typography>
                                     </TableCell>
                                 ))}
-                                <TableCell align="right">
+                                <TableCell align="right" sx={{ ...stickyActionsSx, zIndex: 2 }}>
                                     <Typography variant="h6">Action/ Update</Typography>
                                 </TableCell>
                             </TableRow>

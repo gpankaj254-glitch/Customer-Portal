@@ -40,6 +40,9 @@ import { focusTicket } from "../tickets/ticketSlice"
 import { togglePage } from "../landing/landingSlice"
 import { selectUser } from "../auth/authSlice"
 import SalesDashboard from "../opportunities/SalesDashboard"
+import { getDeliveryOrders, selectOpenOrderList } from "../delivery/deliveryOrderSlice"
+import { getVendors } from "../vendors/vendorSlice"
+import DeliveryOrderTable from "../delivery/DeliveryOrderTable"
 import { pages, roles } from "../../consts"
 import { pageStatusVals } from "../tickets/utils"
 import { getFormattedDateTimeGMT } from "../../utils/dates"
@@ -47,6 +50,12 @@ import { getFormattedDateTimeGMT } from "../../utils/dates"
 const DATE_FORMAT = "YYYY-MM-DD"
 
 const TICKET_TAB_LABELS = ["Main Dashboard", "Open Tickets", "Closed Tickets"]
+// "Delivery" and the Sales tabs below are both shown to SCX Admin only -
+// SCX NOC (which shares this same dashboard component) gets neither. SCX
+// Admin has full rights on Delivery Orders (see roles.js), so this table is
+// rendered with canEdit/canDelete, same as the module's own View Open Order
+// tab.
+const DELIVERY_TAB_LABEL = "Delivery"
 // Shown to SCX Admin only, after the ticket tabs - they are the Sales
 // dashboard's own Summary / Opportunities / Supplier tabs (see SalesDashboard).
 const SALES_TAB_LABELS = ["Sales Summary", "Sales Opportunities", "Sales Supplier"]
@@ -138,7 +147,12 @@ function OpenTicketsTable({ rows, onOpenTicket }) {
                 <TableHead>
                     <TableRow>
                         {openTicketColumns.map((label) => (
-                            <TableCell key={label} sx={{ fontWeight: 600 }}>{label}</TableCell>
+                            <TableCell
+                                key={label}
+                                sx={{ fontWeight: 600, width: label === "Vendor Circuit ID" ? "8%" : undefined }}
+                            >
+                                {label}
+                            </TableCell>
                         ))}
                     </TableRow>
                 </TableHead>
@@ -165,7 +179,7 @@ function OpenTicketsTable({ rows, onOpenTicket }) {
                             </TableCell>
                             <TableCell>{row.customerReference}</TableCell>
                             <TableCell>{row.vendorTicketId}</TableCell>
-                            <TableCell>{row.vendorCircuitId}</TableCell>
+                            <TableCell sx={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>{row.vendorCircuitId}</TableCell>
                             <TableCell>{row.vendorName}</TableCell>
                             <TableCell>{row.problemType}</TableCell>
                             <TableCell>{row.status}</TableCell>
@@ -195,9 +209,14 @@ export default function ScxDashboard() {
     const closedAnalysisError = useSelector(selectClosedTicketsAnalysisError)
     const closedAnalysisStatus = useSelector(selectClosedTicketsAnalysisStatus)
     const customerList = useSelector(selectCustomerList)
+    const openOrderList = useSelector(selectOpenOrderList)
     const user = useSelector(selectUser)
-    const showSalesTabs = user.role === roles.SCLOUDX_ADMIN
-    const tabLabels = showSalesTabs ? [...TICKET_TAB_LABELS, ...SALES_TAB_LABELS] : TICKET_TAB_LABELS
+    // Both the Delivery tab and the Sales tabs are SCX Admin only - SCX NOC
+    // shares this same dashboard component but gets neither.
+    const isAdmin = user.role === roles.SCLOUDX_ADMIN
+    const deliveryTabIndex = TICKET_TAB_LABELS.length
+    const salesTabStartIndex = TICKET_TAB_LABELS.length + 1
+    const tabLabels = isAdmin ? [...TICKET_TAB_LABELS, DELIVERY_TAB_LABEL, ...SALES_TAB_LABELS] : TICKET_TAB_LABELS
 
     const [activeTab, setActiveTab] = React.useState(0)
     const [startDate, setStartDate] = React.useState(() => defaultClosedRange().startDate)
@@ -211,6 +230,19 @@ export default function ScxDashboard() {
         dispatch(getCustomers({ limit: 200, page: 1 }))
         dispatch(getClosedTicketsAnalysis(defaultClosedRange()))
     }, [dispatch])
+
+    // "Add Service Delivery Module and Dashboard to ... SCX Admin" - same
+    // openOrderList/vendor data the Service Delivery Management module and
+    // the Delivery role's own Dashboard use (see deliveryOrderSlice.js /
+    // Dashboard.js).
+    React.useEffect(() => {
+        if (!isAdmin) {
+            return
+        }
+        dispatch(getDeliveryOrders({ limit: 1000, page: 1, search: "", tab: "open" }))
+        dispatch(getVendors({ limit: 1000, page: 1 }))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAdmin])
 
     // Sends the user to Tickets > View Open Ticket with this ticket's details
     // expanded (see ticketSlice's focusTicket and TicketsTable).
@@ -393,9 +425,18 @@ export default function ScxDashboard() {
                 </>
             )}
 
-            {showSalesTabs && activeTab >= TICKET_TAB_LABELS.length && (
+            {isAdmin && activeTab === deliveryTabIndex && (
+                <>
+                    <SectionHeading>View Open Orders</SectionHeading>
+                    <Grid item xs={12}>
+                        <DeliveryOrderTable rows={openOrderList} canEdit canDelete />
+                    </Grid>
+                </>
+            )}
+
+            {isAdmin && activeTab >= salesTabStartIndex && (
                 <Grid item xs={12}>
-                    <SalesDashboard embeddedTab={activeTab - TICKET_TAB_LABELS.length} compact />
+                    <SalesDashboard embeddedTab={activeTab - salesTabStartIndex} compact />
                 </Grid>
             )}
         </Grid>
