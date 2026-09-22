@@ -1,9 +1,12 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit"
-import { fetchCreateCircuit, fetchUpdateCircuit, fetchMoveCircuit, fetchDeactivateCircuit, fetchBulkUploadCircuits } from "./circuitAPI"
+import { fetchCreateCircuit, fetchUpdateCircuit, fetchMoveCircuit, fetchDeactivateCircuit, fetchBulkUploadCircuits, fetchCircuitsList } from "./circuitAPI"
 import { pageStatusVals } from "./utils"
 
 const initialState = {
     pageStatus: pageStatusVals.idle,
+    circuitsList: [],
+    circuitsListStatus: pageStatusVals.idle,
+    circuitsListError: null,
 }
 
 export const createCircuit = createAsyncThunk(
@@ -46,15 +49,36 @@ export const bulkUploadCircuits = createAsyncThunk(
     }
 )
 
-// Circuits don't keep their own list in this slice - the display data lives
-// nested under each site in inventorySlice.siteList[].circuitList, so
-// callers refetch that list (getSites) after a mutation succeeds.
+// The flat, cross-customer circuit list used by the SCX Finance dashboard
+// table (see fetchCircuitsList) - unlike the rest of this slice, which
+// doesn't keep circuit data of its own since it normally lives nested under
+// each site in inventorySlice.siteList[].circuitList.
+export const getCircuitsList = createAsyncThunk(
+    "circuits/fetchCircuitsList",
+    async (data, { rejectWithValue }) => {
+        const response = await fetchCircuitsList(data, rejectWithValue)
+        return response
+    }
+)
+
 export const circuitSlice = createSlice({
     name: "circuits",
     initialState,
     reducers: {},
     extraReducers: (builder) => {
         builder
+            .addCase(getCircuitsList.pending, (state) => {
+                state.circuitsListStatus = pageStatusVals.loading
+                state.circuitsListError = null
+            })
+            .addCase(getCircuitsList.fulfilled, (state, action) => {
+                state.circuitsListStatus = pageStatusVals.fetched
+                state.circuitsList = action.payload.results || []
+            })
+            .addCase(getCircuitsList.rejected, (state, action) => {
+                state.circuitsListStatus = pageStatusVals.error
+                state.circuitsListError = action.payload
+            })
             .addCase(createCircuit.fulfilled, (state) => {
                 state.pageStatus = pageStatusVals.fetched
             })
@@ -87,5 +111,9 @@ export const circuitSlice = createSlice({
             })
     }
 })
+
+export const selectCircuitsList = (state) => state.circuits.circuitsList
+export const selectCircuitsListStatus = (state) => state.circuits.circuitsListStatus
+export const selectCircuitsListError = (state) => state.circuits.circuitsListError
 
 export default circuitSlice.reducer

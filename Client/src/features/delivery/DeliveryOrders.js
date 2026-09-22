@@ -1,0 +1,159 @@
+import * as React from "react"
+import Container from "@mui/material/Container"
+import Grid from "@mui/material/Grid"
+import Paper from "@mui/material/Paper"
+import Tabs from "@mui/material/Tabs"
+import Tab from "@mui/material/Tab"
+import TextField from "@mui/material/TextField"
+import { useSelector, useDispatch } from "react-redux"
+import DeliveryOrderTable from "./DeliveryOrderTable"
+import CreateDeliveryOrder from "./CreateDeliveryOrder"
+import BulkUploadDeliveryOrders from "./BulkUploadDeliveryOrders"
+import {
+    getDeliveryOrders,
+    selectOpenOrderList,
+    selectDeliveredOrderList,
+    selectPagination,
+    selectSearch,
+    setSearch,
+} from "./deliveryOrderSlice"
+import { fetchDeletedDeliveryOrders, fetchRestoreDeliveryOrder, fetchPermanentlyDeleteDeliveryOrder } from "./deliveryOrderAPI"
+import { getVendors } from "../vendors/vendorSlice"
+import { selectUser } from "../auth/authSlice"
+import { roles } from "../../consts"
+import DeletedRecordsPanel from "../../components/DeletedRecordsPanel"
+
+const deletedOrderColumns = [
+    { id: "orderId", label: "Order ID" },
+    { id: "customer.name", label: "Customer" },
+    { id: "newCustomerName", label: "New Customer" },
+    { id: "siteAddress", label: "Site Address" },
+]
+
+// SCX Service Delivery's own module (also reachable read-only through the
+// SCX Management dashboard's Delivery tab - see ManagementDashboard.js).
+// createDeliveryOrders/deleteDeliveryOrders/bulkUpload are only held by SCX
+// Admin and SCX Service Delivery (see roles.js) - SCX Management has none of
+// them, so New Order/Deleted Orders/Bulk Upload Orders are left out of the
+// tab list entirely for it, same pattern as Tickets.js/Opportunities.js/
+// Customers.js.
+export default function DeliveryOrders() {
+    const dispatch = useDispatch()
+    const currentUser = useSelector(selectUser)
+    const canManage = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_SERVICE_DELIVERY
+
+    const openOrderList = useSelector(selectOpenOrderList)
+    const deliveredOrderList = useSelector(selectDeliveredOrderList)
+    const pagination = useSelector(selectPagination)
+    const search = useSelector(selectSearch)
+
+    const [value, setValue] = React.useState(0)
+    const [searchInput, setSearchInput] = React.useState(search)
+
+    const handleChange = (event, newValue) => {
+        setValue(newValue)
+    }
+
+    // Re-fetches both lists whenever page, limit, or the committed search
+    // term changes - simpler than tracking which tab is active, and each
+    // fetch is cheap (limit 1000, matching every other "no page limit" list
+    // in this app).
+    React.useEffect(() => {
+        dispatch(getDeliveryOrders({ limit: pagination.limit, page: pagination.page + 1, search, tab: "open" }))
+        dispatch(getDeliveryOrders({ limit: pagination.limit, page: pagination.page + 1, search, tab: "completed" }))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pagination.page, pagination.limit, search])
+
+    // The row/details Vendor Name comes from this list too (see
+    // DeliveryOrderTable.js's vendorNameById) - fetched here rather than
+    // only from the New Order tab, so it's populated even for someone who
+    // lands straight on View Open Order and never opens New Order.
+    React.useEffect(() => {
+        dispatch(getVendors({ limit: 1000, page: 1 }))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    // Debounce the search box: only commit to Redux (and trigger the fetch
+    // above) 400ms after the user stops typing.
+    React.useEffect(() => {
+        const timeout = setTimeout(() => {
+            if (searchInput !== search) {
+                dispatch(setSearch(searchInput))
+            }
+        }, 400)
+        return () => clearTimeout(timeout)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchInput])
+
+    const searchBox = (
+        <TextField
+            fullWidth
+            label="Search delivery orders"
+            placeholder="Search by Order ID, customer, SCloudX Order Ref, site address, city, Customer PO, Vendor Circuit ID or notes"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            sx={{ mb: 2 }}
+        />
+    )
+
+    const tabs = [
+        {
+            label: "View Open Order",
+            content: (
+                <>
+                    {searchBox}
+                    <DeliveryOrderTable rows={openOrderList} canEdit={canManage} canDelete={canManage} />
+                </>
+            ),
+        },
+    ]
+
+    if (canManage) {
+        tabs.push({ label: "New Order", content: <CreateDeliveryOrder /> })
+    }
+
+    tabs.push({
+        label: "Delivered Orders",
+        content: (
+            <>
+                {searchBox}
+                <DeliveryOrderTable rows={deliveredOrderList} canEdit={canManage} canDelete={canManage} />
+            </>
+        ),
+    })
+
+    if (canManage) {
+        tabs.push({
+            label: "Deleted Orders",
+            content: (
+                <DeletedRecordsPanel
+                    columns={deletedOrderColumns}
+                    fetchDeleted={fetchDeletedDeliveryOrders}
+                    restoreRecord={fetchRestoreDeliveryOrder}
+                    permanentlyDeleteRecord={fetchPermanentlyDeleteDeliveryOrder}
+                    entityLabel="order"
+                />
+            ),
+        })
+        tabs.push({ label: "Bulk Upload Orders", content: <BulkUploadDeliveryOrders /> })
+    }
+
+    return (
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+            <Grid container spacing={3}>
+                <Grid item xs={12}>
+                    <Tabs value={value} onChange={handleChange} aria-label="delivery orders">
+                        {tabs.map((tab) => (
+                            <Tab key={tab.label} label={tab.label} />
+                        ))}
+                    </Tabs>
+                </Grid>
+                <Grid item xs={12}>
+                    <Paper sx={{ p: 2, display: "flex", flexDirection: "column" }}>
+                        {tabs[value] ? tabs[value].content : tabs[0].content}
+                    </Paper>
+                </Grid>
+            </Grid>
+        </Container>
+    )
+}

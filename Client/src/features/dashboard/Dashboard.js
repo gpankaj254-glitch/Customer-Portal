@@ -37,6 +37,11 @@ import { getFormattedDateTimeGMT } from "../../utils/dates"
 import SalesDashboard from "../opportunities/SalesDashboard"
 import ScxDashboard from "./ScxDashboard"
 import CustomerClosedTickets from "./CustomerClosedTickets"
+import FinanceDashboard from "./FinanceDashboard"
+import ManagementDashboard from "./ManagementDashboard"
+import { getDeliveryOrders, selectOpenOrderList } from "../delivery/deliveryOrderSlice"
+import { getVendors } from "../vendors/vendorSlice"
+import DeliveryOrderTable from "../delivery/DeliveryOrderTable"
 
 const openTicketColumns = [
     "Ticket ID",
@@ -108,10 +113,13 @@ function DashboardContent() {
     const isScx = user.role === roles.SCLOUDX_ADMIN || user.role === roles.SCLOUDX_USER
     const isCustomerRole = user.role === roles.CUSTOMER_ADMIN || user.role === roles.CUSTOMER_USER
     const isSalesRole = user.role === roles.SCLOUDX_SALES_ADMIN || user.role === roles.SCLOUDX_SALES_USER
-    // SalesDashboard and ScxDashboard fetch their own data; every other role
-    // (Customer Admin/User, and the plain fallback) uses the site/customer
-    // fetches and layout below.
-    const hasOwnDashboard = isSalesRole || isScx
+    const isFinance = user.role === roles.SCLOUDX_FINANCE
+    const isManagement = user.role === roles.SCLOUDX_MANAGEMENT
+    const isDeliveryRole = user.role === roles.SCLOUDX_SERVICE_DELIVERY
+    // SalesDashboard, ScxDashboard, FinanceDashboard and ManagementDashboard
+    // fetch their own data; every other role (Customer Admin/User, and the
+    // plain fallback) uses the site/customer fetches and layout below.
+    const hasOwnDashboard = isSalesRole || isScx || isFinance || isManagement || isDeliveryRole
 
     const getSiteError = useSelector(selectGetSiteError)
     const getCustomerError = useSelector(selectGetCustomersError)
@@ -122,6 +130,7 @@ function DashboardContent() {
     const summary = useSelector(selectDashboardSummary)
     const openAnalysis = useSelector(selectOpenTicketsAnalysis)
     const openAnalysisError = useSelector(selectOpenTicketsAnalysisError)
+    const openOrderList = useSelector(selectOpenOrderList)
     // Dashboard state isn't cleared on logout, so a previous user's open
     // tickets could still be in the store - only show the list once this
     // visit's own request has come back.
@@ -142,6 +151,19 @@ function DashboardContent() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
+
+    // "Show View Open Orders in Dashboard for Delivery role" - same
+    // openOrderList/vendor data the Service Delivery Management module
+    // itself uses (see DeliveryOrders.js), fetched here too since a Service
+    // Delivery user may land on the Dashboard first.
+    React.useEffect(() => {
+        if (!isDeliveryRole) {
+            return
+        }
+        dispatch(getDeliveryOrders({ limit: 1000, page: 1, search: "", tab: "open" }))
+        dispatch(getVendors({ limit: 1000, page: 1 }))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isDeliveryRole])
 
     // Sends the user to Tickets > View Open Ticket with this ticket's details
     // expanded (see ticketSlice's focusTicket and TicketsTable) - same as the
@@ -175,6 +197,23 @@ function DashboardContent() {
                     <Grid item xs={12}>
                         <ScxDashboard />
                     </Grid>
+                ) : isFinance ? (
+                    <Grid item xs={12}>
+                        <FinanceDashboard />
+                    </Grid>
+                ) : isManagement ? (
+                    <Grid item xs={12}>
+                        <ManagementDashboard />
+                    </Grid>
+                ) : isDeliveryRole ? (
+                    <>
+                        <Grid item xs={12}>
+                            <Typography component="h2" variant="h5" sx={{ mt: 0.5, fontSize: "0.85rem", fontWeight: 600 }}>View Open Orders</Typography>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <DeliveryOrderTable rows={openOrderList} canEdit canDelete />
+                        </Grid>
+                    </>
                 ) : isCustomerRole ? (
                     <>
                         <Grid item xs={12}>

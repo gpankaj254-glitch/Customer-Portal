@@ -18,7 +18,10 @@ const createUser = {
           "vendorAdmin",
           "vendorUser",
           "scloudxSalesAdmin",
-          "scloudxSalesUser"
+          "scloudxSalesUser",
+          "scloudxFinance",
+          "scloudxServiceDelivery",
+          "scloudxManagement"
         ),
       regionAccess: Joi.array(),
       domainAccess: Joi.array(),
@@ -81,7 +84,10 @@ const updateUser = {
         "vendorAdmin",
         "vendorUser",
         "scloudxSalesAdmin",
-        "scloudxSalesUser"
+        "scloudxSalesUser",
+        "scloudxFinance",
+        "scloudxServiceDelivery",
+        "scloudxManagement"
       ),
       customerId: Joi.when("role", [
         {

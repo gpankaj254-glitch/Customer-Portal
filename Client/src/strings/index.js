@@ -20,6 +20,8 @@ export function sideMenuItemNames (sideMenuItem) {
         return "Vendor Management"
     case sideMenuItems.SALES_OPPORTUNITIES:
         return "Sales Opportunities"
+    case sideMenuItems.DELIVERY_ORDERS:
+        return "Service Delivery Management"
     default:
         return sideMenuItem
     }
@@ -34,7 +36,7 @@ export function roleNames (role) {
     case roles.SCLOUDX_ADMIN:
         return "Scloudx Admin"
     case roles.SCLOUDX_USER:
-        return "Scloudx User"
+        return "SCX NOC"
     case roles.VENDOR_ADMIN:
         return "Vendor Admin"
     case roles.VENDOR_USER:
@@ -42,7 +44,13 @@ export function roleNames (role) {
     case roles.SCLOUDX_SALES_ADMIN:
         return "SCX Sales Admin"
     case roles.SCLOUDX_SALES_USER:
-        return "SCX Sales User"
+        return "SCX Sales"
+    case roles.SCLOUDX_FINANCE:
+        return "SCX Finance"
+    case roles.SCLOUDX_SERVICE_DELIVERY:
+        return "SCX Service Delivery"
+    case roles.SCLOUDX_MANAGEMENT:
+        return "SCX Management"
     default:
         return role
     }

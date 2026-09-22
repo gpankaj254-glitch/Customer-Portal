@@ -66,6 +66,11 @@ function TicketsContent() {
     // bookkeeping step after a ticket is closed, so for them a completed
     // ticket simply stays under View Closed Tickets (see getClosedTickets).
     const isCustomer = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
+    // SCX Management's Tickets access is read-only (no createTickets right) -
+    // the tab stays in place (so the other tabs' indices don't shift) but is
+    // disabled, rather than letting Management reach a Create Ticket form the
+    // server would then reject.
+    const isManagement = currentUser.role === roles.SCLOUDX_MANAGEMENT
 
     // function handleToggleCreateTickets(){
     // 	setOpenCreateTickets(!openCreateTickets)
@@ -116,7 +121,7 @@ function TicketsContent() {
                 <Grid item xs={12}>
                     <Tabs value={value} onChange={handleChange} aria-label="user management">
                         <Tab label="View Open Ticket"/>
-                        <Tab label="Create New Ticket"/>
+                        <Tab label="Create New Ticket" disabled={isManagement}/>
                         <Tab label="View Closed Tickets"/>
                         {!isCustomer && <Tab label="Completed Tickets"/>}
                         {isAdmin && <Tab label="Deleted Tickets"/>}

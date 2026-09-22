@@ -28,7 +28,11 @@ const drawerWidth = 240
 
 const mainListItems = [sideMenuItems.DASHBOARD, sideMenuItems.TICKETS ]
 
-const secondaryListItems = [sideMenuItems.CUSTOMER_MANAGEMENT, sideMenuItems.USER_MANAGEMENT, sideMenuItems.SITE_MANAGEMENT, sideMenuItems.INVENTORY, sideMenuItems.VENDOR_MANAGEMENT, sideMenuItems.SALES_OPPORTUNITIES]
+// DELIVERY_ORDERS ("Service Delivery Management") is listed first - only SCX
+// Service Delivery currently has this permission (see permissions.js), so
+// this puts it right below Dashboard for that role, above every other item
+// here. Everyone else's list is unaffected since they don't have it at all.
+const secondaryListItems = [sideMenuItems.DELIVERY_ORDERS, sideMenuItems.CUSTOMER_MANAGEMENT, sideMenuItems.USER_MANAGEMENT, sideMenuItems.SITE_MANAGEMENT, sideMenuItems.INVENTORY, sideMenuItems.VENDOR_MANAGEMENT, sideMenuItems.SALES_OPPORTUNITIES]
 
 const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== "open" })(
     ({ theme, open }) => ({

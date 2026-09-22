@@ -7,6 +7,9 @@ const initialState = {
     pageStatus: pageStatusVals.loading,
     getSiteError: null,
     search: "",
+    // Set by focusSite (see the Finance dashboard's Site Name link) - the
+    // site to auto-expand once it's in siteList (see InventoryTable).
+    focusSiteId: "",
     pagination: {
         page: 0,
         limit: 200,
@@ -39,6 +42,17 @@ export const inventorySlice = createSlice({
             state.search = payload
             state.pagination.page = 0
         },
+        // Search by the site's own name so it's actually in the (search-
+        // filtered) list once it loads, and remember its id so the exact
+        // site - not just anything matching the name - gets auto-expanded.
+        focusSite: (state, {payload}) => {
+            state.search = payload.name
+            state.focusSiteId = payload.id
+            state.pagination.page = 0
+        },
+        clearFocusSite: (state) => {
+            state.focusSiteId = ""
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -60,12 +74,13 @@ export const inventorySlice = createSlice({
     }
 })
 
-export const { changePage, changeLimit, setSearch } = inventorySlice.actions
+export const { changePage, changeLimit, setSearch, focusSite, clearFocusSite } = inventorySlice.actions
 
 export const selectSiteList = (state) => state.inventory.siteList
 export const selectGetSiteError = (state) => state.inventory.getSiteError
 export const selectPageStatus = (state) => state.inventory.pageStatus
 export const selectPagination = (state) => state.inventory.pagination
 export const selectSearch = (state) => state.inventory.search
+export const selectFocusSiteId = (state) => state.inventory.focusSiteId
 
 export default inventorySlice.reducer

@@ -98,12 +98,34 @@ const openTicketColumns = [
     "Ticket ID",
     "Customer Reference",
     "Vendor Reference",
+    "Vendor Circuit ID",
+    "Vendor Name",
     "Problem Type",
     "Ticket Status",
     "Vendor Status",
     "Ticket Create Date (GMT)",
     "Days Pending",
 ]
+
+// Case-insensitive match against every column actually shown in the table -
+// Vendor Circuit ID/Name included, so the new "Allow Search on the displayed
+// field" covers them too, not just the original columns.
+function matchesOpenTicketSearch(row, term) {
+    if (!term) {
+        return true
+    }
+    const haystack = [
+        row.ticketId,
+        row.customerReference,
+        row.vendorTicketId,
+        row.vendorCircuitId,
+        row.vendorName,
+        row.problemType,
+        row.status,
+        row.vendorTicketStatus,
+    ]
+    return haystack.some((value) => String(value || "").toLowerCase().includes(term))
+}
 
 function OpenTicketsTable({ rows, onOpenTicket }) {
     return (
@@ -143,6 +165,8 @@ function OpenTicketsTable({ rows, onOpenTicket }) {
                             </TableCell>
                             <TableCell>{row.customerReference}</TableCell>
                             <TableCell>{row.vendorTicketId}</TableCell>
+                            <TableCell>{row.vendorCircuitId}</TableCell>
+                            <TableCell>{row.vendorName}</TableCell>
                             <TableCell>{row.problemType}</TableCell>
                             <TableCell>{row.status}</TableCell>
                             <TableCell>{row.vendorTicketStatus}</TableCell>
@@ -179,6 +203,7 @@ export default function ScxDashboard() {
     const [startDate, setStartDate] = React.useState(() => defaultClosedRange().startDate)
     const [endDate, setEndDate] = React.useState(() => defaultClosedRange().endDate)
     const [filterCustomerId, setFilterCustomerId] = React.useState("")
+    const [openTicketSearch, setOpenTicketSearch] = React.useState("")
 
     React.useEffect(() => {
         dispatch(getDashboardSummary())
@@ -214,6 +239,9 @@ export default function ScxDashboard() {
     }
 
     const closureTime = _.get(closedAnalysis, "closureTime", {})
+    const openTicketSearchTerm = openTicketSearch.trim().toLowerCase()
+    const openTickets = _.get(openAnalysis, "tickets", [])
+    const filteredOpenTickets = openTickets.filter((row) => matchesOpenTicketSearch(row, openTicketSearchTerm))
 
     return (
         <Grid container spacing={1.5}>
@@ -256,8 +284,18 @@ export default function ScxDashboard() {
                 <>
                     <OpenTicketCharts analysis={openAnalysis} />
                     <SectionHeading>Open Tickets</SectionHeading>
+                    <Grid item xs={12} sm={6} md={4}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            label="Search open tickets"
+                            placeholder="Search by any column shown below"
+                            value={openTicketSearch}
+                            onChange={(event) => setOpenTicketSearch(event.target.value)}
+                        />
+                    </Grid>
                     <Grid item xs={12}>
-                        <OpenTicketsTable rows={_.get(openAnalysis, "tickets", [])} onOpenTicket={handleOpenTicket} />
+                        <OpenTicketsTable rows={filteredOpenTickets} onOpenTicket={handleOpenTicket} />
                     </Grid>
                 </>
             )}

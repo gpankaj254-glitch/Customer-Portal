@@ -99,7 +99,7 @@ const getOpenTicketsAnalysis = async (actingUser) => {
   }
 
   const docs = await Ticket.find(match)
-    .select("ticketId customerReference vendorTicketId problemType priority status vendorTicketStatus createdAt")
+    .select("ticketId customerReference vendorTicketId vendor vendorCircuitId problemType priority status vendorTicketStatus createdAt")
     .lean();
 
   const now = moment();
@@ -109,6 +109,8 @@ const getOpenTicketsAnalysis = async (actingUser) => {
       ticketId: doc.ticketId,
       customerReference: doc.customerReference || "",
       vendorTicketId: doc.vendorTicketId || "",
+      vendorName: _.get(doc, "vendor.name", ""),
+      vendorCircuitId: doc.vendorCircuitId || "",
       problemType: doc.problemType,
       status: doc.status,
       vendorTicketStatus: doc.vendorTicketStatus || "",

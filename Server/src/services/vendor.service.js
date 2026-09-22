@@ -47,6 +47,19 @@ const queryVendors = async (filter, options) => {
 };
 
 /**
+ * Vendor ids (as strings, matching how Circuit.vendorId is stored) whose
+ * Vendor Name matches the search text - used to let a circuit search find
+ * circuits by their vendor's name, which isn't itself stored on the circuit.
+ * @param {string} search
+ * @returns {Promise<string[]>}
+ */
+const findVendorIdsMatchingSearch = async (search) => {
+  const regex = { $regex: search, $options: "i" };
+  const ids = await Vendor.find({ name: regex }).distinct("_id");
+  return ids.map((id) => id.toString());
+};
+
+/**
  * Get vendor by id
  * @param {ObjectId} vendorId
  * @returns {Promise<Vendor>}
@@ -327,6 +340,7 @@ module.exports = {
   getVendorByName,
   getVendorById,
   queryVendors,
+  findVendorIdsMatchingSearch,
   updateVendorById,
   bulkUploadVendors,
 };

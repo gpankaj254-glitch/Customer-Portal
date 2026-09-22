@@ -10,3 +10,4 @@ module.exports.Contact = require("./contact.model");
 module.exports.Ticket = require("./ticket.model");
 module.exports.Counter = require("./counter.model");
 module.exports.Opportunity = require("./opportunity.model");
+module.exports.DeliveryOrder = require("./deliveryOrder.model");

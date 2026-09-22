@@ -51,7 +51,39 @@ const createCircuit = catchAsync(async (req, res) => {
 });
 
 const getCircuits = catchAsync(async (req, res) => {
-  const filter = activeOnly(filterByCustomerId(req.user, req.body));
+  // search is pulled out separately rather than left in req.body, since
+  // filterByCustomerId (and queryCircuits -> Circuit.paginate) treats the
+  // filter object as a literal Mongo query - a raw "search" key would just
+  // fail to match anything instead of actually searching. Mirrors getSites.
+  const search = _.trim(_.get(req.body, "search", ""));
+  const baseFilter = _.omit(req.body, "search");
+  const filter = activeOnly(filterByCustomerId(req.user, baseFilter));
+
+  if (search) {
+    const regex = { $regex: search, $options: "i" };
+    // This endpoint is currently only used by the Finance dashboard's circuit
+    // table (see FinanceDashboard.js) - the search fields are kept to exactly
+    // the columns shown there. Matching on a field the table doesn't display
+    // (e.g. Vendor LEC Name, an order reference) is confusing: a result shows
+    // up with nothing visible in the row to explain why it matched.
+    const orConditions = [
+      { "site.name": regex },
+      { "customer.name": regex },
+      { vendorCircuitId: regex },
+      { customerCircuitBillStartDate: regex },
+      { customerCircuitContractTerm: regex },
+      { vendorCircuitBillStartDate: regex },
+      { vendorCircuitContractTerm: regex },
+    ];
+    // Vendor Name isn't stored on the circuit itself (only vendorId), so
+    // matching it needs a lookup into Vendor first.
+    const matchingVendorIds = await vendorService.findVendorIdsMatchingSearch(search);
+    if (matchingVendorIds.length > 0) {
+      orConditions.push({ vendorId: { $in: matchingVendorIds } });
+    }
+    _.assign(filter, { $or: orConditions });
+  }
+
   const options = pick(req.query, ["sortBy", "limit", "page"]);
   const result = await circuitService.queryCircuits(filter, options);
   res.send(result);

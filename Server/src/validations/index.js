@@ -9,3 +9,4 @@ module.exports.ticketValidation = require("./ticket.validation");
 module.exports.siteValidation = require("./site.validation");
 module.exports.dashboardValidation = require("./dashboard.validation");
 module.exports.opportunityValidation = require("./opportunity.validation");
+module.exports.deliveryOrderValidation = require("./deliveryOrder.validation");

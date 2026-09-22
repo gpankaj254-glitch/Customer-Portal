@@ -33,6 +33,18 @@ function VendorsContent() {
     const vendorSearch = useSelector(selectVendorSearch)
     const currentUser = useSelector(selectUser)
     const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    const isServiceDelivery = currentUser.role === roles.SCLOUDX_SERVICE_DELIVERY
+    // SCX Admin, SCX Sales Admin and SCX Service Delivery hold createVendors
+    // (see roles.js) - any other viewer of this page (currently SCX
+    // Management/NOC, read-only) doesn't, so Create Vendor is left out of
+    // the tab list entirely rather than shown and then rejected by the
+    // server.
+    const canCreateVendor = currentUser.role === roles.SCLOUDX_ADMIN
+        || currentUser.role === roles.SCLOUDX_SALES_ADMIN
+        || isServiceDelivery
+    // Deleted Vendors (restore) and Bulk Upload are SCX Admin's and SCX
+    // Service Delivery's - both hold deleteVendors/bulkUpload (see roles.js).
+    const canManageVendor = isAdmin || isServiceDelivery
     const [value, setValue] = React.useState(0)
     // Local, uncommitted text box value - kept separate from the Redux
     // search term so we can debounce before actually dispatching a fetch.
@@ -82,10 +94,13 @@ function VendorsContent() {
                 </>
             ),
         },
-        { label: "Create Vendor", content: <CreateVendor /> },
     ]
 
-    if (isAdmin) {
+    if (canCreateVendor) {
+        tabs.push({ label: "Create Vendor", content: <CreateVendor /> })
+    }
+
+    if (canManageVendor) {
         tabs.push({
             label: "Deleted Vendors",
             content: (

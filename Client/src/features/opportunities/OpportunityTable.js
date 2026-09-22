@@ -68,6 +68,10 @@ export default function OpportunityTable(props) {
     const opportunityList = useSelector(selectOpportunityList)
     const currentUser = useSelector(selectUser)
     const canDelete = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_SALES_ADMIN
+    // SCX Management has viewOpportunities only (no editOpportunities), so
+    // the Edit icon - unconditional for every other viewer of this page,
+    // who all do have that right - is hidden for it specifically.
+    const canEdit = currentUser.role !== roles.SCLOUDX_MANAGEMENT
 
     const pagination = props.pagination
     const { autoExpandOpportunityId, onAutoExpanded } = props
@@ -207,13 +211,15 @@ export default function OpportunityTable(props) {
                                             </TableCell>
                                         ))}
                                         <TableCell align="right">
-                                            <IconButton
-                                                size="small"
-                                                aria-label={`edit ${row.name}`}
-                                                onClick={() => setOpportunityToEdit(row)}
-                                            >
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
+                                            {canEdit && (
+                                                <IconButton
+                                                    size="small"
+                                                    aria-label={`edit ${row.name}`}
+                                                    onClick={() => setOpportunityToEdit(row)}
+                                                >
+                                                    <EditIcon fontSize="small" />
+                                                </IconButton>
+                                            )}
                                             {canDelete && (
                                                 <IconButton
                                                     size="small"

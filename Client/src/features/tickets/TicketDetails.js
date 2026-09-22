@@ -79,6 +79,12 @@ export default function TicketDetails({ ticket, mode }) {
     const dispatch = useDispatch()
     const currentUser = useSelector(selectUser)
     const canUpdateTicket = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_USER
+    // Within the read-only (!canUpdateTicket) panel below, Customer Admin/User
+    // can still add comments and files (they have appendTicketDescription).
+    // Any other role landing on this panel - currently only SCX Management,
+    // via its read-only Tickets access - has no such right, so the Add
+    // Comments box is hidden rather than shown and then rejected by the server.
+    const canComment = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
     const descriptionRef = React.useRef(null)
     const vendorDescriptionRef = React.useRef(null)
 
@@ -422,6 +428,12 @@ export default function TicketDetails({ ticket, mode }) {
                             <Grid item xs={12}>
                                 <Typography variant="body2" color="text.secondary">
                                     This ticket is closed - comments can no longer be added.
+                                </Typography>
+                            </Grid>
+                        ) : !canComment ? (
+                            <Grid item xs={12}>
+                                <Typography variant="body2" color="text.secondary">
+                                    You have view-only access to this ticket.
                                 </Typography>
                             </Grid>
                         ) : (

@@ -36,6 +36,10 @@ export default function VendorTable(props) {
     const vendorList = useSelector(selectVendorList)
     const currentUser = useSelector(selectUser)
     const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    // SCX Admin and SCX Service Delivery hold editVendors/deleteVendors (see
+    // roles.js) - SCX NOC's own Vendor Management access is read-only, so
+    // it's deliberately excluded here.
+    const canManage = isAdmin || currentUser.role === roles.SCLOUDX_SERVICE_DELIVERY
 
     const pagination = props.pagination
     const dispatch = useDispatch()
@@ -115,7 +119,7 @@ export default function VendorTable(props) {
                                         </TableCell>
                                     ))}
                                     <TableCell align="right">
-                                        {isAdmin && (
+                                        {canManage && (
                                             <>
                                                 <IconButton
                                                     aria-label={`edit ${row.name}`}

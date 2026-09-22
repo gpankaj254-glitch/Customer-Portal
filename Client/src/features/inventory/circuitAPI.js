@@ -93,6 +93,25 @@ export async function fetchSitesOfCustomer(data) {
     }
 }
 
+// Flat, cross-customer circuit list (not scoped to one site) - used by the
+// SCX Finance dashboard table. "search" is the same server-side text search
+// used elsewhere (site name, customer name, vendor name, Vendor Circuit ID,
+// bill start dates, contract terms, etc).
+export async function fetchCircuitsList(data, rejectWithValue) {
+    try {
+        const { search } = data || {}
+        const response = await axios.post(
+            `${baseURL}/circuit/get?limit=1000&page=1&sortBy=site.name:asc`,
+            { search: search || "" },
+            {headers: headers()}
+        )
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
 export async function fetchBulkUploadCircuits(file, rejectWithValue) {
     try {
         const formData = new FormData()

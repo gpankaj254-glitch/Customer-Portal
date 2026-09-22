@@ -9,7 +9,7 @@ import TableHead from "@mui/material/TableHead"
 import TablePagination from "@mui/material/TablePagination"
 import TableRow from "@mui/material/TableRow"
 import PropTypes from "prop-types"
-import {changeLimit, changePage, getSites, selectGetSiteError, selectSiteList, selectPageStatus} from "./inventorySlice"
+import {changeLimit, changePage, getSites, selectGetSiteError, selectSiteList, selectPageStatus, selectFocusSiteId, clearFocusSite} from "./inventorySlice"
 import { useSelector, useDispatch } from "react-redux"
 import { Alert, Collapse, IconButton, Typography} from "@mui/material"
 import { pageStatusVals} from "./utils"
@@ -54,6 +54,22 @@ export default function InventoryTable(props) {
     // const [details, setDetails] = React.useState(true)
 
     const dispatch = useDispatch()
+    const focusSiteId = useSelector(selectFocusSiteId)
+
+    // Arriving from another page for a specific site (see the Finance
+    // dashboard's Site Name link, via inventorySlice's focusSite): expand
+    // its circuits as soon as its row is in the (search-filtered) list.
+    React.useEffect(() => {
+        if (!focusSiteId) {
+            return
+        }
+        const match = siteList.find((site) => site.id === focusSiteId)
+        if (match) {
+            setOpen(match.id)
+            dispatch(clearFocusSite())
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [siteList, focusSiteId])
 
     const handleChangePage = (event, newPage) => {    
         const data = {

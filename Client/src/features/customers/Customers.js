@@ -32,6 +32,11 @@ function CustomersContent() {
     const customerSearch = useSelector(selectCustomerSearch)
     const currentUser = useSelector(selectUser)
     const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    // SCX Admin and SCX NOC both hold createCustomers (see roles.js) - any
+    // other viewer of this page (SCX Finance/Service Delivery/Management)
+    // doesn't, so Create Customer is left out of the tab list entirely
+    // rather than shown and then rejected by the server.
+    const canCreateCustomer = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_USER
     const [value, setValue] = React.useState(0)
     // Local, uncommitted text box value - kept separate from the Redux
     // search term so we can debounce before actually dispatching a fetch.
@@ -81,8 +86,11 @@ function CustomersContent() {
                 </>
             ),
         },
-        { label: "Create Customer", content: <CreateCustomer /> },
     ]
+
+    if (canCreateCustomer) {
+        tabs.push({ label: "Create Customer", content: <CreateCustomer /> })
+    }
 
     if (isAdmin) {
         tabs.push({

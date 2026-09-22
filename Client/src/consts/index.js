@@ -8,6 +8,7 @@ export const pages = {
     SITE_MANAGEMENT: "siteManagement",
     VENDOR_MANAGEMENT: "vendorManagement",
     SALES_OPPORTUNITIES: "salesOpportunities",
+    DELIVERY_ORDERS: "deliveryOrders",
 }
 
 export const sideMenuItems = {
@@ -20,6 +21,7 @@ export const sideMenuItems = {
     SITE_MANAGEMENT: "siteManagement",
     VENDOR_MANAGEMENT: "vendorManagement",
     SALES_OPPORTUNITIES: "salesOpportunities",
+    DELIVERY_ORDERS: "deliveryOrders",
 }
 
 export const roles = {
@@ -30,7 +32,10 @@ export const roles = {
     VENDOR_ADMIN : "vendorAdmin",
     VENDOR_USER : "vendorUser",
     SCLOUDX_SALES_ADMIN : "scloudxSalesAdmin",
-    SCLOUDX_SALES_USER : "scloudxSalesUser"
+    SCLOUDX_SALES_USER : "scloudxSalesUser",
+    SCLOUDX_FINANCE : "scloudxFinance",
+    SCLOUDX_SERVICE_DELIVERY : "scloudxServiceDelivery",
+    SCLOUDX_MANAGEMENT : "scloudxManagement"
 }
 
 export const roleLabels = {
@@ -41,7 +46,10 @@ export const roleLabels = {
     VENDOR_ADMIN : "vendorAdmin",
     VENDOR_USER : "vendorUser",
     SCLOUDX_SALES_ADMIN : "scloudxSalesAdmin",
-    SCLOUDX_SALES_USER : "scloudxSalesUser"
+    SCLOUDX_SALES_USER : "scloudxSalesUser",
+    SCLOUDX_FINANCE : "scloudxFinance",
+    SCLOUDX_SERVICE_DELIVERY : "scloudxServiceDelivery",
+    SCLOUDX_MANAGEMENT : "scloudxManagement"
 }
 
 export const roleList = [
@@ -52,7 +60,10 @@ export const roleList = [
     "vendorAdmin",
     "vendorUser",
     "scloudxSalesAdmin",
-    "scloudxSalesUser"
+    "scloudxSalesUser",
+    "scloudxFinance",
+    "scloudxServiceDelivery",
+    "scloudxManagement"
 ]
 
 export const permisiions = {
@@ -64,5 +75,6 @@ export const permisiions = {
     CUSTOMER_MANAGEMENT: "customerManagement",
     SITE_MANAGEMENT: "siteManagement",
     VENDOR_MANAGEMENT: "vendorManagement",
-    SALES_OPPORTUNITIES: "salesOpportunities"
+    SALES_OPPORTUNITIES: "salesOpportunities",
+    DELIVERY_ORDERS: "deliveryOrders"
 }

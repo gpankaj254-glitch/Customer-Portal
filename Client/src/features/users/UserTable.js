@@ -24,6 +24,7 @@ import { selectUser } from "../auth/authSlice"
 import { selectCustomerList } from "../customers/customerSlice"
 import { selectVendorList } from "../vendors/vendorSlice"
 import { roles, roleList } from "../../consts"
+import { roleNames } from "../../strings"
 import { useSelector, useDispatch } from "react-redux"
 import moment from "moment"
 import _ from "lodash"
@@ -38,7 +39,7 @@ const columns = [
     { id: "description", label: "Description"},
 ]
 
-// SCX users show as "SCX Admin"/"SCX User"; Customer/Vendor users show as
+// SCX users show as "SCX Admin"/"SCX NOC"/etc; Customer/Vendor users show as
 // their Customer/Vendor name followed by Admin/User, e.g. "Aryaka Networks Admin".
 function getUserTypeLabel(role) {
     return role === roles.SCLOUDX_ADMIN || role === roles.CUSTOMER_ADMIN || role === roles.VENDOR_ADMIN
@@ -46,12 +47,19 @@ function getUserTypeLabel(role) {
         : "User"
 }
 
+// SCX role display names that don't follow the "SCX Admin"/"SCX User" pattern.
+const SCX_ROLE_LABELS = {
+    [roles.SCLOUDX_USER]: "SCX NOC",
+    [roles.SCLOUDX_SALES_ADMIN]: "SCX Sales Admin",
+    [roles.SCLOUDX_SALES_USER]: "SCX Sales",
+    [roles.SCLOUDX_FINANCE]: "SCX Finance",
+    [roles.SCLOUDX_SERVICE_DELIVERY]: "SCX Service Delivery",
+    [roles.SCLOUDX_MANAGEMENT]: "SCX Management",
+}
+
 function getRoleDisplay(row) {
-    if (row.role === roles.SCLOUDX_SALES_ADMIN) {
-        return "SCX Sales Admin"
-    }
-    if (row.role === roles.SCLOUDX_SALES_USER) {
-        return "SCX Sales User"
+    if (SCX_ROLE_LABELS[row.role]) {
+        return SCX_ROLE_LABELS[row.role]
     }
     const userType = getUserTypeLabel(row.role)
     if (row.role === roles.CUSTOMER_ADMIN || row.role === roles.CUSTOMER_USER) {
@@ -90,7 +98,7 @@ function buildEditableFields(customerList, vendorList, isCustomerAdminActor, isS
                 name: "role",
                 label: "Role",
                 type: "select",
-                options: availableRoles.map((role) => ({ value: role, label: role })),
+                options: availableRoles.map((role) => ({ value: role, label: roleNames(role) })),
             },
         ]
         if (!isCustomerAdminActor && (values.role === roles.CUSTOMER_ADMIN || values.role === roles.CUSTOMER_USER)) {

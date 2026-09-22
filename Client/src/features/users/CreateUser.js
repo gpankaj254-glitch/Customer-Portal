@@ -33,6 +33,9 @@ const baseRoleList = [
     roles.VENDOR_USER,
     roles.SCLOUDX_USER,
     roles.SCLOUDX_SALES_USER,
+    roles.SCLOUDX_FINANCE,
+    roles.SCLOUDX_SERVICE_DELIVERY,
+    roles.SCLOUDX_MANAGEMENT,
 ]
 
 export default function CreateUser() {

@@ -39,6 +39,10 @@ function OpportunitiesContent() {
     // (permanentlyDeleteOpportunities is not granted to Sales Admin) -
     // mirrors Users.js's isScxAdmin gating of permanentlyDeleteUsers.
     const isScxAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    // SCX Management's Sales Opportunities access is read-only (no
+    // createOpportunities right) - Create Opportunity is left out of the tab
+    // list entirely rather than shown and then rejected by the server.
+    const isManagement = currentUser.role === roles.SCLOUDX_MANAGEMENT
     const [value, setValue] = React.useState(0)
     // Local, uncommitted text box value - kept separate from the Redux
     // search term so we can debounce before actually dispatching a fetch.
@@ -109,8 +113,11 @@ function OpportunitiesContent() {
                 </>
             ),
         },
-        { label: "Create Opportunity", content: <CreateOpportunity onCreated={handleOpportunityCreated} /> },
     ]
+
+    if (!isManagement) {
+        tabs.push({ label: "Create Opportunity", content: <CreateOpportunity onCreated={handleOpportunityCreated} /> })
+    }
 
     if (isAdmin) {
         tabs.push({

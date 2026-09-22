@@ -9,3 +9,4 @@ module.exports.ticketController = require("./ticket.controller");
 module.exports.siteController = require("./site.controller");
 module.exports.dashboardController = require("./dashboard.controller");
 module.exports.opportunityController = require("./opportunity.controller");
+module.exports.deliveryOrderController = require("./deliveryOrder.controller");

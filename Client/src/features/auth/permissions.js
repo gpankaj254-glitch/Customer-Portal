@@ -21,6 +21,16 @@ function roleBasedPermissions(role) {
         return [permisiions.USER_MANAGEMENT, permisiions.SALES_OPPORTUNITIES, permisiions.VENDOR_MANAGEMENT]
     case roles.SCLOUDX_SALES_USER:
         return [permisiions.SALES_OPPORTUNITIES]
+    case roles.SCLOUDX_SERVICE_DELIVERY:
+        return [permisiions.CUSTOMER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.INVENTORY, permisiions.DELIVERY_ORDERS, permisiions.VENDOR_MANAGEMENT]
+    // SCX Management's own side menu, on top of its Dashboard (which already
+    // rolls up Sales/Finance/Delivery/NOC as tabs - see ManagementDashboard):
+    // read-only Customer/Site Management, Sales Opportunities and Tickets.
+    // Every page here already hides its create/edit/delete controls unless
+    // the viewer's role is an exact match (SCX Admin, SCX Sales Admin,
+    // etc.) - Management is neither, so it gets a view-only page for free.
+    case roles.SCLOUDX_MANAGEMENT:
+        return [permisiions.CUSTOMER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.SALES_OPPORTUNITIES, permisiions.TICKETS]
     default:
         return []
     }
