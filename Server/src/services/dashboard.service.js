@@ -130,6 +130,21 @@ const getOpenTicketsAnalysis = async (actingUser) => {
   };
 };
 
+// Problem Start Date is typed into a datetime-local box on Create Ticket
+// ("YYYY-MM-DDTHH:mm", no time zone - see TicketDetails.js's own WALL_CLOCK)
+// and is free text otherwise, so bulk-imported/legacy tickets can hold
+// something else entirely or be blank. Only trust it when it actually has
+// that shape; otherwise fall back to createdAt (the ticket's own record of
+// when it was raised) so those tickets still get counted rather than
+// producing a bogus/NaN duration.
+const PROBLEM_START_FORMAT = "YYYY-MM-DDTHH:mm";
+function resolveClosureStartDate(doc) {
+  if (doc.problemStartDate && moment(doc.problemStartDate, PROBLEM_START_FORMAT, true).isValid()) {
+    return doc.problemStartDate;
+  }
+  return doc.createdAt;
+}
+
 /**
  * Closed-ticket breakdowns for the dashboard, scoped by the optional
  * Start Date/End Date (against closedAt) and Customer filters. A Customer
@@ -138,8 +153,9 @@ const getOpenTicketsAnalysis = async (actingUser) => {
  * one customer can never query another's ticket data.
  *
  * closureTime buckets each ticket by how long it took to close (closedAt
- * minus createdAt): within 2 days, over 2 up to 5, over 5 up to 10, and over
- * 10 - so the four always add up to totalClosed.
+ * minus Problem Start Date - see resolveClosureStartDate; createdAt when
+ * Problem Start Date isn't usable): within 2 days, over 2 up to 5, over 5
+ * up to 10, and over 10 - so the four always add up to totalClosed.
  * @param {Object} filters
  * @param {string} [filters.startDate]
  * @param {string} [filters.endDate]
@@ -151,12 +167,12 @@ const getClosedTicketsAnalysis = async ({ startDate, endDate, customerId } = {},
   const match = buildClosedMatch({ startDate, endDate, customerId }, actingUser);
 
   const docs = await Ticket.find(match)
-    .select("createdAt closedAt problemType priority closureDetails.category")
+    .select("createdAt closedAt problemStartDate problemType priority closureDetails.category")
     .lean();
 
   const closureTime = { within2Days: 0, from2To5Days: 0, from5To10Days: 0, over10Days: 0 };
   docs.forEach((doc) => {
-    const days = moment(doc.closedAt).diff(doc.createdAt, "days", true);
+    const days = moment(doc.closedAt).diff(resolveClosureStartDate(doc), "days", true);
     if (days <= 2) closureTime.within2Days += 1;
     else if (days <= 5) closureTime.from2To5Days += 1;
     else if (days <= 10) closureTime.from5To10Days += 1;

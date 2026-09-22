@@ -54,7 +54,7 @@ export default function ManagementDashboard() {
                             <Typography component="h2" variant="h5" sx={{ fontSize: "0.85rem", fontWeight: 600 }}>View Open Orders</Typography>
                         </Grid>
                         <Grid item xs={12}>
-                            <DeliveryOrderTable rows={openOrderList} />
+                            <DeliveryOrderTable rows={openOrderList} dashboardView />
                         </Grid>
                     </Grid>
                 )}

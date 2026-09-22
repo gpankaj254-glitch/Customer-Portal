@@ -211,7 +211,7 @@ function DashboardContent() {
                             <Typography component="h2" variant="h5" sx={{ mt: 0.5, fontSize: "0.85rem", fontWeight: 600 }}>View Open Orders</Typography>
                         </Grid>
                         <Grid item xs={12}>
-                            <DeliveryOrderTable rows={openOrderList} canEdit canDelete />
+                            <DeliveryOrderTable rows={openOrderList} canEdit canDelete dashboardView />
                         </Grid>
                     </>
                 ) : isCustomerRole ? (

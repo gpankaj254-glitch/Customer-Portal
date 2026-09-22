@@ -14,9 +14,9 @@ import ListItemIcon from "@mui/material/ListItemIcon"
 import Typography from "@mui/material/Typography"
 
 import { useSelector, useDispatch } from "react-redux"
-import { selecPermissions } from "../auth/authSlice" 
+import { selecPermissions, selectUser } from "../auth/authSlice"
 import {selectPage, togglePage} from "./landingSlice"
-import {sideMenuItems} from "../../consts"
+import {sideMenuItems, roles} from "../../consts"
 import { sideMenuItemNames } from "../../strings"
 import getMenuItemIcon from "./SideMenuIcon"
 // import { getUsers } from "../users/userSlice"
@@ -33,6 +33,30 @@ const mainListItems = [sideMenuItems.DASHBOARD, sideMenuItems.TICKETS ]
 // this puts it right below Dashboard for that role, above every other item
 // here. Everyone else's list is unaffected since they don't have it at all.
 const secondaryListItems = [sideMenuItems.DELIVERY_ORDERS, sideMenuItems.CUSTOMER_MANAGEMENT, sideMenuItems.USER_MANAGEMENT, sideMenuItems.SITE_MANAGEMENT, sideMenuItems.INVENTORY, sideMenuItems.VENDOR_MANAGEMENT, sideMenuItems.SALES_OPPORTUNITIES]
+
+// SCX Management's own explicit order, everything below Dashboard - "Sales
+// Management, Service Delivery Management, NOC Management, Customer
+// Management, Site Management, Inventory Management" - Tickets moves out of
+// the top mainListItems section (see managementMainListItems below) into
+// its place here, under its Management-only name (see
+// MANAGEMENT_LABEL_OVERRIDES). Every other role is unaffected - this only
+// replaces the list used when the signed-in role is SCX Management.
+const managementMainListItems = [sideMenuItems.DASHBOARD]
+const managementSecondaryListItems = [
+    sideMenuItems.SALES_OPPORTUNITIES,
+    sideMenuItems.DELIVERY_ORDERS,
+    sideMenuItems.TICKETS,
+    sideMenuItems.CUSTOMER_MANAGEMENT,
+    sideMenuItems.SITE_MANAGEMENT,
+    sideMenuItems.INVENTORY,
+]
+
+// SCX Management sees these two items under different names - every other
+// role keeps the default name from strings/index.js's sideMenuItemNames.
+const MANAGEMENT_LABEL_OVERRIDES = {
+    [sideMenuItems.SALES_OPPORTUNITIES]: "Sales Management",
+    [sideMenuItems.TICKETS]: "NOC Management",
+}
 
 const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== "open" })(
     ({ theme, open }) => ({
@@ -75,6 +99,11 @@ export default function SideMenu(props) {
 
     const page = useSelector(selectPage)
     const permissions = useSelector(selecPermissions)
+    const currentUser = useSelector(selectUser)
+    const isManagement = currentUser.role === roles.SCLOUDX_MANAGEMENT
+    const effectiveMainListItems = isManagement ? managementMainListItems : mainListItems
+    const effectiveSecondaryListItems = isManagement ? managementSecondaryListItems : secondaryListItems
+    const getLabel = (item) => (isManagement && MANAGEMENT_LABEL_OVERRIDES[item]) || sideMenuItemNames(item)
 
     // const [open, setOpen] = React.useState(true)
     // const toggleDrawer = () => {
@@ -103,28 +132,28 @@ export default function SideMenu(props) {
 
                 <List component="nav">
                     <React.Fragment>
-                        {mainListItems.map((item) => (
+                        {effectiveMainListItems.map((item) => (
                             _.includes(permissions, item) && (<ListItemButton key = {item} selected = {page === item} onClick = {(event) => handleToggle(event, item)}>
                                 <ListItemIcon>
                                     {getMenuItemIcon(item)}
                                 </ListItemIcon>
-                                <Typography variant="h4">{sideMenuItemNames(item)}
+                                <Typography variant="h4">{getLabel(item)}
                                 </Typography>
-                                {/* <ListItemText primary={sideMenuItemNames(item)} /> */}
+                                {/* <ListItemText primary={getLabel(item)} /> */}
                             </ListItemButton>)
                         ))}
                         <Divider sx={{ my: 1 }} />
-                        {secondaryListItems.map((item) => (
+                        {effectiveSecondaryListItems.map((item) => (
                             _.includes(permissions, item) && (<ListItemButton key = {item} selected = {page === item} onClick = {(event) => handleToggle(event, item)}>
                                 <ListItemIcon>
                                     {getMenuItemIcon(item)}
                                 </ListItemIcon>
                                 <Box overflow="inherit">
-                                    <Typography variant="h4">{sideMenuItemNames(item)}
+                                    <Typography variant="h4">{getLabel(item)}
                                     </Typography>
                                 </Box>
-                                
-                                {/* <ListItemText primary={sideMenuItemNames(item)} variant="h4" /> */}
+
+                                {/* <ListItemText primary={getLabel(item)} variant="h4" /> */}
                             </ListItemButton>
                             )
                         ))}

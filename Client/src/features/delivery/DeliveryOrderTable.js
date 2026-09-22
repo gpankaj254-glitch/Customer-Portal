@@ -46,7 +46,7 @@ const compactSx = {
     "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": { fontSize: "0.72rem" },
 }
 
-const columns = [
+const baseColumns = [
     { id: "orderId", label: "Order ID" },
     { id: "serialNumber", label: "Serial Number" },
     { id: "customerNameText", label: "Customer Name" },
@@ -57,14 +57,56 @@ const columns = [
     { id: "status", label: "Status" },
 ]
 
+// "Delivery Dashboard - All Roles, Do not display Order ID [or] Customer
+// Order Number, Display End User Name [where Customer Order Number was] and
+// LMP Name after Vendor name, Display Milestone Status (which is under
+// progress) after Order Status" - only for the 3 Dashboard call sites
+// (Dashboard.js's Delivery role branch, ScxDashboard.js's Delivery tab,
+// ManagementDashboard.js's Delivery tab), not the full Service Delivery
+// Management module (DeliveryOrders.js), which keeps Order ID/Customer PO
+// and has no need for a milestone summary since OrderDetails' own tabs
+// already show all of this.
+function buildColumns(dashboardView) {
+    if (!dashboardView) {
+        return baseColumns
+    }
+    const columns = baseColumns.filter(
+        (column) => column.id !== "orderId" && column.id !== "customerOrderReference"
+    )
+    const scloudxRefIndex = columns.findIndex((column) => column.id === "scloudxOrderReference")
+    columns.splice(scloudxRefIndex + 1, 0, { id: "endUser", label: "End User Name" })
+    const vendorIndex = columns.findIndex((column) => column.id === "vendorName")
+    columns.splice(vendorIndex + 1, 0, { id: "lmpName", label: "LMP Name" })
+    // Narrow, with word-wrap on the cell below - a milestone name like
+    // "Configuration provisioning and testing" would otherwise stretch the
+    // column (same fix already used for Vendor/Customer Circuit ID
+    // elsewhere - see CircuitTable.js).
+    columns.push({ id: "milestoneStatus", label: "Milestone Status", width: "10%" })
+    return columns
+}
+
+// The name of the first milestone not yet Completed - i.e. whichever one is
+// currently under way, given the sequential gating (see OrderDetails.js).
+// "Completed" once every milestone is Completed; blank if there are none.
+function currentMilestoneStatus(row) {
+    const milestones = row.milestones || []
+    const inProgress = milestones.find((milestone) => milestone.status !== "Completed")
+    if (inProgress) {
+        return inProgress.name
+    }
+    return milestones.length > 0 ? "Completed" : ""
+}
+
 // One table, reused for both the View Open Order and Delivered Orders tabs -
 // `rows` is that tab's own list (see DeliveryOrders.js). A row expands (like
 // Inventory's site rows) into the full View/Edit Orders panel
 // (OrderDetails) - there's too much on that screen (the milestone table
 // especially) for a small popup dialog. `canEdit`/`canDelete` render
 // OrderDetails read-only and hide the Delete icon for a read-only viewer
-// (SCX Management).
-export default function DeliveryOrderTable({ rows, canEdit, canDelete }) {
+// (SCX Management). `dashboardView` swaps in the Dashboard-only column set
+// above.
+export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboardView }) {
+    const columns = buildColumns(dashboardView)
     const dispatch = useDispatch()
     const errorMessage = useSelector(selectGetOrdersError)
     const pagination = useSelector(selectPagination)
@@ -85,6 +127,7 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete }) {
         customerNameText: customerName(row),
         vendorName: vendorNameById.get(row.vendorId) || "",
         orderDateText: formatDate(row.orderDate),
+        milestoneStatus: dashboardView ? currentMilestoneStatus(row) : "",
     }))
 
     const handleChangePage = (event, newPage) => {
@@ -124,7 +167,7 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete }) {
                         <TableRow>
                             <TableCell />
                             {columns.map((column) => (
-                                <TableCell key={column.id}>
+                                <TableCell key={column.id} style={{ width: column.width }}>
                                     <Typography variant="subtitle2">{column.label}</Typography>
                                 </TableCell>
                             ))}
@@ -152,7 +195,10 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete }) {
                                         </IconButton>
                                     </TableCell>
                                     {columns.map((column) => (
-                                        <TableCell key={`${row.id}${column.id}`}>
+                                        <TableCell
+                                            key={`${row.id}${column.id}`}
+                                            sx={column.width ? { wordBreak: "break-word", overflowWrap: "anywhere" } : undefined}
+                                        >
                                             <Typography variant="body2">{row[column.id]}</Typography>
                                         </TableCell>
                                     ))}
@@ -207,9 +253,11 @@ DeliveryOrderTable.propTypes = {
     rows: PropTypes.array.isRequired,
     canEdit: PropTypes.bool,
     canDelete: PropTypes.bool,
+    dashboardView: PropTypes.bool,
 }
 
 DeliveryOrderTable.defaultProps = {
     canEdit: false,
     canDelete: false,
+    dashboardView: false,
 }

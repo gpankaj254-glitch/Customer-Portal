@@ -429,7 +429,7 @@ export default function ScxDashboard() {
                 <>
                     <SectionHeading>View Open Orders</SectionHeading>
                     <Grid item xs={12}>
-                        <DeliveryOrderTable rows={openOrderList} canEdit canDelete />
+                        <DeliveryOrderTable rows={openOrderList} canEdit canDelete dashboardView />
                     </Grid>
                 </>
             )}
