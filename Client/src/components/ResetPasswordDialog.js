@@ -4,8 +4,8 @@ import DialogTitle from "@mui/material/DialogTitle"
 import DialogContent from "@mui/material/DialogContent"
 import DialogActions from "@mui/material/DialogActions"
 import Button from "@mui/material/Button"
-import TextField from "@mui/material/TextField"
 import PropTypes from "prop-types"
+import PasswordField from "./PasswordField"
 
 // Mirrors the server's password rule (custom.validation.js): at least 8
 // characters, with at least one letter and one number.
@@ -37,11 +37,10 @@ export default function ResetPasswordDialog({ open, userName, onSave, onCancel, 
         <Dialog open={open} onClose={onCancel} fullWidth maxWidth="sm">
             <DialogTitle>Reset Password{userName ? ` - ${userName}` : ""}</DialogTitle>
             <DialogContent>
-                <TextField
+                <PasswordField
                     autoFocus
                     fullWidth
                     margin="dense"
-                    type="password"
                     label="New Password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
@@ -49,10 +48,9 @@ export default function ResetPasswordDialog({ open, userName, onSave, onCancel, 
                     helperText={passwordInvalid ? "At least 8 characters, with a letter and a number" : ""}
                     disabled={loading}
                 />
-                <TextField
+                <PasswordField
                     fullWidth
                     margin="dense"
-                    type="password"
                     label="Confirm New Password"
                     value={confirmPassword}
                     onChange={(event) => setConfirmPassword(event.target.value)}

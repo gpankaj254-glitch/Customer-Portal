@@ -11,6 +11,7 @@ import Alert from "@mui/material/Alert"
 import Typography from "@mui/material/Typography"
 import { LoadingButton } from "@mui/lab"
 import { fetchForgotPassword, fetchResetPassword } from "./authAPI"
+import PasswordField from "../../components/PasswordField"
 
 // Email sending isn't configured yet (see Server/src/services/email.service.js) -
 // outside production, /auth/forgot-password returns the reset link directly
@@ -88,21 +89,19 @@ export default function ForgotPasswordDialog({ open, onClose }) {
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                             Email sending isn&apos;t configured yet, so the reset step is unlocked directly. Enter your new password below.
                         </Typography>
-                        <TextField
+                        <PasswordField
                             autoFocus
                             fullWidth
                             required
                             margin="normal"
-                            type="password"
                             label="New Password"
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
                         />
-                        <TextField
+                        <PasswordField
                             fullWidth
                             required
                             margin="normal"
-                            type="password"
                             label="Confirm New Password"
                             value={confirmPassword}
                             onChange={(event) => setConfirmPassword(event.target.value)}

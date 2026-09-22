@@ -17,6 +17,7 @@ import Alert from "@mui/material/Alert"
 import { useSelector, useDispatch } from "react-redux"
 import { login, selectLoginError } from "./authSlice"
 import ForgotPasswordDialog from "./ForgotPasswordDialog"
+import PasswordField from "../../components/PasswordField"
 
 // const theme = createTheme()
 
@@ -92,13 +93,12 @@ export default function Login () {
                             autoComplete="email"
                             autoFocus
                         />
-                        <TextField
+                        <PasswordField
                             margin="normal"
                             required
                             fullWidth
                             name="password"
                             label="Password"
-                            type="password"
                             id="password"
                             autoComplete="current-password"
                         />

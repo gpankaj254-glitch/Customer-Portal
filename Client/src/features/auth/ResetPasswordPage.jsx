@@ -5,12 +5,12 @@ import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
 import Container from "@mui/material/Container"
 import CssBaseline from "@mui/material/CssBaseline"
-import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import Alert from "@mui/material/Alert"
 import LockResetIcon from "@mui/icons-material/LockReset"
 import { LoadingButton } from "@mui/lab"
 import { fetchResetPassword } from "./authAPI"
+import PasswordField from "../../components/PasswordField"
 
 // Reached by the link in the password-reset email
 // (<APP_URL>/reset-password?token=...) - App.jsx routes here directly off
@@ -63,21 +63,19 @@ export default function ResetPasswordPage({ token }) {
                     </>
                 ) : (
                     <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: "100%" }}>
-                        <TextField
+                        <PasswordField
                             autoFocus
                             fullWidth
                             required
                             margin="normal"
-                            type="password"
                             label="New Password"
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
                         />
-                        <TextField
+                        <PasswordField
                             fullWidth
                             required
                             margin="normal"
-                            type="password"
                             label="Confirm New Password"
                             value={confirmPassword}
                             onChange={(event) => setConfirmPassword(event.target.value)}

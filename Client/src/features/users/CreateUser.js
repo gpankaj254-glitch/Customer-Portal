@@ -17,6 +17,7 @@ import MenuItem from "@mui/material/MenuItem"
 import FormControl from "@mui/material/FormControl"
 import Select from "@mui/material/Select"
 import { createUser} from "./userSlice"
+import PasswordField from "../../components/PasswordField"
 
 import { useSelector, useDispatch } from "react-redux"
 import { selectCustomerList, selectGetCustomersError } from "../customers/customerSlice"
@@ -221,12 +222,11 @@ export default function CreateUser() {
                                 />
                             </Grid>
                             <Grid item xs={12}>
-                                <TextField
+                                <PasswordField
                                     required
                                     fullWidth
                                     name="password"
                                     label="Password"
-                                    type="password"
                                     id="password"
                                     autoComplete="new-password"
                                 />
