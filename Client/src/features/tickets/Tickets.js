@@ -67,9 +67,11 @@ function TicketsContent() {
     // ticket simply stays under View Closed Tickets (see getClosedTickets).
     const isCustomer = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
     // SCX Management's Tickets access is read-only (no createTickets right) -
-    // the tab stays in place (so the other tabs' indices don't shift) but is
-    // disabled, rather than letting Management reach a Create Ticket form the
-    // server would then reject.
+    // the tab is left out entirely (see the tabs array below), same as every
+    // other read-only role/module in this app (Inventory/Sites/Customers'
+    // Create tabs, Deleted/Bulk Upload below) - not shown-but-disabled, which
+    // read as a bug ("Create Ticket Tab (blocked) visible to Management
+    // user").
     const isManagement = currentUser.role === roles.SCLOUDX_MANAGEMENT
 
     // function handleToggleCreateTickets(){
@@ -90,16 +92,25 @@ function TicketsContent() {
 
     const pagination = useSelector(selectPagination)
 
-    function toggleTabs() {
-        switch (value) {
-        case 1:
-            return    <CreateTicket></CreateTicket>
-        case 2:
-            return    <TicketsTable pagination = {pagination} mode = "closed"  />
-        case 3:
-            return    <TicketsTable pagination = {pagination} mode = "completed"  />
-        case 4:
-            return isAdmin ? (
+    // Built up conditionally (same pattern as Inventory.js/Sites.js's own
+    // tabs array) rather than a fixed-index switch, so a role that doesn't
+    // get one of these tabs (Management's Create, a Customer's Completed,
+    // non-Admin's Deleted/Bulk Upload) simply never sees it - no gap, no
+    // index mismatch between the Tab row and its content below.
+    const tabs = [
+        { label: "View Open Ticket", content: <TicketsTable pagination={pagination} mode="open" /> },
+    ]
+    if (!isManagement) {
+        tabs.push({ label: "Create New Ticket", content: <CreateTicket /> })
+    }
+    tabs.push({ label: "View Closed Tickets", content: <TicketsTable pagination={pagination} mode="closed" /> })
+    if (!isCustomer) {
+        tabs.push({ label: "Completed Tickets", content: <TicketsTable pagination={pagination} mode="completed" /> })
+    }
+    if (isAdmin) {
+        tabs.push({
+            label: "Deleted Tickets",
+            content: (
                 <DeletedRecordsPanel
                     columns={deletedTicketColumns}
                     fetchDeleted={fetchDeletedTickets}
@@ -107,12 +118,9 @@ function TicketsContent() {
                     permanentlyDeleteRecord={fetchPermanentlyDeleteTicket}
                     entityLabel="ticket"
                 />
-            ) : <TicketsTable pagination = {pagination} mode = "open"  />
-        case 5:
-            return isAdmin ? <BulkUploadTickets /> : <TicketsTable pagination = {pagination} mode = "open"  />
-        default:
-            return <TicketsTable pagination = {pagination} mode = "open"  />
-        }
+            ),
+        })
+        tabs.push({ label: "Bulk Upload Tickets", content: <BulkUploadTickets /> })
     }
 
     return (
@@ -120,21 +128,14 @@ function TicketsContent() {
             <Grid container spacing={3}>
                 <Grid item xs={12}>
                     <Tabs value={value} onChange={handleChange} aria-label="user management">
-                        <Tab label="View Open Ticket"/>
-                        <Tab label="Create New Ticket" disabled={isManagement}/>
-                        <Tab label="View Closed Tickets"/>
-                        {!isCustomer && <Tab label="Completed Tickets"/>}
-                        {isAdmin && <Tab label="Deleted Tickets"/>}
-                        {isAdmin && <Tab label="Bulk Upload Tickets"/>}
-
+                        {tabs.map((tab) => (
+                            <Tab key={tab.label} label={tab.label} />
+                        ))}
                     </Tabs>
                 </Grid>
                 <Grid item xs={12}>
                     <Paper sx={{ p: 2, display: "flex", flexDirection: "column" }}>
-                        {/* {pageStatus == pageStatusVals.idle && (<TicketsTable />)} */}
-                        {/* <TicketsTable pagination = {pagination} open = {openTicketsTable} handleToggle = {handleToggleTicketsTable} /> */}
-                        {toggleTabs()}
-
+                        {tabs[value] ? tabs[value].content : tabs[0].content}
                     </Paper>
                 </Grid>
                 {/* <Grid item xs={12}>

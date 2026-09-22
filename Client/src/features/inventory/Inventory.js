@@ -60,8 +60,12 @@ function InventoryContent() {
     const pagination = useSelector(selectPagination)
     const search = useSelector(selectSearch)
     const currentUser = useSelector(selectUser)
-    const canCreate = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_USER
+    // "Remove Create circuit option from NOC" - SCX Admin only now (SCX
+    // Service Delivery doesn't hold createCircuits either; it creates
+    // circuits automatically via a completed Delivery Order instead - see
+    // deliveryOrder.service.js's createCircuitFromOrder).
     const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    const canCreate = isAdmin
 
     // Local, uncommitted text box value - kept separate from the Redux search
     // term so we can debounce before actually dispatching a fetch.

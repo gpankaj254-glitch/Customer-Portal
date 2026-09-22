@@ -2,11 +2,10 @@ const allRoles = {
   scloudxUser: [
     "moveCircuits",
     "createUsers",
-    // createSites/createCustomers removed - both now belong to SCX Admin
-    // (the general Customer/Site Management modules) and SCX Service
-    // Delivery (inline, while completing a Delivery Order - see
-    // scloudxServiceDelivery below).
-    "createCircuits",
+    // createSites/createCustomers/createCircuits removed - all three now
+    // belong to SCX Admin (the general Customer/Site/Inventory Management
+    // modules) and SCX Service Delivery (inline, while completing a
+    // Delivery Order - see scloudxServiceDelivery below).
     // Vendor Management is read-only for SCX NOC - SCX Service Delivery has
     // full read/write access instead (see scloudxServiceDelivery below).
     "createTickets",

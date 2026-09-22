@@ -54,6 +54,36 @@ function normalizeBulkIpRequirement(value) {
 }
 
 /**
+ * One Activity Log entry - who made it, when, and a description. Mirrors
+ * ticket.service.js's getLatestUpdate (see ActivityLogDialog.js, reused for
+ * Delivery Orders too).
+ * @param {string} status
+ * @param {string} comment
+ * @param {Object} user
+ * @returns {Object}
+ */
+function getHistoryEntry(status, comment, user) {
+  return {
+    status,
+    comment,
+    user: extractUserDetails(user),
+    updatedAt: moment().toISOString(),
+  };
+}
+
+/**
+ * Appends one Activity Log entry to an order's (in-memory) history array -
+ * does not save; the caller saves once after making all its changes.
+ * @param {DeliveryOrder} order
+ * @param {string} status
+ * @param {string} comment
+ * @param {Object} user
+ */
+function appendHistory(order, status, comment, user) {
+  order.history = _.concat(order.history || [], getHistoryEntry(status, comment, user));
+}
+
+/**
  * Atomically reserve the next serial and build "DO<YY><MM><4-digit serial>",
  * same pattern as Ticket's ticketId/Opportunity's opportunityId (see
  * ticket.service.js's generateTicketNumber) - scoped to year+month, so it
@@ -135,6 +165,7 @@ const createDeliveryOrder = async (reqBody, user) => {
     orderDate: new Date(reqBody.orderDate),
     deliveryTimelineDays: reqBody.deliveryTimelineDays ?? null,
     milestones: buildInitialMilestones(),
+    history: [getHistoryEntry("SCX", "Order created", user)],
     createdBy: extractUserDetails(user),
     updatedBy: extractUserDetails(user),
   };
@@ -279,6 +310,10 @@ const updateDeliveryOrderById = async (deliveryOrderId, updateBody, user) => {
   if (!order) {
     throw new ApiError(httpStatus.NOT_FOUND, "Delivery order not found");
   }
+  // Captured before any of the fields below are touched, so a real
+  // transition can still be told apart from a Save that doesn't change
+  // Status (see the Activity Log entry below).
+  const previousStatus = order.status;
 
   if (updateBody.customerId) {
     const customer = await getActiveCustomerById(updateBody.customerId);
@@ -321,15 +356,33 @@ const updateDeliveryOrderById = async (deliveryOrderId, updateBody, user) => {
     order.vendorBillStartDate = updateBody.vendorBillStartDate ? new Date(updateBody.vendorBillStartDate) : null;
   }
 
+  // Activity Log - one entry per real Status transition ("Save"/"Save and
+  // Complete" that doesn't change Status logs nothing, same as a Ticket
+  // Save that doesn't change status doesn't add its own history entry
+  // either - see ticket.service.js).
+  if (updateBody.status && updateBody.status !== previousStatus) {
+    appendHistory(order, updateBody.status, `Status changed from "${previousStatus}" to "${updateBody.status}"`, user);
+  }
+
   order.updatedBy = extractUserDetails(user);
   await order.save();
 
   if (updateBody.status === "Completed") {
-    const { circuitCreationError } = await createCircuitFromOrder(order, user);
+    // Not yet stored before this call, so a re-save of an already-completed
+    // order (createCircuitFromOrder is idempotent) doesn't log a second,
+    // duplicate "Circuit created" entry.
+    const hadCircuitBefore = !!order.circuitId;
+    const { circuitId, circuitCreationError } = await createCircuitFromOrder(order, user);
     if (circuitCreationError) {
+      appendHistory(order, order.status, `Circuit auto-creation failed: ${circuitCreationError}`, user);
+      await order.save();
       const result = order.toJSON();
       result.circuitCreationError = circuitCreationError;
       return result;
+    }
+    if (circuitId && !hadCircuitBefore) {
+      appendHistory(order, order.status, `Circuit created automatically (ID: ${circuitId})`, user);
+      await order.save();
     }
   }
 
@@ -547,6 +600,7 @@ const bulkCreateDeliveryOrders = async (validRows, user) => {
       orderDate: row.orderDate,
       deliveryTimelineDays: row.deliveryTimelineDays,
       notes: row.notes,
+      history: [getHistoryEntry("SCX", "Order created (bulk upload)", user)],
       createdBy: extractUserDetails(user),
       updatedBy: extractUserDetails(user),
     });
@@ -799,6 +853,7 @@ const bulkCreateClosedDeliveryOrders = async (validRows, user) => {
       lecPM: row.lecPM,
       lecPMDetails: row.lecPMDetails,
       notes: row.notes,
+      history: [getHistoryEntry("Completed", "Order imported (historical bulk upload)", user)],
       createdBy: extractUserDetails(user),
       updatedBy: extractUserDetails(user),
     });

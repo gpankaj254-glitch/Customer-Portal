@@ -9,6 +9,7 @@ import TablePagination from "@mui/material/TablePagination"
 import TableRow from "@mui/material/TableRow"
 import IconButton from "@mui/material/IconButton"
 import DeleteIcon from "@mui/icons-material/Delete"
+import HistoryIcon from "@mui/icons-material/History"
 import { KeyboardArrowDown, KeyboardArrowUp } from "@mui/icons-material"
 import Collapse from "@mui/material/Collapse"
 import Snackbar from "@mui/material/Snackbar"
@@ -25,8 +26,16 @@ import {
     deactivateDeliveryOrder,
 } from "./deliveryOrderSlice"
 import { selectVendorList } from "../vendors/vendorSlice"
+import { selectUser } from "../auth/authSlice"
+import { roles } from "../../consts"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import OrderDetails from "./OrderDetails"
+import ActivityLogDialog from "./ActivityLogDialog"
+
+// Same SCX-only visibility as Ticket's own Activity Log (see
+// tickets/TicketsTable.js's canViewLog) - plus SCX Management, which already
+// has read-only view access to Delivery Orders elsewhere.
+const ACTIVITY_LOG_ROLES = [roles.SCLOUDX_ADMIN, roles.SCLOUDX_SERVICE_DELIVERY, roles.SCLOUDX_MANAGEMENT]
 
 function formatDate(value) {
     return value ? moment(value).format("DD-MM-YYYY") : ""
@@ -111,11 +120,14 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboard
     const errorMessage = useSelector(selectGetOrdersError)
     const pagination = useSelector(selectPagination)
     const vendorList = useSelector(selectVendorList)
+    const currentUser = useSelector(selectUser)
+    const canViewLog = ACTIVITY_LOG_ROLES.includes(currentUser.role)
 
     const [open, setOpen] = React.useState(null)
     const [orderToDelete, setOrderToDelete] = React.useState(null)
     const [deleting, setDeleting] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)
+    const [logOrder, setLogOrder] = React.useState(null)
 
     const vendorNameById = React.useMemo(
         () => new Map(vendorList.map((vendor) => [vendor.id, vendor.name])),
@@ -171,7 +183,7 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboard
                                     <Typography variant="subtitle2">{column.label}</Typography>
                                 </TableCell>
                             ))}
-                            {canDelete && (
+                            {(canDelete || canViewLog) && (
                                 <TableCell align="right">
                                     <Typography variant="subtitle2">Actions</Typography>
                                 </TableCell>
@@ -202,11 +214,18 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboard
                                             <Typography variant="body2">{row[column.id]}</Typography>
                                         </TableCell>
                                     ))}
-                                    {canDelete && (
+                                    {(canDelete || canViewLog) && (
                                         <TableCell align="right">
-                                            <IconButton size="small" aria-label={`delete ${row.orderId}`} onClick={() => setOrderToDelete(row)}>
-                                                <DeleteIcon fontSize="small" />
-                                            </IconButton>
+                                            {canViewLog && (
+                                                <IconButton size="small" aria-label={`activity log ${row.orderId}`} title="Activity Log" onClick={() => setLogOrder(row)}>
+                                                    <HistoryIcon fontSize="small" />
+                                                </IconButton>
+                                            )}
+                                            {canDelete && (
+                                                <IconButton size="small" aria-label={`delete ${row.orderId}`} onClick={() => setOrderToDelete(row)}>
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            )}
                                         </TableCell>
                                     )}
                                 </TableRow>
@@ -245,6 +264,12 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboard
             <Snackbar open={!!feedback} autoHideDuration={4000} onClose={() => setFeedback(null)}>
                 {feedback && <Alert severity={feedback.severity} onClose={() => setFeedback(null)}>{feedback.message}</Alert>}
             </Snackbar>
+
+            <ActivityLogDialog
+                open={!!logOrder}
+                order={logOrder}
+                onClose={() => setLogOrder(null)}
+            />
         </Paper>
     )
 }

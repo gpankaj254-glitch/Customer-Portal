@@ -173,6 +173,16 @@ const deliveryOrderSchema = mongoose.Schema(
       type: [milestoneSchema],
       default: [],
     },
+    // Activity Log - one entry per real Status transition (plus automatic
+    // Circuit creation), with who made it, when, and a description - same
+    // shape/purpose as Ticket's own history field (see ticket.model.js),
+    // "Activity Log function for Service Delivery Process as created and
+    // managed in NOC Management". Seeded with an "Order created" entry (see
+    // deliveryOrder.service.js's createDeliveryOrder/appendHistory).
+    history: {
+      type: Array,
+      default: [],
+    },
     // Captured once the order reaches Completed status - handoverDate
     // defaults to now the first time status moves to Completed (mirrors
     // Ticket's closedAt) but stays editable/overridable afterwards. Not
