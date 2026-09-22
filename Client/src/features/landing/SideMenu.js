@@ -36,11 +36,12 @@ const secondaryListItems = [sideMenuItems.DELIVERY_ORDERS, sideMenuItems.CUSTOME
 
 // SCX Management's own explicit order, everything below Dashboard - "Sales
 // Management, Service Delivery Management, NOC Management, Customer
-// Management, Site Management, Inventory Management" - Tickets moves out of
-// the top mainListItems section (see managementMainListItems below) into
-// its place here, under its Management-only name (see
-// RENAMED_ROLE_LABEL_OVERRIDES). Every other role is unaffected - this only
-// replaces the list used when the signed-in role is SCX Management.
+// Management, Site Management, Inventory Management, Vendor Management
+// (read-only)" - Tickets moves out of the top mainListItems section (see
+// managementMainListItems below) into its place here, under its
+// Management-only name (see RENAMED_ROLE_LABEL_OVERRIDES). Every other role
+// is unaffected - this only replaces the list used when the signed-in role
+// is SCX Management.
 const managementMainListItems = [sideMenuItems.DASHBOARD]
 const managementSecondaryListItems = [
     sideMenuItems.SALES_OPPORTUNITIES,
@@ -49,6 +50,7 @@ const managementSecondaryListItems = [
     sideMenuItems.CUSTOMER_MANAGEMENT,
     sideMenuItems.SITE_MANAGEMENT,
     sideMenuItems.INVENTORY,
+    sideMenuItems.VENDOR_MANAGEMENT,
 ]
 
 // SCX Admin's own explicit order - "Replicate like SCX Management Role":
