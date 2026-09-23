@@ -40,11 +40,6 @@ function formatDateTime(value) {
     return value ? moment(value).format("MMM D, YYYY h:mm A") : ""
 }
 
-function lastStatusChangeDate(row) {
-    const history = _.get(row, "customerRequest.statusHistory", [])
-    return formatDateTime(_.get(_.last(history), "changedAt"))
-}
-
 const columns = [
     { id: "opportunityId", label: "Opportunity #" },
     { id: "name", label: "Name" },
@@ -55,7 +50,12 @@ const columns = [
         render: (row) => formatDateTime(_.get(row, "customerRequest.requestDate")),
     },
     { id: "customerRequest.quoteStatus", label: "Quote Status" },
-    { id: "quoteStatusDate", label: "Quote Status Date", render: lastStatusChangeDate },
+    // "Remove Quote Status Date and add Currency NRC, MRC" - the Customer
+    // Request's own fields (see opportunity.model.js), same ones already
+    // editable on the Opportunity's own edit form.
+    { id: "customerRequest.currency", label: "Currency" },
+    { id: "customerRequest.nrc", label: "NRC" },
+    { id: "customerRequest.mrc", label: "MRC" },
 ]
 
 const currencySelectOptions = currencyOptions.map((option) => ({

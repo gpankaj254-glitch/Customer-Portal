@@ -156,16 +156,17 @@ function formatDateTime(value) {
     return value ? moment(value).format("MMM D, YYYY h:mm A") : ""
 }
 
-function lastStatusChangeDate(entry) {
-    return formatDateTime(_.get(_.last(entry.statusHistory), "changedAt"))
-}
-
 const supplierCommunicationColumns = [
     { id: "supplier", label: "Supplier" },
     { id: "quoteRequestDate", label: "Quote Request Date", format: formatDateTime },
     { id: "lec", label: "LEC" },
     { id: "quoteStatus", label: "Quote Status" },
-    { id: "quoteStatusDate", label: "Quote Status Date", render: lastStatusChangeDate },
+    // "Remove Quote Status Date and add Currency NRC, MRC" - already
+    // editable per entry (see buildSupplierCommunicationFields above), just
+    // not previously shown in the list itself.
+    { id: "currency", label: "Currency" },
+    { id: "nrc", label: "NRC" },
+    { id: "mrc", label: "MRC" },
 ]
 
 function emptyValuesFor(fields) {
