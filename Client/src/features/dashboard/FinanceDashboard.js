@@ -31,6 +31,30 @@ import { togglePage } from "../landing/landingSlice"
 import { pages } from "../../consts"
 import { downloadCsv } from "../../utils/csv"
 
+// "Reduce Font of all Filter and Sort options" - matches this page's own
+// existing 0.72rem scale (already used for the table/row-count text below).
+// Covers every visible filter/sort control (search box, the 3-step filter,
+// the gap checkbox, sort controls, Download CSV button) since they all sit
+// inside the same <Grid container> this is applied to.
+const compactSx = {
+    "& .MuiInputBase-root, & .MuiInputLabel-root, & .MuiFormControlLabel-label, & .MuiButton-root": { fontSize: "0.72rem" },
+    "& .MuiOutlinedInput-input": { padding: "8px 10px" },
+}
+
+// Select renders its dropdown menu in a portal (outside the Grid above), so
+// compactSx alone never reaches it - passed as each <Select>'s own
+// MenuProps instead.
+const selectMenuProps = {
+    PaperProps: {
+        sx: { "& .MuiMenuItem-root": { fontSize: "0.72rem", minHeight: 32 } },
+    },
+}
+
+// Same portal issue for Autocomplete's own options list/popup.
+const autocompletePaperSx = {
+    "& .MuiAutocomplete-option, & .MuiAutocomplete-noOptions": { fontSize: "0.72rem" },
+}
+
 // Fixed column widths (see the Table's tableLayout: "fixed" below) so every
 // row lines up under its header instead of each column auto-sizing to its
 // own widest value.
@@ -247,7 +271,7 @@ export default function FinanceDashboard() {
     const loading = status === pageStatusVals.loading || status === pageStatusVals.idle
 
     return (
-        <Grid container spacing={1.5}>
+        <Grid container spacing={1.5} sx={compactSx}>
             <Grid item xs={12}>
                 <TextField
                     fullWidth
@@ -267,6 +291,7 @@ export default function FinanceDashboard() {
                         label="Filter by"
                         value={filterBasis}
                         onChange={handleFilterBasisChange}
+                        MenuProps={selectMenuProps}
                     >
                         <MenuItem value=""><em>None</em></MenuItem>
                         <MenuItem value="customer">Customer</MenuItem>
@@ -282,6 +307,7 @@ export default function FinanceDashboard() {
                     options={filterNameOptions}
                     value={filterName}
                     onChange={(event, newValue) => setFilterName(newValue)}
+                    componentsProps={{ paper: { sx: autocompletePaperSx } }}
                     renderInput={(params) => (
                         <TextField
                             {...params}
@@ -300,6 +326,7 @@ export default function FinanceDashboard() {
                         label="Pending"
                         value={pendingOperator}
                         onChange={(event) => setPendingOperator(event.target.value)}
+                        MenuProps={selectMenuProps}
                     >
                         <MenuItem value=">">&gt; (more than)</MenuItem>
                         <MenuItem value="<">&lt; (less than)</MenuItem>
@@ -321,7 +348,7 @@ export default function FinanceDashboard() {
             <Grid item xs={12} sm={2} sx={{ display: "flex", alignItems: "center" }}>
                 <FormControlLabel
                     control={<Checkbox size="small" checked={onlyGapRows} onChange={(event) => setOnlyGapRows(event.target.checked)} />}
-                    label={<Typography variant="body2" sx={{ fontSize: "0.75rem" }}>Only Contract Gap rows</Typography>}
+                    label={<Typography variant="body2" sx={{ fontSize: "0.72rem" }}>Only Contract Gap rows</Typography>}
                 />
             </Grid>
             {/* "Sorting the List in Ascending or Descending order by Contract
@@ -334,6 +361,7 @@ export default function FinanceDashboard() {
                         label="Sort by"
                         value={sortField}
                         onChange={(event) => setSortField(event.target.value)}
+                        MenuProps={selectMenuProps}
                     >
                         <MenuItem value=""><em>None</em></MenuItem>
                         <MenuItem value="customerContractPendingMonths">Customer Contract Pending (Months)</MenuItem>
@@ -349,6 +377,7 @@ export default function FinanceDashboard() {
                         label="Order"
                         value={sortDirection}
                         onChange={(event) => setSortDirection(event.target.value)}
+                        MenuProps={selectMenuProps}
                     >
                         <MenuItem value="asc">Ascending</MenuItem>
                         <MenuItem value="desc">Descending</MenuItem>
