@@ -161,6 +161,10 @@ const CIRCUIT_STATUS_FIELDS = ["status", "billStopDate", "changeType", "changeOr
  * the newly-set status are cleared, so old Ceased/Changed data doesn't
  * linger once a circuit moves on to a different status (mirrors
  * deliveryOrder.service.js's own handoverDate-on-status-change handling).
+ * "Service Delivery Login, remove change option for Changed and Ceased
+ * Circuit" - once a circuit has already been marked Changed/Ceased, Service
+ * Delivery can no longer touch its status again (SCX Admin still can, same
+ * as every other Circuit field).
  * @param {ObjectId} circuitId
  * @param {Object} updateBody
  * @param {Object} actingUser
@@ -172,6 +176,11 @@ const updateCircuitStatusById = async (circuitId, updateBody, actingUser) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Circuit not found");
   } else if (!circuit.active) {
     throw new ApiError(httpStatus.NOT_ACCEPTABLE, "Circuit is not active");
+  }
+
+  const currentStatus = circuit.status || "Live";
+  if (actingUser.role === roleTypes.scloudxServiceDelivery && (currentStatus === "Changed" || currentStatus === "Ceased")) {
+    throw new ApiError(httpStatus.FORBIDDEN, `This circuit is already ${currentStatus} and can no longer have its status changed`);
   }
 
   const update = _.pick(updateBody, CIRCUIT_STATUS_FIELDS);

@@ -157,7 +157,15 @@ export default function CircuitTable(props) {
     // "Delivery Team Should able to change Circuit Status Under Inventory
     // Module" - SCX Service Delivery gets just this, not the full Edit
     // dialog (still SCX Admin only).
-    const canEditStatus = isAdmin || currentUser.role === roles.SCLOUDX_SERVICE_DELIVERY
+    const isServiceDelivery = currentUser.role === roles.SCLOUDX_SERVICE_DELIVERY
+    const canEditStatus = isAdmin || isServiceDelivery
+    // "Service Delivery Login, remove change option for Changed and Ceased
+    // Circuit" - once a circuit already sits at Changed/Ceased, Service
+    // Delivery no longer gets the option to touch its status again (server
+    // enforces the same restriction - see updateCircuitStatusById); SCX
+    // Admin is unaffected.
+    const canEditStatusForRow = (row) =>
+        canEditStatus && !(isServiceDelivery && (row.status === "Changed" || row.status === "Ceased"))
     const isCustomerRole = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
     const pagination = useSelector(selectPagination)
     const vendorList = useSelector(selectVendorList)
@@ -248,7 +256,7 @@ export default function CircuitTable(props) {
                         <EditIcon />
                     </IconButton>
                 )}
-                {canEditStatus && (
+                {canEditStatusForRow(row) && (
                     <IconButton
                         aria-label={`edit status ${row.vendorCircuitId || row.code}`}
                         title="Change Circuit Status"
