@@ -16,7 +16,6 @@ import Snackbar from "@mui/material/Snackbar"
 import { Alert, Typography } from "@mui/material"
 import PropTypes from "prop-types"
 import _ from "lodash"
-import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
 import {
     changePage,
@@ -31,15 +30,12 @@ import { roles } from "../../consts"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import OrderDetails from "./OrderDetails"
 import ActivityLogDialog from "./ActivityLogDialog"
+import { getFormattedDateOnly as formatDate } from "../../utils/dates"
 
 // Same SCX-only visibility as Ticket's own Activity Log (see
 // tickets/TicketsTable.js's canViewLog) - plus SCX Management, which already
 // has read-only view access to Delivery Orders elsewhere.
 const ACTIVITY_LOG_ROLES = [roles.SCLOUDX_ADMIN, roles.SCLOUDX_SERVICE_DELIVERY, roles.SCLOUDX_MANAGEMENT]
-
-function formatDate(value) {
-    return value ? moment(value).format("DD-MM-YYYY") : ""
-}
 
 function customerName(row) {
     return _.get(row, "customer.name") || row.newCustomerName || ""

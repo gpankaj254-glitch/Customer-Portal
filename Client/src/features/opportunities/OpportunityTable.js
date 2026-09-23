@@ -16,7 +16,7 @@ import { KeyboardArrowDown, KeyboardArrowUp } from "@mui/icons-material"
 import Snackbar from "@mui/material/Snackbar"
 
 import PropTypes from "prop-types"
-import moment from "moment"
+import { getFormattedDateTime as formatDateTime } from "../../utils/dates"
 
 // eslint-disable-next-line no-unused-vars
 import { changeLimit, changePage, getOpportunities, selectGetOpportunitiesError, selectOpportunityList, deactivateOpportunity, updateOpportunity } from "./opportunitySlice"
@@ -34,10 +34,6 @@ import OpportunityDetails from "./OpportunityDetails"
 
 function displayCustomerOrProspect(row) {
     return _.get(row, "customer.name") || row.prospectName || ""
-}
-
-function formatDateTime(value) {
-    return value ? moment(value).format("MMM D, YYYY h:mm A") : ""
 }
 
 const columns = [

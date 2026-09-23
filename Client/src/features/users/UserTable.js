@@ -26,7 +26,7 @@ import { selectVendorList } from "../vendors/vendorSlice"
 import { roles, roleList } from "../../consts"
 import { roleNames } from "../../strings"
 import { useSelector, useDispatch } from "react-redux"
-import moment from "moment"
+import { getFormattedDateTime } from "../../utils/dates"
 import _ from "lodash"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
@@ -375,7 +375,7 @@ export default function UserTable(props) {
                     }}
                     lastEditedNote={
                         userToEdit && userToEdit.updatedBy && userToEdit.updatedBy.name
-                            ? `Last edited by ${userToEdit.updatedBy.name} on ${moment(userToEdit.updatedAt).format("MMM D, YYYY h:mm A")}`
+                            ? `Last edited by ${userToEdit.updatedBy.name} on ${getFormattedDateTime(userToEdit.updatedAt)}`
                             : null
                     }
                     onSave={handleSaveEdit}

@@ -30,6 +30,7 @@ import { pageStatusVals } from "../inventory/utils"
 import { togglePage } from "../landing/landingSlice"
 import { pages } from "../../consts"
 import { downloadCsv } from "../../utils/csv"
+import { getFormattedStoredDate } from "../../utils/dates"
 
 // "Reduce Font of all Filter and Sort options" - matches this page's own
 // existing 0.72rem scale (already used for the table/row-count text below).
@@ -190,8 +191,11 @@ export default function FinanceDashboard() {
             customerName: _.get(circuit, "customer.name", ""),
             vendorName: vendorNameById.get(circuit.vendorId) || "",
             scloudxOrderReference: circuit.scloudxOrderReference || "",
-            customerCircuitBillStartDate: circuit.customerCircuitBillStartDate || "",
-            vendorCircuitBillStartDate: circuit.vendorCircuitBillStartDate || "",
+            // "Change all dates display in DD-MMM-YY Format" - reformatted
+            // for display only; customerPendingMonths/vendorPendingMonths
+            // above were already computed from the raw stored value.
+            customerCircuitBillStartDate: circuit.customerCircuitBillStartDate ? getFormattedStoredDate(circuit.customerCircuitBillStartDate) : "",
+            vendorCircuitBillStartDate: circuit.vendorCircuitBillStartDate ? getFormattedStoredDate(circuit.vendorCircuitBillStartDate) : "",
             customerCircuitContractTerm: circuit.customerCircuitContractTerm || "",
             vendorCircuitContractTerm: circuit.vendorCircuitContractTerm || "",
             customerContractPendingMonths: customerPendingMonths === null ? "-" : String(customerPendingMonths),

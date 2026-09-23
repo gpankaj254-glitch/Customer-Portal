@@ -16,7 +16,6 @@ import { Alert, Typography } from "@mui/material"
 
 import PropTypes from "prop-types"
 import _ from "lodash"
-import moment from "moment"
 import { useSelector, useDispatch } from "react-redux"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
@@ -27,6 +26,7 @@ import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
 import MoveCircuitDialog from "./MoveCircuitDialog"
 import { bandwidthOptions, productOptions, circuitStatusOptions, circuitChangeTypeOptions } from "../../consts/circuitOptions"
+import { getFormattedDateTime, getFormattedStoredDate as reformatStoredDate } from "../../utils/dates"
 
 // "Every Circuit Should have following status ... Live since (Bill Start
 // date) / Ceased (Capture Bill Stop date) / Changed (Captured Change -
@@ -35,13 +35,13 @@ import { bandwidthOptions, productOptions, circuitStatusOptions, circuitChangeTy
 function formatCircuitStatus(row) {
     const status = row.status || "Live"
     if (status === "Ceased") {
-        return row.billStopDate ? `Ceased ${row.billStopDate}` : "Ceased"
+        return row.billStopDate ? `Ceased ${reformatStoredDate(row.billStopDate)}` : "Ceased"
     }
     if (status === "Changed") {
-        const parts = [row.changeType, row.changeOrderNumber, row.changeDate].filter(Boolean)
+        const parts = [row.changeType, row.changeOrderNumber, row.changeDate ? reformatStoredDate(row.changeDate) : ""].filter(Boolean)
         return parts.length ? `Changed (${parts.join(" - ")})` : "Changed"
     }
-    return row.customerCircuitBillStartDate ? `Live since ${row.customerCircuitBillStartDate}` : "Live"
+    return row.customerCircuitBillStartDate ? `Live since ${reformatStoredDate(row.customerCircuitBillStartDate)}` : "Live"
 }
 
 // customerVisible controls which columns Customer Admin/Customer User can
@@ -60,9 +60,9 @@ const columns = [
     { id: "scloudxOrderReference", label: "Scloudx Order Ref", customerVisible: true },
     { id: "vendorOrderReference", label: "Vendor Order Ref", customerVisible: false },
     { id: "customerOrderReference", label: "Customer Order Ref", customerVisible: true },
-    { id: "customerCircuitBillStartDate", label: "Customer Bill Start Date", customerVisible: false },
+    { id: "customerCircuitBillStartDate", label: "Customer Bill Start Date", customerVisible: false, format: (row) => reformatStoredDate(row.customerCircuitBillStartDate) },
     { id: "customerCircuitContractTerm", label: "Customer Contract Term", customerVisible: false },
-    { id: "vendorCircuitBillStartDate", label: "Vendor Bill Start Date", customerVisible: false },
+    { id: "vendorCircuitBillStartDate", label: "Vendor Bill Start Date", customerVisible: false, format: (row) => reformatStoredDate(row.vendorCircuitBillStartDate) },
     { id: "vendorCircuitContractTerm", label: "Vendor Contract Term", customerVisible: false },
     { id: "vendorLECName", label: "Vendor LEC Name", customerVisible: false },
     { id: "bandwidth", label: "Bandwidth", customerVisible: true },
@@ -323,7 +323,7 @@ export default function CircuitTable(props) {
                 initialValues={circuitToEdit ? _.pick(circuitToEdit, buildEditableFields(circuitToEdit).map((field) => field.name)) : {}}
                 lastEditedNote={
                     circuitToEdit && circuitToEdit.updatedBy && circuitToEdit.updatedBy.name
-                        ? `Last edited by ${circuitToEdit.updatedBy.name} on ${moment(circuitToEdit.updatedAt).format("MMM D, YYYY h:mm A")}`
+                        ? `Last edited by ${circuitToEdit.updatedBy.name} on ${getFormattedDateTime(circuitToEdit.updatedAt)}`
                         : null
                 }
                 onSave={handleSaveEdit}

@@ -1,6 +1,5 @@
 import * as React from "react"
 import _ from "lodash"
-import moment from "moment"
 import Paper from "@mui/material/Paper"
 import Table from "@mui/material/Table"
 import TableBody from "@mui/material/TableBody"
@@ -17,6 +16,7 @@ import Button from "@mui/material/Button"
 import Snackbar from "@mui/material/Snackbar"
 import PropTypes from "prop-types"
 import ConfirmDialog from "./ConfirmDialog"
+import { getFormattedDateTime } from "../utils/dates"
 
 // Read-only view of soft-deleted records, with an optional bulk restore
 // action. Fetches directly rather than going through Redux, since this is a
@@ -108,7 +108,7 @@ export default function DeletedRecordsPanel({ columns, fetchDeleted, restoreReco
 
     const allColumns = [
         ...columns,
-        { id: "deletedAt", label: "Deleted At", format: (value) => (value ? moment(value).format("MMM D, YYYY h:mm A") : "") },
+        { id: "deletedAt", label: "Deleted At", format: getFormattedDateTime },
         { id: "deletedBy.name", label: "Deleted By" },
     ]
 

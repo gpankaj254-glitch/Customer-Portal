@@ -13,11 +13,7 @@ import TableContainer from "@mui/material/TableContainer"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
 import PropTypes from "prop-types"
-import moment from "moment"
-
-function formatDateTime(value) {
-    return value ? moment(value).format("MMM D, YYYY h:mm A") : ""
-}
+import { getFormattedDateTime as formatDateTime } from "../utils/dates"
 
 // "Reduce and standardize Fonts of all Activity Logs" - same compact scale
 // (0.75rem) already used across this app's other compacted list pages,

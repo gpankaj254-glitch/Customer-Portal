@@ -23,7 +23,6 @@ import DialogContent from "@mui/material/DialogContent"
 import DialogActions from "@mui/material/DialogActions"
 import PropTypes from "prop-types"
 import _ from "lodash"
-import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
 import { updateOpportunity, uploadSupplierCommunicationAttachment } from "./opportunitySlice"
 import { downloadSupplierCommunicationAttachment } from "./opportunityAPI"
@@ -32,6 +31,7 @@ import { currencyOptions } from "../../consts/currencyOptions"
 import { selectVendorList } from "../vendors/vendorSlice"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
+import { getFormattedDateTime as formatDateTime } from "../../utils/dates"
 import StatusHistoryDialog from "../../components/StatusHistoryDialog"
 
 const ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.gif,.bmp,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
@@ -156,10 +156,6 @@ function buildSupplierCommunicationFields(vendorOptions) {
     ]
 }
 const supplierCommunicationNumberFields = ["nrc", "mrc"]
-
-function formatDateTime(value) {
-    return value ? moment(value).format("MMM D, YYYY h:mm A") : ""
-}
 
 const supplierCommunicationColumns = [
     { id: "supplier", label: "Supplier" },

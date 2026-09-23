@@ -50,7 +50,7 @@ const columns = [
 // Problem Start is saved as text with no time zone, and comes in two shapes:
 // "YYYY-MM-DDTHH:mm" (typed on Create Ticket) and a bare "YYYY-MM-DD" (bulk
 // imports - no time of day was recorded). Both are shown in the same
-// DD/MM/YYYY style as the Closed Date, as entered rather than shifted; a
+// DD-MMM-YY style as the Closed Date, as entered rather than shifted; a
 // date-only value shows just the date rather than inventing a time. Anything
 // else (free text) is shown as-is.
 const WALL_CLOCK = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
@@ -58,7 +58,7 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 function formatProblemStart(value) {
     if (!value) return ""
     if (WALL_CLOCK.test(value)) return getFormattedDateTimeGMT(value)
-    if (DATE_ONLY.test(value)) return moment.utc(value, "YYYY-MM-DD").format("DD/MM/YYYY")
+    if (DATE_ONLY.test(value)) return moment.utc(value, "YYYY-MM-DD").format("DD-MMM-YY").toUpperCase()
     return value
 }
 

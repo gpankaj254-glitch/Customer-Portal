@@ -58,6 +58,10 @@ function OpportunitiesContent() {
     // (permanentlyDeleteOpportunities is not granted to Sales Admin) -
     // mirrors Users.js's isScxAdmin gating of permanentlyDeleteUsers.
     const isScxAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    // "Add Sales Opportunity Upload facility to Sales User Also" - a
+    // narrower right than isAdmin above (Sales User doesn't get Deleted
+    // Opportunities, just Bulk Upload - see roles.js's scloudxSalesUser).
+    const canBulkUpload = isAdmin || currentUser.role === roles.SCLOUDX_SALES_USER
     // SCX Management's Sales Opportunities access is read-only (no
     // createOpportunities right) - Create Opportunity is left out of the tab
     // list entirely rather than shown and then rejected by the server.
@@ -151,6 +155,9 @@ function OpportunitiesContent() {
                 />
             ),
         })
+    }
+
+    if (canBulkUpload) {
         tabs.push({ label: "Bulk Upload", content: <BulkUploadOpportunities /> })
     }
 

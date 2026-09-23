@@ -106,11 +106,11 @@ function buildColumns (mode) {
 // Problem Start Date is typed as a plain wall-clock string with no time
 // zone (see TicketDetails.js's own WALL_CLOCK) - shown as entered rather
 // than converted, unlike Created Date/Ticket Close Date, which are real UTC
-// timestamps. Formatted with the same "DD/MM/YYYY hh:mm a" pattern as
+// timestamps. Formatted with the same "DD-MMM-YY hh:mm a" pattern as
 // getFormattedDateTimeGMT (Ticket Close Date's own formatter) so the two
 // columns read consistently when a time is actually present. Some real
 // tickets only ever got a bare date ("YYYY-MM-DD", no time) - those are
-// formatted as just "DD/MM/YYYY" rather than faking a "12:00 am" that was
+// formatted as just "DD-MMM-YY" rather than faking a "12:00 am" that was
 // never entered. Bulk-imported tickets can hold something else entirely,
 // so anything matching none of these shapes is shown as-is instead of
 // blanked out.
@@ -118,10 +118,10 @@ function formatProblemStartDate(value) {
     if (!value) return ""
     const dateOnly = moment(value, "YYYY-MM-DD", true)
     if (dateOnly.isValid() && !value.includes("T")) {
-        return dateOnly.format("DD/MM/YYYY")
+        return dateOnly.format("DD-MMM-YY").toUpperCase()
     }
     const withTime = moment(value, ["YYYY-MM-DDTHH:mm:ss", "YYYY-MM-DDTHH:mm"], true)
-    return withTime.isValid() ? withTime.format("DD/MM/YYYY hh:mm a") : value
+    return withTime.isValid() ? withTime.format("DD-MMM-YY hh:mm a").toUpperCase() : value
 }
 
 function createDisplayData (data) {

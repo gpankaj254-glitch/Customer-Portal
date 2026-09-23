@@ -117,7 +117,9 @@ const allRoles = {
     "createVendors",
     "bulkUploadOpportunities",
   ],
-  scloudxSalesUser: ["createOpportunities", "editOpportunities", "viewOpportunities", "viewDashboard"],
+  // "Add Sales Opportunity Upload facility to Sales User Also" - Sales
+  // Admin's own bulkUploadOpportunities, granted here too.
+  scloudxSalesUser: ["createOpportunities", "editOpportunities", "viewOpportunities", "viewDashboard", "bulkUploadOpportunities"],
 };
 
 

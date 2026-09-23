@@ -21,7 +21,7 @@ import { roles } from "../../consts"
 import { useSelector, useDispatch } from "react-redux"
 import { Alert, Typography } from "@mui/material"
 import _ from "lodash"
-import moment from "moment"
+import { getFormattedDateTime } from "../../utils/dates"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
 
@@ -173,7 +173,7 @@ export default function CustomerTable(props) {
                     initialValues={{ name: customerToEdit ? customerToEdit.name : "" }}
                     lastEditedNote={
                         customerToEdit && customerToEdit.updatedBy && customerToEdit.updatedBy.name
-                            ? `Last edited by ${customerToEdit.updatedBy.name} on ${moment(customerToEdit.updatedAt).format("MMM D, YYYY h:mm A")}`
+                            ? `Last edited by ${customerToEdit.updatedBy.name} on ${getFormattedDateTime(customerToEdit.updatedAt)}`
                             : null
                     }
                     onSave={handleSaveEdit}

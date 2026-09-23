@@ -17,7 +17,7 @@ import Snackbar from "@mui/material/Snackbar"
 import { Alert, Typography } from "@mui/material"
 import PropTypes from "prop-types"
 import _ from "lodash"
-import moment from "moment"
+import { getFormattedDateTime } from "../../utils/dates"
 
 import { changeLimit, changePage, selectSiteList, selectGetSitesError, selectSearch, deactivateSite, updateSite, getSites } from "./siteSlice"
 import { selectUser } from "../auth/authSlice"
@@ -237,7 +237,7 @@ export default function SiteTable(props) {
                 }}
                 lastEditedNote={
                     siteToEdit && siteToEdit.updatedBy && siteToEdit.updatedBy.name
-                        ? `Last edited by ${siteToEdit.updatedBy.name} on ${moment(siteToEdit.updatedAt).format("MMM D, YYYY h:mm A")}`
+                        ? `Last edited by ${siteToEdit.updatedBy.name} on ${getFormattedDateTime(siteToEdit.updatedAt)}`
                         : null
                 }
                 onSave={handleSaveEdit}

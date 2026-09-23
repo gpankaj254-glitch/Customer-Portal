@@ -13,7 +13,6 @@ import TableContainer from "@mui/material/TableContainer"
 import Alert from "@mui/material/Alert"
 import PropTypes from "prop-types"
 import _ from "lodash"
-import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
 import {
     getSalesDashboardSummary,
@@ -22,10 +21,7 @@ import {
     selectSalesDashboardSummaryError,
 } from "./opportunitySlice"
 import { pageStatusVals } from "./utils"
-
-function formatDate(value) {
-    return value ? moment(value).format("MMM D, YYYY") : ""
-}
+import { getFormattedDateOnly as formatDate } from "../../utils/dates"
 
 // Set by SalesDashboard's `compact` prop (used when it's embedded in the SCX
 // Admin dashboard, next to the ticket tabs) so the tiles, headings and tables
