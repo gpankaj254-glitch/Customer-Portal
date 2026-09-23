@@ -39,6 +39,16 @@ const columns = [
     { id: "description", label: "Description"},
 ]
 
+// "reduce font of User Management for all users" - the header/row Typography
+// was left at its oversized default (h6 headers), unlike Tickets' own table
+// which already got this same compact treatment ("Align to List Open Ticket
+// font of Dashboard" - see TicketsTable.js's own compactSx). Applied the same
+// values here so User Management reads consistently with the rest of the app.
+const compactSx = {
+    "& .MuiTableCell-root": { fontSize: "0.72rem", padding: "4px 8px" },
+    "& .MuiTypography-root": { fontSize: "0.72rem" },
+}
+
 // SCX users show as "SCX Admin"/"SCX NOC"/etc; Customer/Vendor users show as
 // their Customer/Vendor name followed by Admin/User, e.g. "Aryaka Networks Admin".
 function getUserTypeLabel(role) {
@@ -262,7 +272,7 @@ export default function UserTable(props) {
                     </Toolbar>
                 )}
                 <TableContainer sx={{ maxHeight: 440 }}>
-                    <Table stickyHeader aria-label="sticky table">
+                    <Table stickyHeader size="small" aria-label="sticky table" sx={compactSx}>
                         <TableHead>
                             <TableRow>
                                 {isAdmin && (

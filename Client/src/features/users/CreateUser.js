@@ -122,7 +122,7 @@ export default function CreateUser() {
                     }}
                 >
 
-                    <Typography component="h1" variant="h1">
+                    <Typography component="h1" variant="h5">
 
             Create New User
                     </Typography>
