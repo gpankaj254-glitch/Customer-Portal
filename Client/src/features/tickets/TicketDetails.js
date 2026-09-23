@@ -519,7 +519,29 @@ export default function TicketDetails({ ticket, mode }) {
             <Paper sx={{ p: 2, mb: 2 }}>
                 <Typography variant="h5" gutterBottom>Edit / Modify Ticket</Typography>
 
-                <Tabs value={activeTab} onChange={(event, newValue) => setActiveTab(newValue)} sx={{ mb: 2 }}>
+                <Tabs
+                    value={activeTab}
+                    onChange={(event, newValue) => {
+                        setActiveTab(newValue)
+                        // "if i change status to Closed but do not save,
+                        // change to other tab, it immediately blocks
+                        // Customer Communication" - status/closedAt/
+                        // closureCode are shared state across every tab's
+                        // Save (handleSubmit always sends the whole
+                        // ticket), so a picked-but-unsaved "Closed" lingers
+                        // and makes Vendor Communication's own Save (or
+                        // coming back to this tab) demand a Closure Code
+                        // for a close nobody asked for right now. Leaving
+                        // the tab without saving discards that in-progress
+                        // close, back to the ticket's real saved values -
+                        // an intentional close has to be completed without
+                        // switching tabs in between.
+                        setStatus(_.get(ticket, "status", "Submitted"))
+                        setClosedAt("")
+                        setClosureCode(_.get(ticket, "closureCode", ""))
+                    }}
+                    sx={{ mb: 2 }}
+                >
                     <Tab label="Customer Communication" />
                     <Tab label="Vendor Communication" />
                     {mode !== "open" && <Tab label="Ticket Closure details" />}
