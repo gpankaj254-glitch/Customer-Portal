@@ -149,12 +149,30 @@ export default function TicketDetails({ ticket, mode }) {
     // may have no closed date recorded.
     const closedAtText = _.get(ticket, "closedAt") ? getFormattedDate(ticket.closedAt) : "Not recorded"
     const closureCodeText = _.get(ticket, "closureCode") || "Not recorded"
-    // Customer Communication / Vendor Communication (the core ticket fields
-    // and their comment threads) are only editable from the Open Tickets
-    // view - once a ticket has moved to the Closed or Completed tab, only
-    // the Ticket Closure details tab may still be touched (and none at all
-    // once Completed), mirroring the server's own guard in updateTicket.
-    const mainFieldsLocked = mode !== "open"
+    // Customer Communication / Vendor Communication's own fields are only
+    // editable from the Open Tickets view - once a ticket has moved to the
+    // Closed or Completed tab, only the Ticket Closure details tab may
+    // still be touched (and none at all once Completed) - except for SCX
+    // Admin, who can still edit these too ("Give rights to SCX Admin to
+    // update Ticket for Closed or Completed Ticket also"), mirroring the
+    // server's own guard in updateTicket.
+    const mainFieldsLocked = mode !== "open" && currentUser.role !== roles.SCLOUDX_ADMIN
+    // Adding a new comment/attachment is a separate server-side capability
+    // (appendTicketDescription/appendVendorDescription/addTicketAttachments)
+    // that stays closed-ticket-blocked for every role including SCX Admin -
+    // unlike mainFieldsLocked above, this has no Admin exception.
+    const commentsLocked = mode !== "open"
+    // Ticket Closure details tab - already editable for everyone while
+    // Closed; Completed freezes it too, except for SCX Admin, same
+    // exception as mainFieldsLocked above.
+    const closureFieldsLocked = mode === "completed" && currentUser.role !== roles.SCLOUDX_ADMIN
+    // The Status dropdown itself stays locked even for SCX Admin once a
+    // ticket is Closed/Completed - the server only ever accepts it
+    // unchanged or moving Closed -> Completed (see updateTicket), and this
+    // dropdown's own option list (tab0StatusOptions) isn't scoped down to
+    // just those choices, so leaving it enabled could offer a pick the
+    // server would then reject.
+    const statusFieldLocked = mode !== "open"
     // The locally selected, not-yet-saved status - drives whether Closure
     // Code appears (Open mode only) the moment "Closed" is picked, ahead of
     // the eventual save.
@@ -179,8 +197,10 @@ export default function TicketDetails({ ticket, mode }) {
         }
     }, [vendorDescription])
 
-    // The general ticket edit form - Open Tickets tab only (Customer/Vendor
-    // Communication). Ticket Closure details has its own handler below.
+    // The general ticket edit form (Customer/Vendor Communication) - Open
+    // Tickets only for most roles; SCX Admin can also reach this from a
+    // Closed/Completed ticket (see mainFieldsLocked). Ticket Closure
+    // details has its own handler below.
     const handleSubmit = async (event) => {
         event.preventDefault()
         if (closingNow && !closureCode) {
@@ -574,7 +594,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     />
                                 </Grid>
                                 <Grid item xs={12} sm={4}>
-                                    <FormControl fullWidth required disabled={mainFieldsLocked}>
+                                    <FormControl fullWidth required disabled={statusFieldLocked}>
                                         <InputLabel id={`status-${ticket.id}`}>Status</InputLabel>
                                         <Select
                                             labelId={`status-${ticket.id}`}
@@ -674,7 +694,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     </Grid>
                                 )}
 
-                                {mainFieldsLocked ? (
+                                {commentsLocked ? (
                                     <Grid item xs={12}>
                                         <Typography variant="body2" color="text.secondary">
                                             This ticket is closed - comments can no longer be added.
@@ -808,7 +828,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     </Grid>
                                 )}
 
-                                {mainFieldsLocked ? (
+                                {commentsLocked ? (
                                     <Grid item xs={12}>
                                         <Typography variant="body2" color="text.secondary">
                                             This ticket is closed - comments can no longer be added.
@@ -887,7 +907,7 @@ export default function TicketDetails({ ticket, mode }) {
                                 </Grid>
                             )}
                             <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth disabled={mode === "completed"}>
+                                <FormControl fullWidth disabled={closureFieldsLocked}>
                                     <InputLabel id="rfo-status-label">RFO Status</InputLabel>
                                     <Select
                                         labelId="rfo-status-label"
@@ -910,7 +930,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={ticketStartDateTime}
                                     onChange={(event) => setTicketStartDateTime(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -921,7 +941,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={actualIssueStartDateTime}
                                     onChange={(event) => setActualIssueStartDateTime(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -932,7 +952,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={reportedToSupplier}
                                     onChange={(event) => setReportedToSupplier(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -943,7 +963,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={resolvedFromSupplier}
                                     onChange={(event) => setResolvedFromSupplier(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -954,7 +974,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={issueReportedResolvedToAryaka}
                                     onChange={(event) => setIssueReportedResolvedToAryaka(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -964,7 +984,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     label="Actual Down time (Minutes)"
                                     value={actualDownTimeMinutes}
                                     onChange={(event) => setActualDownTimeMinutes(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -975,7 +995,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     InputLabelProps={{ shrink: true }}
                                     value={issueResolvedDateTime}
                                     onChange={(event) => setIssueResolvedDateTime(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -985,20 +1005,20 @@ export default function TicketDetails({ ticket, mode }) {
                                     label="Overall Down Time"
                                     value={overallDownTime}
                                     onChange={(event) => setOverallDownTime(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="RFO" value={rfo} onChange={(event) => setRfo(event.target.value)} disabled={mode === "completed"} />
+                                <TextField fullWidth label="RFO" value={rfo} onChange={(event) => setRfo(event.target.value)} disabled={closureFieldsLocked} />
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} disabled={mode === "completed"} />
+                                <TextField fullWidth label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} disabled={closureFieldsLocked} />
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Reason Code" value={reasonCode} onChange={(event) => setReasonCode(event.target.value)} disabled={mode === "completed"} />
+                                <TextField fullWidth label="Reason Code" value={reasonCode} onChange={(event) => setReasonCode(event.target.value)} disabled={closureFieldsLocked} />
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Remarks" value={remarks} onChange={(event) => setRemarks(event.target.value)} disabled={mode === "completed"} />
+                                <TextField fullWidth label="Remarks" value={remarks} onChange={(event) => setRemarks(event.target.value)} disabled={closureFieldsLocked} />
                             </Grid>
                             <Grid item xs={12} sm={4}>
                                 <TextField
@@ -1007,7 +1027,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     label="Scloudx Bucket"
                                     value={scloudxBucket}
                                     onChange={(event) => setScloudxBucket(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -1017,7 +1037,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     label="Supplier Bucket"
                                     value={supplierBucket}
                                     onChange={(event) => setSupplierBucket(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -1027,11 +1047,11 @@ export default function TicketDetails({ ticket, mode }) {
                                     label="Customer Bucket"
                                     value={customerBucket}
                                     onChange={(event) => setCustomerBucket(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Category" value={category} onChange={(event) => setCategory(event.target.value)} disabled={mode === "completed"} />
+                                <TextField fullWidth label="Category" value={category} onChange={(event) => setCategory(event.target.value)} disabled={closureFieldsLocked} />
                             </Grid>
                             <Grid item xs={12} sm={4}>
                                 <TextField
@@ -1040,7 +1060,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     label="Total Minutes"
                                     value={totalMinutes}
                                     onChange={(event) => setTotalMinutes(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -1050,7 +1070,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     label="Down Time Minutes"
                                     value={downTimeMinutes}
                                     onChange={(event) => setDownTimeMinutes(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -1060,7 +1080,7 @@ export default function TicketDetails({ ticket, mode }) {
                                     label="Uptime %"
                                     value={uptimePercent}
                                     onChange={(event) => setUptimePercent(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -1070,11 +1090,11 @@ export default function TicketDetails({ ticket, mode }) {
                                     label="Down Time Hours"
                                     value={downTimeHours}
                                     onChange={(event) => setDownTimeHours(event.target.value)}
-                                    disabled={mode === "completed"}
+                                    disabled={closureFieldsLocked}
                                 />
                             </Grid>
 
-                            {mode === "closed" && (
+                            {!closureFieldsLocked && (
                                 <Grid item xs={12}>
                                     <Button type="submit" variant="contained" disabled={submitting}>
                                         {submitting ? "Saving..." : "Save"}

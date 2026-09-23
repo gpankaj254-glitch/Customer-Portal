@@ -226,6 +226,13 @@ const getAuthorizedTicket = async (ticketId, user) => {
  * different circuit. Description/Vendor Description are not editable here -
  * they can only be appended to (see appendTicketDescription /
  * appendVendorDescription), so the original text is always preserved.
+ * A Closed or Completed ticket is normally frozen (Closed keeps only its
+ * Closure Details editable; Completed is fully frozen) - "Give rights to
+ * SCX Admin to update Ticket for Closed or Completed Ticket also" lifts
+ * that for SCX Admin specifically, who can still edit every normal field on
+ * either. The status itself still only moves forward one step at most
+ * (stays put, or Closed -> Completed) - this doesn't add a way to reopen a
+ * ticket back to an earlier status.
  * @param {Object} ticketBody
  * @param {Object} user
  * @returns {Promise<Ticket>}
@@ -272,25 +279,42 @@ const updateTicket = async (ticketBody, user) => {
     vendorTicketClosureDate,
   } = ticketBody;
   const ticket = await getAuthorizedTicket(ticketId, user);
+  const isScxAdmin = user.role === roleTypes.scloudxAdmin;
 
-  // Completed is final - no further edits through this endpoint at all.
-  if (ticket.status === "Completed") {
+  // Completed is final - no further edits through this endpoint at all,
+  // except for SCX Admin (see this function's own doc comment above).
+  if (ticket.status === "Completed" && !isScxAdmin) {
     throw new ApiError(httpStatus.BAD_REQUEST, "This ticket is completed and can no longer be modified");
   }
 
-  if (ticket.status === "Closed") {
-    // Once Closed, the rest of the ticket is frozen - only Ticket Closure
-    // details may still be edited, via the Closed Tickets tab, and the only
-    // status change allowed from here is on to Completed (or resaving
-    // Closure details while staying Closed).
-    if (status !== "Closed" && status !== "Completed") {
-      throw new ApiError(httpStatus.BAD_REQUEST, "A closed ticket can only stay Closed or be marked Completed");
+  if (ticket.status === "Closed" || (ticket.status === "Completed" && isScxAdmin)) {
+    // Once Closed (or Completed, for SCX Admin), the rest of the ticket is
+    // frozen for every other role - only Ticket Closure details may still
+    // be edited, via the Closed Tickets tab, and status can only stay put
+    // or move on to Completed, never back to an earlier open status.
+    if (status !== ticket.status && status !== "Completed") {
+      throw new ApiError(httpStatus.BAD_REQUEST, "This ticket's status can only stay the same or move to Completed");
     }
     CLOSURE_DETAIL_FIELDS.forEach((field) => {
       if (ticketBody[field] !== undefined) {
         ticket.closureDetails[field] = ticketBody[field];
       }
     });
+    if (isScxAdmin) {
+      // Same fields a still-open ticket allows below - SCX Admin can still
+      // fix these after the ticket is Closed/Completed.
+      if (problemType !== undefined) ticket.problemType = problemType;
+      if (otherProblemDetails !== undefined) ticket.otherProblemDetails = _.trim(otherProblemDetails);
+      if (ticket.problemType !== "Other") ticket.otherProblemDetails = "";
+      if (customerReference !== undefined) ticket.customerReference = customerReference;
+      if (priority !== undefined) ticket.priority = priority;
+      if (closureCode !== undefined) ticket.closureCode = closureCode;
+      if (scxInternalComments !== undefined) ticket.scxInternalComments = scxInternalComments;
+      if (vendorTicketId !== undefined) ticket.vendorTicketId = vendorTicketId;
+      if (vendorTicketCreateDate !== undefined) ticket.vendorTicketCreateDate = vendorTicketCreateDate;
+      if (vendorTicketStatus !== undefined) ticket.vendorTicketStatus = vendorTicketStatus;
+      if (vendorTicketClosureDate !== undefined) ticket.vendorTicketClosureDate = vendorTicketClosureDate;
+    }
     ticket.status = status;
     return updateAndSave(ticket, status, "", user);
   }
