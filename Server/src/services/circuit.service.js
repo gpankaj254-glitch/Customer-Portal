@@ -523,8 +523,12 @@ const BULK_UPLOAD_COLUMNS = [
  * all other site-derived details (customer, region) come from that matched
  * Site record, never from the CSV's own copies. Vendor Name must match an
  * existing active Vendor, and Bandwidth/Product (when given) must be one of
- * the predefined options. Does not write anything - the caller only inserts
- * if there are zero failedRows, keeping the upload all-or-nothing.
+ * the predefined options. A row's Vendor Circuit ID is only rejected as a
+ * duplicate against an existing Live circuit at that site - one that's
+ * already Ceased or Changed no longer blocks a new circuit from reusing its
+ * ID ("This duplicate validation should be checked only for Live circuits,
+ * not Closed[Ceased] or Changed"). Does not write anything - the caller only
+ * inserts if there are zero failedRows, keeping the upload all-or-nothing.
  * @param {Buffer} fileBuffer
  * @returns {Promise<{totalRows: number, failedRows: Array, validRows: Array}>}
  */
@@ -600,8 +604,15 @@ const validateBulkUploadCircuits = async (fileBuffer) => {
       circuitCodes.add(createCodeFromName(vendorCircuitId, site.code));
     }
   });
-  const existingCircuits = await Circuit.find({ code: { $in: [...circuitCodes] } }).select("code");
-  const existingCircuitCodes = new Set(existingCircuits.map((circuit) => circuit.code));
+  const existingCircuits = await Circuit.find({ code: { $in: [...circuitCodes] } }).select("code status");
+  // "This duplicate validation should be checked only for Live circuits, not
+  // Closed[Ceased] or Changed" - a circuit that's already moved on to Ceased
+  // or Changed no longer blocks a new circuit from reusing its Vendor
+  // Circuit ID at the same site; only an existing Live circuit does (status
+  // defaults to "Live" - see circuit.model.js).
+  const existingLiveCircuitCodes = new Set(
+    existingCircuits.filter((circuit) => (circuit.status || "Live") === "Live").map((circuit) => circuit.code)
+  );
 
   const failedRows = [];
   const validRows = [];
@@ -663,7 +674,7 @@ const validateBulkUploadCircuits = async (fileBuffer) => {
         errors.push("Duplicate circuit (same Site + Vendor Circuit ID) within this file");
       } else {
         seenCodes.add(code);
-        if (existingCircuitCodes.has(code)) {
+        if (existingLiveCircuitCodes.has(code)) {
           errors.push("A circuit with this Vendor Circuit ID already exists for this site");
         }
       }
