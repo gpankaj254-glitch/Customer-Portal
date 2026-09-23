@@ -3,6 +3,7 @@ import Box from "@mui/material/Box"
 import Grid from "@mui/material/Grid"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
+import TextField from "@mui/material/TextField"
 import Tabs from "@mui/material/Tabs"
 import Tab from "@mui/material/Tab"
 import Table from "@mui/material/Table"
@@ -359,27 +360,37 @@ CommunicationList.defaultProps = {
     readOnly: false,
 }
 
-// One label/value pair in the Opportunity Details read-only summary below.
-function DetailItem({ label, value, fullWidth }) {
+// One field in the Opportunity Details read-only summary below - "Why
+// Opportunity Details are in plain text, not in Field Form?" - rendered as
+// a disabled, bordered TextField (same look as Create Opportunity's own
+// fields) instead of plain label/value text.
+function DetailItem({ label, value, fullWidth, multiline }) {
     return (
         <Grid item xs={12} sm={fullWidth ? 12 : 6} md={fullWidth ? 12 : 4}>
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{label}</Typography>
-            <Typography variant="body2" sx={{ wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
-                {value || <>&mdash;</>}
-            </Typography>
+            <TextField
+                fullWidth
+                size="small"
+                disabled
+                multiline={multiline}
+                minRows={multiline ? 3 : undefined}
+                label={label}
+                value={value || ""}
+            />
         </Grid>
     )
 }
 
 DetailItem.propTypes = {
     label: PropTypes.string.isRequired,
-    value: PropTypes.node,
+    value: PropTypes.string,
     fullWidth: PropTypes.bool,
+    multiline: PropTypes.bool,
 }
 
 DetailItem.defaultProps = {
     value: "",
     fullWidth: false,
+    multiline: false,
 }
 
 // "New Tab before supplier communication - Opportunity Details - Display
@@ -403,7 +414,7 @@ function OpportunityDetailsView({ opportunity, onEdit }) {
                 <DetailItem label="Opportunity Name" value={opportunity.name} />
                 <DetailItem label="Customer / Prospect" value={_.get(opportunity, "customer.name") || opportunity.prospectName} />
                 <DetailItem label="Stage" value={opportunity.stage} />
-                <DetailItem label="Description" value={opportunity.description} fullWidth />
+                <DetailItem label="Description" value={opportunity.description} fullWidth multiline />
                 <DetailItem label="Request ID" value={customerRequest.requestId} />
                 <DetailItem label="Request Date" value={customerRequest.requestDate} />
                 <DetailItem label="Link Type" value={customerRequest.linkType} />
