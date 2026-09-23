@@ -18,6 +18,8 @@ import TableCell from "@mui/material/TableCell"
 import TableContainer from "@mui/material/TableContainer"
 import Link from "@mui/material/Link"
 import Alert from "@mui/material/Alert"
+import Button from "@mui/material/Button"
+import DownloadIcon from "@mui/icons-material/Download"
 import _ from "lodash"
 import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
@@ -27,6 +29,7 @@ import { focusSite } from "../inventory/inventorySlice"
 import { pageStatusVals } from "../inventory/utils"
 import { togglePage } from "../landing/landingSlice"
 import { pages } from "../../consts"
+import { downloadCsv } from "../../utils/csv"
 
 // Fixed column widths (see the Table's tableLayout: "fixed" below) so every
 // row lines up under its header instead of each column auto-sizing to its
@@ -106,6 +109,12 @@ export default function FinanceDashboard() {
     // computed and they don't match. Independent of, and combinable with,
     // the filter above.
     const [onlyGapRows, setOnlyGapRows] = React.useState(false)
+    // "Sorting the List in Ascending or Descending order by Contract
+    // Pending (Months) for both customer and supplier" - sortField is
+    // either Contract Pending column's id ("" = unsorted, keeps the
+    // server's own site.name order).
+    const [sortField, setSortField] = React.useState("")
+    const [sortDirection, setSortDirection] = React.useState("asc")
 
     // Switching basis invalidates the previously-picked Name (a Vendor name
     // isn't a valid Customer name and vice versa).
@@ -210,6 +219,31 @@ export default function FinanceDashboard() {
         return true
     })
 
+    // Rows that couldn't be computed ("-") always sort last regardless of
+    // direction - there's no real value to place them by, and burying them
+    // at the top (as the smallest possible value would, ascending) would
+    // read as "most urgent" when they're actually just unknown.
+    const sortedRows = sortField
+        ? [...filteredRows].sort((a, b) => {
+            const left = a[sortField]
+            const right = b[sortField]
+            if (left === "-" && right === "-") return 0
+            if (left === "-") return 1
+            if (right === "-") return -1
+            const diff = Number(left) - Number(right)
+            return sortDirection === "asc" ? diff : -diff
+        })
+        : filteredRows
+
+    // "Download this whole list in CSV file" - exports exactly what's
+    // currently on screen (search + filters + sort applied), not the
+    // unfiltered full fetch, matching what "this list" refers to.
+    const handleDownloadCsv = () => {
+        const headers = columns.map((column) => column.label)
+        const csvRows = sortedRows.map((row) => columns.map((column) => row[column.id]))
+        downloadCsv(`finance-circuits-${moment().format("YYYY-MM-DD")}.csv`, headers, csvRows)
+    }
+
     const loading = status === pageStatusVals.loading || status === pageStatusVals.idle
 
     return (
@@ -290,6 +324,49 @@ export default function FinanceDashboard() {
                     label={<Typography variant="body2" sx={{ fontSize: "0.75rem" }}>Only Contract Gap rows</Typography>}
                 />
             </Grid>
+            {/* "Sorting the List in Ascending or Descending order by Contract
+                Pending (Months) for both customer and supplier" */}
+            <Grid item xs={12} sm={4}>
+                <FormControl fullWidth size="small">
+                    <InputLabel id="finance-sort-field-label">Sort by</InputLabel>
+                    <Select
+                        labelId="finance-sort-field-label"
+                        label="Sort by"
+                        value={sortField}
+                        onChange={(event) => setSortField(event.target.value)}
+                    >
+                        <MenuItem value=""><em>None</em></MenuItem>
+                        <MenuItem value="customerContractPendingMonths">Customer Contract Pending (Months)</MenuItem>
+                        <MenuItem value="vendorContractPendingMonths">Vendor Contract Pending (Months)</MenuItem>
+                    </Select>
+                </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={2}>
+                <FormControl fullWidth size="small" disabled={!sortField}>
+                    <InputLabel id="finance-sort-direction-label">Order</InputLabel>
+                    <Select
+                        labelId="finance-sort-direction-label"
+                        label="Order"
+                        value={sortDirection}
+                        onChange={(event) => setSortDirection(event.target.value)}
+                    >
+                        <MenuItem value="asc">Ascending</MenuItem>
+                        <MenuItem value="desc">Descending</MenuItem>
+                    </Select>
+                </FormControl>
+            </Grid>
+            {/* "Give option to download this whole list in CSV file" */}
+            <Grid item xs={12} sm={3} sx={{ display: "flex", alignItems: "center" }}>
+                <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<DownloadIcon />}
+                    onClick={handleDownloadCsv}
+                    disabled={loading || sortedRows.length === 0}
+                >
+                    Download CSV
+                </Button>
+            </Grid>
             <Grid item xs={12}>
                 {error ? (
                     <Alert severity="error">Unable to load circuits</Alert>
@@ -323,7 +400,7 @@ export default function FinanceDashboard() {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {filteredRows.length === 0 && (
+                                    {sortedRows.length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={columns.length}>
                                                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.72rem" }}>
@@ -332,7 +409,7 @@ export default function FinanceDashboard() {
                                             </TableCell>
                                         </TableRow>
                                     )}
-                                    {filteredRows.map((row) => (
+                                    {sortedRows.map((row) => (
                                         <TableRow key={row.id}>
                                             {columns.map((column) => (
                                                 <TableCell key={column.id} sx={{ width: column.width }}>
@@ -362,7 +439,7 @@ export default function FinanceDashboard() {
                             </Table>
                         </TableContainer>
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.72rem", mt: 0.5, textAlign: "right" }}>
-                            {filteredRows.length} Rows Found
+                            {sortedRows.length} Rows Found
                         </Typography>
                     </>
                 )}
