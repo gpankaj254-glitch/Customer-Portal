@@ -124,7 +124,10 @@ const opportunitySchema = mongoose.Schema(
       // including the initial value at creation - see
       // opportunity.service.js's createOpportunity/updateOpportunityById.
       // currency/nrc/mrc are a snapshot of those fields as of that change,
-      // not just the status itself.
+      // not just the status itself. A new entry is also logged when
+      // currency/nrc/mrc change on their own, status unchanged ("capture
+      // ... for every price change even if the status does not change"),
+      // and every entry records who made that change.
       statusHistory: {
         type: [
           {
@@ -133,6 +136,12 @@ const opportunitySchema = mongoose.Schema(
             currency: { type: String },
             nrc: { type: Number },
             mrc: { type: Number },
+            user: {
+              id: { type: String },
+              name: { type: String },
+              email: { type: String },
+              role: { type: String },
+            },
           },
         ],
         default: [],
@@ -151,7 +160,10 @@ const opportunitySchema = mongoose.Schema(
           quoteStatus: { type: String, enum: supplierQuoteStatusOptions, default: "Pending" },
           // Every quoteStatus this entry has been set to, in order, including
           // the initial value at creation. currency/nrc/mrc are a snapshot
-          // of those fields as of that change, not just the status itself.
+          // of those fields as of that change, not just the status itself. A
+          // new entry is also logged when currency/nrc/mrc change on their
+          // own, status unchanged, and every entry records who made that
+          // change - same as customerRequest.statusHistory above.
           statusHistory: {
             type: [
               {
@@ -160,6 +172,12 @@ const opportunitySchema = mongoose.Schema(
                 currency: { type: String },
                 nrc: { type: Number },
                 mrc: { type: Number },
+                user: {
+                  id: { type: String },
+                  name: { type: String },
+                  email: { type: String },
+                  role: { type: String },
+                },
               },
             ],
             default: [],

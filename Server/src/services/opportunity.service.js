@@ -111,6 +111,7 @@ const createOpportunity = async (reqBody, user, relatedCustomer = null) => {
         currency: _.get(opportunityToCreate, "customerRequest.currency", ""),
         nrc: _.get(opportunityToCreate, "customerRequest.nrc", null),
         mrc: _.get(opportunityToCreate, "customerRequest.mrc", null),
+        user: extractUserDetails(user),
       },
     ],
   };
@@ -170,13 +171,21 @@ const updateOpportunityById = async (opportunityId, updateBody, actingUser, rela
     const statusChanged =
       updateBody.customerRequest.quoteStatus !== undefined &&
       updateBody.customerRequest.quoteStatus !== existingCustomerRequest.quoteStatus;
-    mergedCustomerRequest.statusHistory = statusChanged
+    // "capture ... activity log updated for every price change even if the
+    // status does not change" - logged independently of statusChanged.
+    const priceChanged =
+      mergedCustomerRequest.currency !== existingCustomerRequest.currency ||
+      mergedCustomerRequest.nrc !== existingCustomerRequest.nrc ||
+      mergedCustomerRequest.mrc !== existingCustomerRequest.mrc;
+    mergedCustomerRequest.statusHistory = statusChanged || priceChanged
       ? _.concat(existingCustomerRequest.statusHistory || [], {
-          status: updateBody.customerRequest.quoteStatus,
+          status: mergedCustomerRequest.quoteStatus,
           changedAt: new Date().toISOString(),
           currency: mergedCustomerRequest.currency || "",
           nrc: mergedCustomerRequest.nrc ?? null,
           mrc: mergedCustomerRequest.mrc ?? null,
+          // "capture the User ID who is changing the price or status"
+          user: extractUserDetails(actingUser),
         })
       : existingCustomerRequest.statusHistory || [];
     updateBody.customerRequest = mergedCustomerRequest;
@@ -187,8 +196,9 @@ const updateOpportunityById = async (opportunityId, updateBody, actingUser, rela
   // entry's statusHistory and attachments have to be explicitly carried over
   // here or they would be silently dropped on save - a brand new entry (no
   // _id yet) gets seeded with its initial status and no attachments, an
-  // existing entry only gets a new log line when its status actually
-  // changed, otherwise its prior history/attachments are preserved.
+  // existing entry only gets a new log line when its status or its
+  // currency/nrc/mrc actually changed, otherwise its prior history/
+  // attachments are preserved.
   if (updateBody.supplierCommunications) {
     const existingById = _.keyBy(snapshot.supplierCommunications || [], (entry) => String(entry._id));
     updateBody.supplierCommunications = updateBody.supplierCommunications.map((entry) => {
@@ -204,19 +214,28 @@ const updateOpportunityById = async (opportunityId, updateBody, actingUser, rela
               currency: entry.currency || "",
               nrc: entry.nrc ?? null,
               mrc: entry.mrc ?? null,
+              user: extractUserDetails(actingUser),
             },
           ],
           attachments: [],
         };
       }
       const statusChanged = entry.quoteStatus !== undefined && entry.quoteStatus !== existingEntry.quoteStatus;
-      const statusHistory = statusChanged
+      // "capture ... activity log updated for every price change even if
+      // the status does not change" - logged independently of statusChanged.
+      const priceChanged =
+        (entry.currency !== undefined && entry.currency !== existingEntry.currency) ||
+        (entry.nrc !== undefined && entry.nrc !== existingEntry.nrc) ||
+        (entry.mrc !== undefined && entry.mrc !== existingEntry.mrc);
+      const statusHistory = statusChanged || priceChanged
         ? _.concat(existingEntry.statusHistory || [], {
-            status: entry.quoteStatus,
+            status: entry.quoteStatus !== undefined ? entry.quoteStatus : existingEntry.quoteStatus,
             changedAt: now,
-            currency: entry.currency || "",
-            nrc: entry.nrc ?? null,
-            mrc: entry.mrc ?? null,
+            currency: entry.currency !== undefined ? entry.currency || "" : existingEntry.currency || "",
+            nrc: entry.nrc !== undefined ? entry.nrc ?? null : existingEntry.nrc ?? null,
+            mrc: entry.mrc !== undefined ? entry.mrc ?? null : existingEntry.mrc ?? null,
+            // "capture the User ID who is changing the price or status"
+            user: extractUserDetails(actingUser),
           })
         : existingEntry.statusHistory || [];
       return { ...entry, statusHistory, attachments: existingEntry.attachments || [] };
@@ -815,11 +834,21 @@ const bulkUploadSupplierResponses = async (fileBuffer, actingUser) => {
           mrc: row.mrc,
           quoteSubmitDate: row.quoteSubmitDate,
           quoteStatus: row.quoteStatus,
-          statusHistory: [{ status: row.quoteStatus, changedAt: now, currency: row.currency || "", nrc: row.nrc ?? null, mrc: row.mrc ?? null }],
+          statusHistory: [{
+            status: row.quoteStatus,
+            changedAt: now,
+            currency: row.currency || "",
+            nrc: row.nrc ?? null,
+            mrc: row.mrc ?? null,
+            user: extractUserDetails(actingUser),
+          }],
         });
       } else {
         const existing = opportunity.supplierCommunications[matchIndex];
         const statusChanged = row.quoteStatus !== existing.quoteStatus;
+        // "capture ... activity log updated for every price change even if
+        // the status does not change" - logged independently of statusChanged.
+        const priceChanged = row.currency !== existing.currency || row.nrc !== existing.nrc || row.mrc !== existing.mrc;
         existing.supplier = row.supplier;
         existing.quoteRequestDate = row.quoteRequestDate;
         existing.currency = row.currency;
@@ -828,13 +857,15 @@ const bulkUploadSupplierResponses = async (fileBuffer, actingUser) => {
         existing.mrc = row.mrc;
         existing.quoteSubmitDate = row.quoteSubmitDate;
         existing.quoteStatus = row.quoteStatus;
-        if (statusChanged) {
+        if (statusChanged || priceChanged) {
           existing.statusHistory = _.concat(existing.statusHistory || [], {
             status: row.quoteStatus,
             changedAt: now,
             currency: row.currency || "",
             nrc: row.nrc ?? null,
             mrc: row.mrc ?? null,
+            // "capture the User ID who is changing the price or status"
+            user: extractUserDetails(actingUser),
           });
         }
       }

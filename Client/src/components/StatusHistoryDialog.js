@@ -19,11 +19,14 @@ function formatDateTime(value) {
     return value ? moment(value).format("MMM D, YYYY h:mm A") : ""
 }
 
-// Read-only table of {status, currency, nrc, mrc, changedAt} entries, most
-// recent first - shared by the Opportunity-level Log (Customer Request's own
-// status history) and each Supplier Communication entry's own log. Status
-// stays the leftmost column and Changed At the rightmost, with the
-// currency/nrc/mrc snapshot for that change in between.
+// Read-only table of {status, currency, nrc, mrc, changedAt, user} entries,
+// most recent first - shared by the Opportunity-level Log (Customer
+// Request's own status history) and each Supplier Communication entry's own
+// log. Status stays the leftmost column and Changed At the rightmost, with
+// the currency/nrc/mrc snapshot and who made the change in between. A new
+// entry is logged for a price change alone, not just a status change (see
+// opportunity.service.js) - so this doubles as a price-change audit trail,
+// not just a status log.
 export function StatusHistoryTable({ history }) {
     const sorted = [...history].sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))
     return (
@@ -35,13 +38,14 @@ export function StatusHistoryTable({ history }) {
                         <TableCell><Typography variant="subtitle2">Currency</Typography></TableCell>
                         <TableCell><Typography variant="subtitle2">NRC</Typography></TableCell>
                         <TableCell><Typography variant="subtitle2">MRC</Typography></TableCell>
+                        <TableCell><Typography variant="subtitle2">Changed By</Typography></TableCell>
                         <TableCell><Typography variant="subtitle2">Changed At</Typography></TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
                     {sorted.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={5}>
+                            <TableCell colSpan={6}>
                                 <Typography variant="body2" color="text.secondary">
                                     No status changes recorded yet
                                 </Typography>
@@ -55,6 +59,7 @@ export function StatusHistoryTable({ history }) {
                             <TableCell>{entry.currency || ""}</TableCell>
                             <TableCell>{entry.nrc ?? ""}</TableCell>
                             <TableCell>{entry.mrc ?? ""}</TableCell>
+                            <TableCell>{(entry.user || {}).name || ""}</TableCell>
                             <TableCell>{formatDateTime(entry.changedAt)}</TableCell>
                         </TableRow>
                     ))}
