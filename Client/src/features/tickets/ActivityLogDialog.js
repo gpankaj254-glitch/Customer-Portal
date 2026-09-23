@@ -14,6 +14,18 @@ import PropTypes from "prop-types"
 import _ from "lodash"
 import { getFormattedDate } from "../../utils/dates"
 
+// "Reduce and standardize Fonts of all Activity Logs" - same compact scale
+// (0.75rem) shared, identically, with Delivery's own ActivityLogDialog.js
+// and the Opportunity Status Log (StatusHistoryDialog.js) - applied here on
+// the Dialog itself so it reaches every descendant without them being
+// portaled away.
+const logSx = {
+    "& .MuiDialogTitle-root": { fontSize: "1rem" },
+    "& .MuiStepLabel-label, & .MuiTypography-body2, & .MuiTypography-caption": { fontSize: "0.75rem" },
+    "& .MuiChip-root": { height: 20 },
+    "& .MuiChip-label": { fontSize: "0.68rem" },
+}
+
 // A ticket's Activity Log - every status change with who made it, when, and
 // their comment. Opened from the Action/ Update column of the Tickets list
 // (SCX roles only - see TicketsTable).
@@ -21,7 +33,7 @@ export default function ActivityLogDialog({ open, ticket, onClose }) {
     const history = _.get(ticket, "history", [])
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" scroll="paper">
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" scroll="paper" sx={logSx}>
             <DialogTitle>Activity Log{ticket ? ` - ${ticket.ticketId}` : ""}</DialogTitle>
             <DialogContent dividers>
                 {history.length === 0 ? (

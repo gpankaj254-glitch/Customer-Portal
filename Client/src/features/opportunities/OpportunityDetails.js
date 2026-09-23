@@ -40,7 +40,7 @@ const ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.gif,.bmp,.webp,.pdf,.doc,.docx,.xls,
 // attachments - only usable once the entry has a real _id (i.e. it's been
 // saved at least once), since attachments upload straight to the server
 // against that id rather than living in local unsaved state.
-function SupplierAttachmentsDialog({ open, opportunityId, entry, onClose }) {
+function SupplierAttachmentsDialog({ open, opportunityId, entry, onClose, readOnly = false }) {
     const dispatch = useDispatch()
     const [uploading, setUploading] = React.useState(false)
     const [error, setError] = React.useState("")
@@ -97,22 +97,26 @@ function SupplierAttachmentsDialog({ open, opportunityId, entry, onClose }) {
                     ))}
                 </Box>
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept={ATTACHMENT_ACCEPT}
-                    style={{ display: "none" }}
-                    onChange={handleFilesSelected}
-                />
-                <Button
-                    variant="outlined"
-                    startIcon={<AttachFileIcon />}
-                    disabled={uploading}
-                    onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                >
-                    {uploading ? "Uploading..." : "Add Files"}
-                </Button>
+                {!readOnly && (
+                    <>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            multiple
+                            accept={ATTACHMENT_ACCEPT}
+                            style={{ display: "none" }}
+                            onChange={handleFilesSelected}
+                        />
+                        <Button
+                            variant="outlined"
+                            startIcon={<AttachFileIcon />}
+                            disabled={uploading}
+                            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                        >
+                            {uploading ? "Uploading..." : "Add Files"}
+                        </Button>
+                    </>
+                )}
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Close</Button>
@@ -126,6 +130,7 @@ SupplierAttachmentsDialog.propTypes = {
     opportunityId: PropTypes.string,
     entry: PropTypes.object,
     onClose: PropTypes.func.isRequired,
+    readOnly: PropTypes.bool,
 }
 
 const currencySelectOptions = currencyOptions.map((option) => ({
@@ -179,7 +184,7 @@ function emptyValuesFor(fields) {
 // Shared add/edit/delete list UI for Supplier Communication - entries live
 // in the parent's local state (not saved until the "Save Communications"
 // button).
-function CommunicationList({ entries, onChange, columns, fields, numberFields, entityLabel, opportunityId, showAttachments }) {
+function CommunicationList({ entries, onChange, columns, fields, numberFields, entityLabel, opportunityId, showAttachments, readOnly }) {
     const [editingIndex, setEditingIndex] = React.useState(null) // -1 = adding new
     const [deletingIndex, setDeletingIndex] = React.useState(null)
     const [viewingLogIndex, setViewingLogIndex] = React.useState(null)
@@ -215,11 +220,13 @@ function CommunicationList({ entries, onChange, columns, fields, numberFields, e
 
     return (
         <Box>
-            <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
-                <Button startIcon={<AddIcon />} variant="outlined" onClick={() => setEditingIndex(-1)}>
-                    Add {entityLabel}
-                </Button>
-            </Box>
+            {!readOnly && (
+                <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+                    <Button startIcon={<AddIcon />} variant="outlined" onClick={() => setEditingIndex(-1)}>
+                        Add {entityLabel}
+                    </Button>
+                </Box>
+            )}
             <TableContainer component={Paper} variant="outlined">
                 <Table size="small">
                     <TableHead>
@@ -259,12 +266,16 @@ function CommunicationList({ entries, onChange, columns, fields, numberFields, e
                                     )
                                 })}
                                 <TableCell align="right">
-                                    <IconButton aria-label={`edit ${entityLabel} ${index}`} onClick={() => setEditingIndex(index)}>
-                                        <EditIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton aria-label={`delete ${entityLabel} ${index}`} onClick={() => setDeletingIndex(index)}>
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
+                                    {!readOnly && (
+                                        <>
+                                            <IconButton aria-label={`edit ${entityLabel} ${index}`} onClick={() => setEditingIndex(index)}>
+                                                <EditIcon fontSize="small" />
+                                            </IconButton>
+                                            <IconButton aria-label={`delete ${entityLabel} ${index}`} onClick={() => setDeletingIndex(index)}>
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        </>
+                                    )}
                                     <IconButton aria-label={`log ${entityLabel} ${index}`} onClick={() => setViewingLogIndex(index)}>
                                         <HistoryIcon fontSize="small" />
                                     </IconButton>
@@ -313,6 +324,7 @@ function CommunicationList({ entries, onChange, columns, fields, numberFields, e
                     opportunityId={opportunityId}
                     entry={viewingAttachmentsIndex !== null ? entries[viewingAttachmentsIndex] : null}
                     onClose={() => setViewingAttachmentsIndex(null)}
+                    readOnly={readOnly}
                 />
             )}
         </Box>
@@ -328,14 +340,16 @@ CommunicationList.propTypes = {
     entityLabel: PropTypes.string.isRequired,
     opportunityId: PropTypes.string,
     showAttachments: PropTypes.bool,
+    readOnly: PropTypes.bool,
 }
 
 CommunicationList.defaultProps = {
     opportunityId: undefined,
     showAttachments: false,
+    readOnly: false,
 }
 
-export default function OpportunityDetails({ opportunity }) {
+export default function OpportunityDetails({ opportunity, readOnly }) {
     const dispatch = useDispatch()
     const vendorList = useSelector(selectVendorList)
     const vendorOptions = vendorList.map((vendor) => ({ value: vendor.name, label: vendor.name }))
@@ -388,13 +402,16 @@ export default function OpportunityDetails({ opportunity }) {
                     entityLabel="Supplier Communication"
                     opportunityId={opportunity.id}
                     showAttachments
+                    readOnly={readOnly}
                 />
 
-                <Box sx={{ mt: 2 }}>
-                    <Button variant="contained" onClick={handleSave} disabled={saving}>
-                        {saving ? "Saving..." : "Save Communications"}
-                    </Button>
-                </Box>
+                {!readOnly && (
+                    <Box sx={{ mt: 2 }}>
+                        <Button variant="contained" onClick={handleSave} disabled={saving}>
+                            {saving ? "Saving..." : "Save Communications"}
+                        </Button>
+                    </Box>
+                )}
             </Paper>
 
             <Snackbar open={!!feedback} autoHideDuration={4000} onClose={() => setFeedback(null)}>
@@ -406,4 +423,13 @@ export default function OpportunityDetails({ opportunity }) {
 
 OpportunityDetails.propTypes = {
     opportunity: PropTypes.object.isRequired,
+    // "remove Sales Opportunity Edit Option from Management Login, they
+    // should only view the opportunity and see the activity log" - hides
+    // Add/Edit/Delete and Save Communications; the Activity Log and
+    // Attachments view icons stay available either way.
+    readOnly: PropTypes.bool,
+}
+
+OpportunityDetails.defaultProps = {
+    readOnly: false,
 }

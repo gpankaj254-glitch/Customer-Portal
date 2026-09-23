@@ -69,6 +69,21 @@ const adminSecondaryListItems = [
     sideMenuItems.SALES_OPPORTUNITIES,
 ]
 
+// SCX Sales Admin/Sales User's own explicit order - "Put Sales management
+// below Dashboard" - Sales Opportunities moves out of the generic
+// secondaryListItems' order (where it trailed last) to lead this list,
+// right under Dashboard, for these two roles specifically.
+const salesMainListItems = [sideMenuItems.DASHBOARD]
+const salesSecondaryListItems = [
+    sideMenuItems.SALES_OPPORTUNITIES,
+    sideMenuItems.USER_MANAGEMENT,
+    sideMenuItems.VENDOR_MANAGEMENT,
+    sideMenuItems.DELIVERY_ORDERS,
+    sideMenuItems.CUSTOMER_MANAGEMENT,
+    sideMenuItems.SITE_MANAGEMENT,
+    sideMenuItems.INVENTORY,
+]
+
 // SCX Admin and SCX Management both see these two items under different
 // names - every other role keeps the default name from strings/index.js's
 // sideMenuItemNames.
@@ -121,9 +136,10 @@ export default function SideMenu(props) {
     const currentUser = useSelector(selectUser)
     const isManagement = currentUser.role === roles.SCLOUDX_MANAGEMENT
     const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    const isSales = currentUser.role === roles.SCLOUDX_SALES_ADMIN || currentUser.role === roles.SCLOUDX_SALES_USER
     const isRenamedRole = isManagement || isAdmin
-    const effectiveMainListItems = isManagement ? managementMainListItems : isAdmin ? adminMainListItems : mainListItems
-    const effectiveSecondaryListItems = isManagement ? managementSecondaryListItems : isAdmin ? adminSecondaryListItems : secondaryListItems
+    const effectiveMainListItems = isManagement ? managementMainListItems : isAdmin ? adminMainListItems : isSales ? salesMainListItems : mainListItems
+    const effectiveSecondaryListItems = isManagement ? managementSecondaryListItems : isAdmin ? adminSecondaryListItems : isSales ? salesSecondaryListItems : secondaryListItems
     const getLabel = (item) => (isRenamedRole && RENAMED_ROLE_LABEL_OVERRIDES[item]) || sideMenuItemNames(item)
 
     // const [open, setOpen] = React.useState(true)

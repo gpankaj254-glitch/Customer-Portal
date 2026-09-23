@@ -19,6 +19,17 @@ function formatDateTime(value) {
     return value ? moment(value).format("MMM D, YYYY h:mm A") : ""
 }
 
+// "Reduce and standardize Fonts of all Activity Logs" - same compact scale
+// (0.75rem) already used across this app's other compacted list pages,
+// applied here on the Dialog itself so it reaches every descendant (the
+// title, the table's headers/cells) without them being portaled away -
+// shared, identically, by this dialog and Tickets'/Delivery's own
+// ActivityLogDialog.js.
+const logSx = {
+    "& .MuiDialogTitle-root": { fontSize: "1rem" },
+    "& .MuiTypography-subtitle2, & .MuiTypography-body2, & .MuiTypography-caption, & .MuiTableCell-root": { fontSize: "0.75rem" },
+}
+
 // Read-only table of {status, currency, nrc, mrc, changedAt, user} entries,
 // most recent first - shared by the Opportunity-level Log (Customer
 // Request's own status history) and each Supplier Communication entry's own
@@ -75,8 +86,8 @@ StatusHistoryTable.propTypes = {
 
 export default function StatusHistoryDialog({ open, title, history, onClose }) {
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-            <DialogTitle sx={{ fontSize: "1.1rem" }}>{title}</DialogTitle>
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" sx={logSx}>
+            <DialogTitle>{title}</DialogTitle>
             <DialogContent>
                 <StatusHistoryTable history={history} />
             </DialogContent>

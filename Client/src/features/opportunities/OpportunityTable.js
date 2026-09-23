@@ -69,8 +69,14 @@ export default function OpportunityTable(props) {
     const currentUser = useSelector(selectUser)
     const canDelete = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_SALES_ADMIN
     // SCX Management has viewOpportunities only (no editOpportunities), so
-    // the Edit icon - unconditional for every other viewer of this page,
-    // who all do have that right - is hidden for it specifically.
+    // the Edit icon here - unconditional for every other viewer of this
+    // page, who all do have that right - is hidden for it specifically.
+    // Also passed down as OpportunityDetails' readOnly, which closes the
+    // same gap for Supplier Communication's own Add/Edit/Delete/Save
+    // controls ("remove Sales Opportunity Edit Option from Management
+    // Login, they should only view the opportunity and see the activity
+    // log") - Management still gets the row's Activity Log and Attachments
+    // view icons, just not anything that writes.
     const canEdit = currentUser.role !== roles.SCLOUDX_MANAGEMENT
 
     const pagination = props.pagination
@@ -248,7 +254,7 @@ export default function OpportunityTable(props) {
                                     <TableRow>
                                         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={columns.length + 1}>
                                             <Collapse in={open === row.id}>
-                                                {open === row.id && <OpportunityDetails opportunity={row} />}
+                                                {open === row.id && <OpportunityDetails opportunity={row} readOnly={!canEdit} />}
                                             </Collapse>
                                         </TableCell>
                                     </TableRow>

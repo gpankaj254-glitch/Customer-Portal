@@ -14,6 +14,18 @@ import PropTypes from "prop-types"
 import _ from "lodash"
 import { getFormattedDate } from "../../utils/dates"
 
+// "Reduce and standardize Fonts of all Activity Logs" - same compact scale
+// (0.75rem) shared, identically, with Ticket's own ActivityLogDialog.js and
+// the Opportunity Status Log (StatusHistoryDialog.js) - applied here on the
+// Dialog itself so it reaches every descendant without them being portaled
+// away.
+const logSx = {
+    "& .MuiDialogTitle-root": { fontSize: "1rem" },
+    "& .MuiStepLabel-label, & .MuiTypography-body2, & .MuiTypography-caption": { fontSize: "0.75rem" },
+    "& .MuiChip-root": { height: 20 },
+    "& .MuiChip-label": { fontSize: "0.68rem" },
+}
+
 // A delivery order's Activity Log - every real Status transition (plus
 // automatic Circuit creation on completion) with who made it, when, and a
 // description. "Activity Log function for Service Delivery Process as
@@ -25,7 +37,7 @@ export default function ActivityLogDialog({ open, order, onClose }) {
     const history = _.get(order, "history", [])
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" scroll="paper">
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" scroll="paper" sx={logSx}>
             <DialogTitle>Activity Log{order ? ` - ${order.orderId}` : ""}</DialogTitle>
             <DialogContent dividers>
                 {history.length === 0 ? (
