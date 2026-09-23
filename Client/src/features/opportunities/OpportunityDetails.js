@@ -1,7 +1,10 @@
 import * as React from "react"
 import Box from "@mui/material/Box"
+import Grid from "@mui/material/Grid"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
+import Tabs from "@mui/material/Tabs"
+import Tab from "@mui/material/Tab"
 import Table from "@mui/material/Table"
 import TableHead from "@mui/material/TableHead"
 import TableBody from "@mui/material/TableBody"
@@ -28,6 +31,7 @@ import { updateOpportunity, uploadSupplierCommunicationAttachment } from "./oppo
 import { downloadSupplierCommunicationAttachment } from "./opportunityAPI"
 import { supplierQuoteStatusOptions } from "../../consts/opportunityCommOptions"
 import { currencyOptions } from "../../consts/currencyOptions"
+import { bandwidthOptions } from "../../consts/circuitOptions"
 import { selectVendorList } from "../vendors/vendorSlice"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
@@ -153,6 +157,14 @@ function buildSupplierCommunicationFields(vendorOptions) {
         { name: "currency", label: "Currency", type: "autocomplete", options: currencySelectOptions },
         { name: "nrc", label: "NRC" },
         { name: "mrc", label: "MRC" },
+        // "Edit Supplier Communication: Add Field - bandwith, Remarks".
+        {
+            name: "bandwidth",
+            label: "Bandwidth",
+            type: "select",
+            options: [{ value: "", label: "None" }, ...bandwidthOptions.map((option) => ({ value: option, label: option }))],
+        },
+        { name: "remarks", label: "Remarks" },
     ]
 }
 const supplierCommunicationNumberFields = ["nrc", "mrc"]
@@ -168,6 +180,8 @@ const supplierCommunicationColumns = [
     { id: "currency", label: "Currency" },
     { id: "nrc", label: "NRC" },
     { id: "mrc", label: "MRC" },
+    { id: "bandwidth", label: "Bandwidth" },
+    { id: "remarks", label: "Remarks" },
 ]
 
 function emptyValuesFor(fields) {
@@ -345,7 +359,80 @@ CommunicationList.defaultProps = {
     readOnly: false,
 }
 
-export default function OpportunityDetails({ opportunity, readOnly }) {
+// One label/value pair in the Opportunity Details read-only summary below.
+function DetailItem({ label, value, fullWidth }) {
+    return (
+        <Grid item xs={12} sm={fullWidth ? 12 : 6} md={fullWidth ? 12 : 4}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{label}</Typography>
+            <Typography variant="body2" sx={{ wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                {value || <>&mdash;</>}
+            </Typography>
+        </Grid>
+    )
+}
+
+DetailItem.propTypes = {
+    label: PropTypes.string.isRequired,
+    value: PropTypes.node,
+    fullWidth: PropTypes.bool,
+}
+
+DetailItem.defaultProps = {
+    value: "",
+    fullWidth: false,
+}
+
+// "New Tab before supplier communication - Opportunity Details - Display
+// all information captured under create opportunity with Edit option" -
+// read-only view of every field Create Opportunity captures (name/customer/
+// prospect/description plus the whole Customer Request section), with an
+// Edit button that opens the same Edit Opportunity dialog as the row's own
+// pencil icon (onEdit, passed down from OpportunityTable).
+function OpportunityDetailsView({ opportunity, onEdit }) {
+    const customerRequest = _.get(opportunity, "customerRequest", {})
+    return (
+        <Box>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+                {onEdit && (
+                    <Button startIcon={<EditIcon />} variant="outlined" onClick={onEdit}>
+                        Edit
+                    </Button>
+                )}
+            </Box>
+            <Grid container spacing={2}>
+                <DetailItem label="Opportunity Name" value={opportunity.name} />
+                <DetailItem label="Customer / Prospect" value={_.get(opportunity, "customer.name") || opportunity.prospectName} />
+                <DetailItem label="Stage" value={opportunity.stage} />
+                <DetailItem label="Description" value={opportunity.description} fullWidth />
+                <DetailItem label="Request ID" value={customerRequest.requestId} />
+                <DetailItem label="Request Date" value={customerRequest.requestDate} />
+                <DetailItem label="Link Type" value={customerRequest.linkType} />
+                <DetailItem label="Site Address" value={customerRequest.siteAddress} />
+                <DetailItem label="City" value={customerRequest.city} />
+                <DetailItem label="State" value={customerRequest.state} />
+                <DetailItem label="ZIP Code" value={customerRequest.zipCode} />
+                <DetailItem label="Country" value={customerRequest.country} />
+                <DetailItem label="Product" value={customerRequest.product} />
+                <DetailItem label="IP Requirement" value={customerRequest.ipRequirement} />
+                <DetailItem label="Interface" value={customerRequest.interface} />
+                <DetailItem label="Down Bandwidth" value={customerRequest.downBandwidth} />
+                <DetailItem label="Up Bandwidth" value={customerRequest.upBandwidth} />
+                <DetailItem label="Contract Term" value={customerRequest.contractTerm} />
+            </Grid>
+        </Box>
+    )
+}
+
+OpportunityDetailsView.propTypes = {
+    opportunity: PropTypes.object.isRequired,
+    onEdit: PropTypes.func,
+}
+
+OpportunityDetailsView.defaultProps = {
+    onEdit: undefined,
+}
+
+export default function OpportunityDetails({ opportunity, readOnly, onEdit }) {
     const dispatch = useDispatch()
     const vendorList = useSelector(selectVendorList)
     const vendorOptions = vendorList.map((vendor) => ({ value: vendor.name, label: vendor.name }))
@@ -353,6 +440,7 @@ export default function OpportunityDetails({ opportunity, readOnly }) {
     const [supplierCommunications, setSupplierCommunications] = React.useState(_.get(opportunity, "supplierCommunications", []))
     const [saving, setSaving] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)
+    const [activeTab, setActiveTab] = React.useState(0)
 
     // Re-seed local list whenever the underlying opportunity actually
     // changes in Redux (e.g. after a successful save gives entries their
@@ -387,26 +475,37 @@ export default function OpportunityDetails({ opportunity, readOnly }) {
     return (
         <Box sx={{ p: 2 }}>
             <Paper sx={{ p: 2 }}>
-                <Typography variant="subtitle1" sx={{ mb: 2 }}>Supplier Communication</Typography>
+                <Tabs value={activeTab} onChange={(event, newValue) => setActiveTab(newValue)} sx={{ mb: 2 }}>
+                    <Tab label="Opportunity Details" />
+                    <Tab label="Supplier Communication" />
+                </Tabs>
 
-                <CommunicationList
-                    entries={supplierCommunications}
-                    onChange={setSupplierCommunications}
-                    columns={supplierCommunicationColumns}
-                    fields={supplierCommunicationFields}
-                    numberFields={supplierCommunicationNumberFields}
-                    entityLabel="Supplier Communication"
-                    opportunityId={opportunity.id}
-                    showAttachments
-                    readOnly={readOnly}
-                />
+                {activeTab === 0 && (
+                    <OpportunityDetailsView opportunity={opportunity} onEdit={readOnly ? undefined : onEdit} />
+                )}
 
-                {!readOnly && (
-                    <Box sx={{ mt: 2 }}>
-                        <Button variant="contained" onClick={handleSave} disabled={saving}>
-                            {saving ? "Saving..." : "Save Communications"}
-                        </Button>
-                    </Box>
+                {activeTab === 1 && (
+                    <>
+                        <CommunicationList
+                            entries={supplierCommunications}
+                            onChange={setSupplierCommunications}
+                            columns={supplierCommunicationColumns}
+                            fields={supplierCommunicationFields}
+                            numberFields={supplierCommunicationNumberFields}
+                            entityLabel="Supplier Communication"
+                            opportunityId={opportunity.id}
+                            showAttachments
+                            readOnly={readOnly}
+                        />
+
+                        {!readOnly && (
+                            <Box sx={{ mt: 2 }}>
+                                <Button variant="contained" onClick={handleSave} disabled={saving}>
+                                    {saving ? "Saving..." : "Save Communications"}
+                                </Button>
+                            </Box>
+                        )}
+                    </>
                 )}
             </Paper>
 
@@ -424,8 +523,13 @@ OpportunityDetails.propTypes = {
     // Add/Edit/Delete and Save Communications; the Activity Log and
     // Attachments view icons stay available either way.
     readOnly: PropTypes.bool,
+    // Opens the same Edit Opportunity dialog as the row's pencil icon
+    // (owned by OpportunityTable, passed down) - the Opportunity Details
+    // tab's own Edit button. Omitted entirely when readOnly.
+    onEdit: PropTypes.func,
 }
 
 OpportunityDetails.defaultProps = {
     readOnly: false,
+    onEdit: undefined,
 }

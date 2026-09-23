@@ -158,6 +158,9 @@ const opportunitySchema = mongoose.Schema(
           mrc: { type: Number, default: null },
           quoteSubmitDate: { type: String, default: "" },
           quoteStatus: { type: String, enum: supplierQuoteStatusOptions, default: "Pending" },
+          // "Edit Supplier Communication: Add Field - bandwith, Remarks".
+          bandwidth: { type: String, enum: ["", ...bandwidthOptions], default: "" },
+          remarks: { type: String, default: "" },
           // Every quoteStatus this entry has been set to, in order, including
           // the initial value at creation. currency/nrc/mrc are a snapshot
           // of those fields as of that change, not just the status itself. A

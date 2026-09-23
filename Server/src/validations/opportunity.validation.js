@@ -44,6 +44,9 @@ const supplierCommunicationItem = Joi.object().keys({
   mrc: Joi.number().allow(null),
   quoteSubmitDate: Joi.string().allow(""),
   quoteStatus: Joi.string().valid(...supplierQuoteStatusOptions),
+  // "Edit Supplier Communication: Add Field - bandwith, Remarks".
+  bandwidth: Joi.string().valid("", ...bandwidthOptions),
+  remarks: Joi.string().allow(""),
 });
 
 const createOpportunity = {

@@ -11,7 +11,7 @@ import Typography from "@mui/material/Typography"
 import PropTypes from "prop-types"
 import _ from "lodash"
 
-export default function EditDialog({ open, title, fields, initialValues, lastEditedNote, onSave, onCancel, loading, dense }) {
+export default function EditDialog({ open, title, fields, initialValues, lastEditedNote, onSave, onCancel, loading, dense, maxWidth }) {
     const [values, setValues] = React.useState(initialValues)
 
     React.useEffect(() => {
@@ -33,7 +33,7 @@ export default function EditDialog({ open, title, fields, initialValues, lastEdi
     const inputSize = dense ? "small" : "medium"
 
     return (
-        <Dialog open={open} onClose={onCancel} fullWidth maxWidth="sm">
+        <Dialog open={open} onClose={onCancel} fullWidth maxWidth={maxWidth}>
             <DialogTitle sx={dense ? { fontSize: "1.1rem" } : undefined}>{title}</DialogTitle>
             <DialogContent>
                 {lastEditedNote && (
@@ -76,6 +76,13 @@ export default function EditDialog({ open, title, fields, initialValues, lastEdi
                             value={_.get(values, field.name, "")}
                             onChange={handleChange(field.name)}
                             disabled={loading || field.disabled}
+                            // "Edit Opportunity - Description - Make it words wrap,
+                            // bigger window scrollable" - opt-in per field
+                            // (multiline/minRows/maxRows), everything else is
+                            // unaffected since no existing field sets these.
+                            multiline={field.multiline}
+                            minRows={field.multiline ? (field.minRows || 3) : undefined}
+                            maxRows={field.multiline ? field.maxRows : undefined}
                         >
                             {field.type === "select" && field.options.map((option) => (
                                 <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
@@ -102,6 +109,10 @@ EditDialog.propTypes = {
     onCancel: PropTypes.func.isRequired,
     loading: PropTypes.bool,
     dense: PropTypes.bool,
+    // Overridable per-instance so a field-heavy form (e.g. Edit Opportunity,
+    // once expanded to cover every Create Opportunity field) can ask for a
+    // wider dialog - every existing caller is unaffected, still "sm".
+    maxWidth: PropTypes.oneOf(["xs", "sm", "md", "lg", "xl"]),
 }
 
 EditDialog.defaultProps = {
@@ -110,4 +121,5 @@ EditDialog.defaultProps = {
     lastEditedNote: null,
     loading: false,
     dense: false,
+    maxWidth: "sm",
 }

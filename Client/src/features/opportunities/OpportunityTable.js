@@ -20,8 +20,10 @@ import { getFormattedDateTime as formatDateTime } from "../../utils/dates"
 
 // eslint-disable-next-line no-unused-vars
 import { changeLimit, changePage, getOpportunities, selectGetOpportunitiesError, selectOpportunityList, deactivateOpportunity, updateOpportunity } from "./opportunitySlice"
-import { quoteStatusOptions } from "../../consts/opportunityCommOptions"
+import { quoteStatusOptions, linkTypeOptions, ipRequirementOptions, interfaceOptions } from "../../consts/opportunityCommOptions"
 import { currencyOptions } from "../../consts/currencyOptions"
+import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
+import { countryOptions } from "../../consts/countryOptions"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
 import { useSelector, useDispatch } from "react-redux"
@@ -36,6 +38,19 @@ function displayCustomerOrProspect(row) {
     return _.get(row, "customer.name") || row.prospectName || ""
 }
 
+// "Sales Opportunity List, remove Currency, NRC, MRC; Display Link type,
+// Download BW, Site Address+City+Country" - Currency/NRC/MRC stay editable
+// (Edit Opportunity dialog below and the Opportunity Details tab), just no
+// longer shown as their own list columns; the three new ones are Customer
+// Request fields already captured at creation, just not previously listed.
+function displaySiteLocation(row) {
+    return [
+        _.get(row, "customerRequest.siteAddress"),
+        _.get(row, "customerRequest.city"),
+        _.get(row, "customerRequest.country"),
+    ].filter(Boolean).join(", ")
+}
+
 const columns = [
     { id: "opportunityId", label: "Opportunity #" },
     { id: "name", label: "Name" },
@@ -46,18 +61,23 @@ const columns = [
         render: (row) => formatDateTime(_.get(row, "customerRequest.requestDate")),
     },
     { id: "customerRequest.quoteStatus", label: "Quote Status" },
-    // "Remove Quote Status Date and add Currency NRC, MRC" - the Customer
-    // Request's own fields (see opportunity.model.js), same ones already
-    // editable on the Opportunity's own edit form.
-    { id: "customerRequest.currency", label: "Currency" },
-    { id: "customerRequest.nrc", label: "NRC" },
-    { id: "customerRequest.mrc", label: "MRC" },
+    { id: "customerRequest.linkType", label: "Link Type" },
+    { id: "customerRequest.downBandwidth", label: "Download BW" },
+    { id: "siteLocation", label: "Site Address / City / Country", render: displaySiteLocation },
 ]
 
 const currencySelectOptions = currencyOptions.map((option) => ({
     value: option.code,
     label: `${option.code} - ${option.name}`,
 }))
+const countrySelectOptions = countryOptions.map((option) => ({ value: option, label: option }))
+// A plain option list ("Primary"/"Secondary" etc.) rendered as EditDialog
+// select options, with an explicit None first choice - every one of these
+// Customer Request fields is optional, same as on Create Opportunity's own
+// (raw MUI Select, each with its own "<em>None</em>" item) equivalents.
+function withNone(options) {
+    return [{ value: "", label: "None" }, ...options.map((option) => ({ value: option, label: option }))]
+}
 
 export default function OpportunityTable(props) {
     const errorMessage = useSelector(selectGetOpportunitiesError)
@@ -131,7 +151,26 @@ export default function OpportunityTable(props) {
                 // customerRequest is merged server-side, not replaced, so
                 // sending just these fields doesn't wipe out the rest of
                 // customerRequest that Create Opportunity captured.
+                // "New Tab ... Opportunity Details - Display all information
+                // captured under create opportunity with Edit option" - every
+                // Create Opportunity Customer Request field is now editable
+                // here too, not just the original Quote Submit Date/Status/
+                // Currency/NRC/MRC subset.
                 customerRequest: {
+                    requestId: values.requestId,
+                    requestDate: values.requestDate,
+                    linkType: values.linkType,
+                    siteAddress: values.siteAddress,
+                    city: values.city,
+                    state: values.state,
+                    zipCode: values.zipCode,
+                    country: values.country,
+                    product: values.product,
+                    ipRequirement: values.ipRequirement,
+                    interface: values.interface,
+                    downBandwidth: values.downBandwidth,
+                    upBandwidth: values.upBandwidth,
+                    contractTerm: values.contractTerm,
                     quoteSubmitDate: values.quoteSubmitDate,
                     quoteStatus: values.quoteStatus,
                     currency: values.currency,
@@ -160,7 +199,25 @@ export default function OpportunityTable(props) {
     const editFields = (values) => {
         const fields = [
             { name: "name", label: "Opportunity Name", disabled: true },
-            { name: "description", label: "Description" },
+            // "Edit Opportunity - Description - Make it words wrap, bigger
+            // window scrollable" - multiline grows with content up to
+            // maxRows, then scrolls within itself rather than endlessly
+            // stretching the dialog.
+            { name: "description", label: "Description", multiline: true, minRows: 4, maxRows: 10 },
+            { name: "requestId", label: "Request ID" },
+            { name: "requestDate", label: "Request Date", type: "date" },
+            { name: "linkType", label: "Link Type", type: "select", options: withNone(linkTypeOptions) },
+            { name: "siteAddress", label: "Site Address" },
+            { name: "city", label: "City" },
+            { name: "state", label: "State" },
+            { name: "zipCode", label: "ZIP Code" },
+            { name: "country", label: "Country", type: "autocomplete", options: countrySelectOptions },
+            { name: "product", label: "Product", type: "select", options: withNone(productOptions) },
+            { name: "ipRequirement", label: "IP Requirement", type: "select", options: withNone(ipRequirementOptions) },
+            { name: "interface", label: "Interface", type: "select", options: withNone(interfaceOptions) },
+            { name: "downBandwidth", label: "Down Bandwidth", type: "select", options: withNone(bandwidthOptions) },
+            { name: "upBandwidth", label: "Up Bandwidth", type: "select", options: withNone(bandwidthOptions) },
+            { name: "contractTerm", label: "Contract Term" },
             {
                 name: "quoteStatus",
                 label: "Quote Status",
@@ -250,7 +307,13 @@ export default function OpportunityTable(props) {
                                     <TableRow>
                                         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={columns.length + 1}>
                                             <Collapse in={open === row.id}>
-                                                {open === row.id && <OpportunityDetails opportunity={row} readOnly={!canEdit} />}
+                                                {open === row.id && (
+                                                <OpportunityDetails
+                                                    opportunity={row}
+                                                    readOnly={!canEdit}
+                                                    onEdit={canEdit ? () => setOpportunityToEdit(row) : undefined}
+                                                />
+                                            )}
                                             </Collapse>
                                         </TableCell>
                                     </TableRow>
@@ -286,6 +349,20 @@ export default function OpportunityTable(props) {
                         description: opportunityToEdit ? opportunityToEdit.description : "",
                         orderNumber: _.get(opportunityToEdit, "convertedOrder.orderNumber") || "",
                         orderValue: _.get(opportunityToEdit, "convertedOrder.orderValue") || "",
+                        requestId: _.get(opportunityToEdit, "customerRequest.requestId") || "",
+                        requestDate: _.get(opportunityToEdit, "customerRequest.requestDate") || "",
+                        linkType: _.get(opportunityToEdit, "customerRequest.linkType") || "",
+                        siteAddress: _.get(opportunityToEdit, "customerRequest.siteAddress") || "",
+                        city: _.get(opportunityToEdit, "customerRequest.city") || "",
+                        state: _.get(opportunityToEdit, "customerRequest.state") || "",
+                        zipCode: _.get(opportunityToEdit, "customerRequest.zipCode") || "",
+                        country: _.get(opportunityToEdit, "customerRequest.country") || "",
+                        product: _.get(opportunityToEdit, "customerRequest.product") || "",
+                        ipRequirement: _.get(opportunityToEdit, "customerRequest.ipRequirement") || "",
+                        interface: _.get(opportunityToEdit, "customerRequest.interface") || "",
+                        downBandwidth: _.get(opportunityToEdit, "customerRequest.downBandwidth") || "",
+                        upBandwidth: _.get(opportunityToEdit, "customerRequest.upBandwidth") || "",
+                        contractTerm: _.get(opportunityToEdit, "customerRequest.contractTerm") || "",
                         quoteSubmitDate: _.get(opportunityToEdit, "customerRequest.quoteSubmitDate") || "",
                         quoteStatus: _.get(opportunityToEdit, "customerRequest.quoteStatus") || "Pending",
                         currency: _.get(opportunityToEdit, "customerRequest.currency") || "",
@@ -296,6 +373,7 @@ export default function OpportunityTable(props) {
                     onCancel={() => setOpportunityToEdit(null)}
                     loading={saving}
                     dense
+                    maxWidth="md"
                 />
                 <StatusHistoryDialog
                     open={!!opportunityToViewLog}
