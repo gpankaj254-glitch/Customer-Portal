@@ -3,6 +3,9 @@ import Grid from "@mui/material/Grid"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
 import TextField from "@mui/material/TextField"
+import Autocomplete from "@mui/material/Autocomplete"
+import FormControlLabel from "@mui/material/FormControlLabel"
+import Checkbox from "@mui/material/Checkbox"
 import Table from "@mui/material/Table"
 import TableHead from "@mui/material/TableHead"
 import TableBody from "@mui/material/TableBody"
@@ -25,19 +28,23 @@ import { pages } from "../../consts"
 // row lines up under its header instead of each column auto-sizing to its
 // own widest value.
 const columns = [
-    { id: "siteName", label: "Site Name", width: "11%" },
-    { id: "customerName", label: "Customer Name", width: "11%" },
-    { id: "vendorName", label: "Vendor Name", width: "10%" },
+    { id: "siteName", label: "Site Name", width: "10%" },
+    { id: "customerName", label: "Customer Name", width: "10%" },
+    { id: "vendorName", label: "Vendor Name", width: "9%" },
     // "Remove Vendor Circuit ID and Replace with SCX Order Ref Number" -
     // same slot, see circuit.controller.js's getCircuits for the matching
     // search-field swap.
-    { id: "scloudxOrderReference", label: "SCX Order Ref Number", width: "10%" },
-    { id: "customerCircuitBillStartDate", label: "Customer Bill Start Date", width: "11%" },
-    { id: "vendorCircuitBillStartDate", label: "Vendor Bill Start Date", width: "11%" },
-    { id: "customerCircuitContractTerm", label: "Customer Contract Term", width: "10%" },
-    { id: "vendorCircuitContractTerm", label: "Vendor Contract Term", width: "10%" },
+    { id: "scloudxOrderReference", label: "SCX Order Ref Number", width: "9%" },
+    { id: "customerCircuitBillStartDate", label: "Customer Bill Start Date", width: "10%" },
+    { id: "vendorCircuitBillStartDate", label: "Vendor Bill Start Date", width: "10%" },
+    { id: "customerCircuitContractTerm", label: "Customer Contract Term", width: "9%" },
+    { id: "vendorCircuitContractTerm", label: "Vendor Contract Term", width: "9%" },
     { id: "customerContractPendingMonths", label: "Customer Contract Pending (Months)", width: "8%" },
     { id: "vendorContractPendingMonths", label: "Vendor Contract Pending (Months)", width: "8%" },
+    // "Where there is gap between Vendor Contract pending month / Customer
+    // contract pending month (Vendor Contract pending month - Customer
+    // contract pending month)" - see computeContractPendingMonths/rows below.
+    { id: "contractGapMonths", label: "Contract Gap (Months)", width: "8%" },
 ]
 
 // Bill Start Date is stored "DD-MM-YYYY" (see circuit.service.js's
@@ -80,6 +87,17 @@ export default function FinanceDashboard() {
 
     const [searchInput, setSearchInput] = React.useState("")
     const [search, setSearch] = React.useState("")
+    // "Filter options to review Vendor wise / Customer wise" - narrows the
+    // already-fetched list to one Vendor and/or one Customer, entirely
+    // client-side (same rows the search box already filters via the
+    // server); both can be combined with each other, the search box and
+    // the gap toggle below.
+    const [vendorFilter, setVendorFilter] = React.useState(null)
+    const [customerFilter, setCustomerFilter] = React.useState(null)
+    // "Where there is gap between Vendor Contract pending month / Customer
+    // contract pending month" - shows only rows where both sides could be
+    // computed and they don't match.
+    const [onlyGapRows, setOnlyGapRows] = React.useState(false)
 
     React.useEffect(() => {
         dispatch(getVendors({ limit: 1000, page: 1 }))
@@ -130,7 +148,33 @@ export default function FinanceDashboard() {
             vendorCircuitContractTerm: circuit.vendorCircuitContractTerm || "",
             customerContractPendingMonths: customerPendingMonths === null ? "-" : String(customerPendingMonths),
             vendorContractPendingMonths: vendorPendingMonths === null ? "-" : String(vendorPendingMonths),
+            // "Vendor Contract pending month - Customer contract pending
+            // month" - "-" (not computable) whenever either side is, so it
+            // never reads as a real, misleading zero.
+            contractGapMonths: customerPendingMonths === null || vendorPendingMonths === null
+                ? "-"
+                : String(vendorPendingMonths - customerPendingMonths),
         }
+    })
+
+    // Vendor/Customer filter dropdown options - every distinct name actually
+    // present in the (search-filtered) list, not the full Vendor/Customer
+    // Management lists, so there's never an option that would just empty
+    // the table out.
+    const vendorFilterOptions = React.useMemo(
+        () => _.uniq(rows.map((row) => row.vendorName).filter(Boolean)).sort(),
+        [rows]
+    )
+    const customerFilterOptions = React.useMemo(
+        () => _.uniq(rows.map((row) => row.customerName).filter(Boolean)).sort(),
+        [rows]
+    )
+
+    const filteredRows = rows.filter((row) => {
+        if (vendorFilter && row.vendorName !== vendorFilter) return false
+        if (customerFilter && row.customerName !== customerFilter) return false
+        if (onlyGapRows && (row.contractGapMonths === "-" || Number(row.contractGapMonths) === 0)) return false
+        return true
     })
 
     const loading = status === pageStatusVals.loading || status === pageStatusVals.idle
@@ -147,6 +191,30 @@ export default function FinanceDashboard() {
                     onChange={(event) => setSearchInput(event.target.value)}
                 />
             </Grid>
+            <Grid item xs={12} sm={4}>
+                <Autocomplete
+                    size="small"
+                    options={vendorFilterOptions}
+                    value={vendorFilter}
+                    onChange={(event, newValue) => setVendorFilter(newValue)}
+                    renderInput={(params) => <TextField {...params} label="Filter by Vendor" placeholder="All vendors" />}
+                />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+                <Autocomplete
+                    size="small"
+                    options={customerFilterOptions}
+                    value={customerFilter}
+                    onChange={(event, newValue) => setCustomerFilter(newValue)}
+                    renderInput={(params) => <TextField {...params} label="Filter by Customer" placeholder="All customers" />}
+                />
+            </Grid>
+            <Grid item xs={12} sm={4} sx={{ display: "flex", alignItems: "center" }}>
+                <FormControlLabel
+                    control={<Checkbox size="small" checked={onlyGapRows} onChange={(event) => setOnlyGapRows(event.target.checked)} />}
+                    label={<Typography variant="body2" sx={{ fontSize: "0.75rem" }}>Only show rows with a Contract Gap</Typography>}
+                />
+            </Grid>
             <Grid item xs={12}>
                 {error ? (
                     <Alert severity="error">Unable to load circuits</Alert>
@@ -155,7 +223,9 @@ export default function FinanceDashboard() {
                 ) : (
                     <>
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.72rem", mb: 0.5 }}>
-                            {rows.length} circuit{rows.length === 1 ? "" : "s"}
+                            {filteredRows.length === rows.length
+                                ? `${rows.length} circuit${rows.length === 1 ? "" : "s"}`
+                                : `${filteredRows.length} of ${rows.length} circuit${rows.length === 1 ? "" : "s"}`}
                         </Typography>
                         <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: "calc(100vh - 300px)" }}>
                             <Table
@@ -178,7 +248,7 @@ export default function FinanceDashboard() {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {rows.length === 0 && (
+                                    {filteredRows.length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={columns.length}>
                                                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.72rem" }}>
@@ -187,7 +257,7 @@ export default function FinanceDashboard() {
                                             </TableCell>
                                         </TableRow>
                                     )}
-                                    {rows.map((row) => (
+                                    {filteredRows.map((row) => (
                                         <TableRow key={row.id}>
                                             {columns.map((column) => (
                                                 <TableCell key={column.id} sx={{ width: column.width }}>
@@ -217,7 +287,7 @@ export default function FinanceDashboard() {
                             </Table>
                         </TableContainer>
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.72rem", mt: 0.5, textAlign: "right" }}>
-                            {rows.length} Rows Found
+                            {filteredRows.length} Rows Found
                         </Typography>
                     </>
                 )}
