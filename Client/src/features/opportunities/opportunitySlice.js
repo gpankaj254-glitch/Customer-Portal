@@ -16,6 +16,13 @@ const initialState = {
     salesDashboardSummary: null,
     salesDashboardSummaryStatus: pageStatusVals.idle,
     salesDashboardSummaryError: null,
+    // "make Opportunity # hyperlinked to Actual opportunity in Sales
+    // Management" - set from SalesDashboard's Opportunity # link (a
+    // different page from Opportunities.js, so this can't just be local
+    // component state) alongside a togglePage to Sales Management; picked
+    // up there to auto-expand that row, same mechanism CreateOpportunity
+    // already used locally to jump straight to a just-created opportunity.
+    autoExpandOpportunityId: null,
 }
 
 export const getOpportunities = createAsyncThunk(
@@ -97,6 +104,9 @@ export const opportunitySlice = createSlice({
             state.search = payload
             state.pagination.page = 0
         },
+        setAutoExpandOpportunityId: (state, { payload }) => {
+            state.autoExpandOpportunityId = payload
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -172,7 +182,7 @@ export const opportunitySlice = createSlice({
     }
 })
 
-export const { changePage, changeLimit, setSearch } = opportunitySlice.actions
+export const { changePage, changeLimit, setSearch, setAutoExpandOpportunityId } = opportunitySlice.actions
 
 export const selectOpportunityList = (state) => state.opportunities.opportunityList
 export const selectGetOpportunitiesError = (state) => state.opportunities.getOpportunitiesError
@@ -182,5 +192,6 @@ export const selectSearch = (state) => state.opportunities.search
 export const selectSalesDashboardSummary = (state) => state.opportunities.salesDashboardSummary
 export const selectSalesDashboardSummaryStatus = (state) => state.opportunities.salesDashboardSummaryStatus
 export const selectSalesDashboardSummaryError = (state) => state.opportunities.salesDashboardSummaryError
+export const selectAutoExpandOpportunityId = (state) => state.opportunities.autoExpandOpportunityId
 
 export default opportunitySlice.reducer

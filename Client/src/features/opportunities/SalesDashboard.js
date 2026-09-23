@@ -2,6 +2,7 @@ import * as React from "react"
 import Grid from "@mui/material/Grid"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
+import Link from "@mui/material/Link"
 import Tabs from "@mui/material/Tabs"
 import Tab from "@mui/material/Tab"
 import Table from "@mui/material/Table"
@@ -19,7 +20,10 @@ import {
     selectSalesDashboardSummary,
     selectSalesDashboardSummaryStatus,
     selectSalesDashboardSummaryError,
+    setAutoExpandOpportunityId,
 } from "./opportunitySlice"
+import { togglePage } from "../landing/landingSlice"
+import { pages } from "../../consts"
 import { pageStatusVals } from "./utils"
 import { getFormattedDateOnly as formatDate } from "../../utils/dates"
 
@@ -72,8 +76,28 @@ SectionHeading.propTypes = {
     children: PropTypes.node.isRequired,
 }
 
+// Same combined column as the Sales Opportunity List's own "Site Address /
+// City / Country" - see OpportunityTable.js's displaySiteLocation.
+function displaySiteLocation(row) {
+    return [row.siteAddress, row.city, row.country].filter(Boolean).join(", ")
+}
+
+// "In Sales Dashboard - Opportunities, List Columns - ... Also make
+// Opportunity # hyperlinked to Actual opportunity in Sales Management" -
+// same column set as the Sales Opportunity List itself (minus its Actions
+// column, this table is view-only), and Opportunity # jumps to Sales
+// Management with that row auto-expanded - setAutoExpandOpportunityId is
+// the same mechanism CreateOpportunity already uses locally, just reachable
+// across the page switch via Redux (see opportunitySlice.js).
 function OpenOpportunitiesTable({ rows }) {
     const compact = React.useContext(CompactContext)
+    const dispatch = useDispatch()
+
+    const handleOpenOpportunity = (row) => {
+        dispatch(setAutoExpandOpportunityId(row.id))
+        dispatch(togglePage(pages.SALES_OPPORTUNITIES))
+    }
+
     return (
         <TableContainer component={Paper} variant="outlined">
             <Table size="small" sx={compact ? compactTableSx : undefined}>
@@ -83,13 +107,16 @@ function OpenOpportunitiesTable({ rows }) {
                         <TableCell><Typography variant="subtitle2">Name</Typography></TableCell>
                         <TableCell><Typography variant="subtitle2">Customer / Prospect</Typography></TableCell>
                         <TableCell><Typography variant="subtitle2">Request Date</Typography></TableCell>
-                        <TableCell><Typography variant="subtitle2">Days Pending</Typography></TableCell>
+                        <TableCell><Typography variant="subtitle2">Quote Status</Typography></TableCell>
+                        <TableCell><Typography variant="subtitle2">Link Type</Typography></TableCell>
+                        <TableCell><Typography variant="subtitle2">Download BW</Typography></TableCell>
+                        <TableCell><Typography variant="subtitle2">Site Address / City / Country</Typography></TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
                     {rows.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={5}>
+                            <TableCell colSpan={8}>
                                 <Typography variant="body2" color="text.secondary">
                                     No open opportunities
                                 </Typography>
@@ -98,11 +125,20 @@ function OpenOpportunitiesTable({ rows }) {
                     )}
                     {rows.map((row) => (
                         <TableRow key={row.opportunityId}>
-                            <TableCell>{row.opportunityId}</TableCell>
+                            <TableCell>
+                                {row.id ? (
+                                    <Link component="button" variant="body2" onClick={() => handleOpenOpportunity(row)}>
+                                        {row.opportunityId}
+                                    </Link>
+                                ) : row.opportunityId}
+                            </TableCell>
                             <TableCell>{row.name}</TableCell>
                             <TableCell>{row.customerOrProspect}</TableCell>
                             <TableCell>{formatDate(row.requestDate)}</TableCell>
-                            <TableCell>{row.daysPending ?? ""}</TableCell>
+                            <TableCell>{row.quoteStatus}</TableCell>
+                            <TableCell>{row.linkType}</TableCell>
+                            <TableCell>{row.downBandwidth}</TableCell>
+                            <TableCell>{displaySiteLocation(row)}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>

@@ -12,6 +12,8 @@ import {
     selectSearch as selectOpportunitySearch,
     getOpportunities,
     setSearch as setOpportunitySearch,
+    selectAutoExpandOpportunityId,
+    setAutoExpandOpportunityId,
 } from "./opportunitySlice"
 import { useSelector, useDispatch } from "react-redux"
 import CreateOpportunity from "./CreateOpportunity"
@@ -70,15 +72,17 @@ function OpportunitiesContent() {
     // Local, uncommitted text box value - kept separate from the Redux
     // search term so we can debounce before actually dispatching a fetch.
     const [opportunitySearchInput, setOpportunitySearchInput] = React.useState(opportunitySearch)
-    // Set by CreateOpportunity right after a successful create - jumps back
-    // to the list and auto-expands that row so its Customer/Supplier
-    // Communication tabs (which only live on an existing opportunity's row)
-    // are immediately visible instead of requiring the user to find them.
-    const [autoExpandOpportunityId, setAutoExpandOpportunityId] = React.useState(null)
+    // Set by CreateOpportunity right after a successful create, or by
+    // SalesDashboard's Opportunity # link (via Redux, since that's a
+    // different page - see opportunitySlice.js) - jumps to/back on the list
+    // and auto-expands that row so its Opportunity Details/Supplier
+    // Communication tabs are immediately visible instead of requiring the
+    // user to find it themselves.
+    const autoExpandOpportunityId = useSelector(selectAutoExpandOpportunityId)
 
     const handleOpportunityCreated = (opportunityId) => {
         setValue(0)
-        setAutoExpandOpportunityId(opportunityId)
+        dispatch(setAutoExpandOpportunityId(opportunityId))
     }
 
     const handleChange = (event, newValue) => {
@@ -131,7 +135,7 @@ function OpportunitiesContent() {
                     <OpportunityTable
                         pagination={pagination}
                         autoExpandOpportunityId={autoExpandOpportunityId}
-                        onAutoExpanded={() => setAutoExpandOpportunityId(null)}
+                        onAutoExpanded={() => dispatch(setAutoExpandOpportunityId(null))}
                     />
                 </>
             ),

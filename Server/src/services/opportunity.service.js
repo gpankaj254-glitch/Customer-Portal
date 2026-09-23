@@ -286,10 +286,14 @@ const updateOpportunityById = async (opportunityId, updateBody, actingUser, rela
  *   them), quotesReceived (status Received).
  * - supplierWiseReport: the supplierQuotesPending/OverThreeDays counts
  *   broken down per supplier name, sorted by pending count descending.
- * - openOpportunities: one row per "Pending" opportunity (opportunityId,
- *   name, customerOrProspect, requestDate, daysPending), sorted by
+ * - openOpportunities: one row per "Pending" opportunity (id, opportunityId,
+ *   name, customerOrProspect, requestDate, daysPending, quoteStatus,
+ *   linkType, downBandwidth, siteAddress, city, country), sorted by
  *   daysPending descending - the detail list behind the two Open
- *   Opportunity tiles, same idea as supplierWiseReport.
+ *   Opportunity tiles, same idea as supplierWiseReport. Mirrors the Sales
+ *   Opportunity List's own columns so SalesDashboard's own Opportunities
+ *   tab can show the same information, plus `id` so Opportunity # can link
+ *   straight back to that row in Sales Management.
  * @returns {Promise<Object>}
  */
 const getSalesDashboardSummary = async () => {
@@ -328,11 +332,18 @@ const getSalesDashboardSummary = async () => {
         openOpportunitiesOverThreeDays += 1;
       }
       openOpportunities.push({
+        id: String(opportunity._id),
         opportunityId: opportunity.opportunityId,
         name: opportunity.name,
         customerOrProspect: _.get(opportunity, "customer.name") || opportunity.prospectName || "",
         requestDate: customerRequest.requestDate || "",
         daysPending: requestAge,
+        quoteStatus: customerRequest.quoteStatus || "",
+        linkType: customerRequest.linkType || "",
+        downBandwidth: customerRequest.downBandwidth || "",
+        siteAddress: customerRequest.siteAddress || "",
+        city: customerRequest.city || "",
+        country: customerRequest.country || "",
       });
     }
 
