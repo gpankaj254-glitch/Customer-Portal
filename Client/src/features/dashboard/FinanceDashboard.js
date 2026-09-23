@@ -6,6 +6,10 @@ import TextField from "@mui/material/TextField"
 import Autocomplete from "@mui/material/Autocomplete"
 import FormControlLabel from "@mui/material/FormControlLabel"
 import Checkbox from "@mui/material/Checkbox"
+import FormControl from "@mui/material/FormControl"
+import InputLabel from "@mui/material/InputLabel"
+import Select from "@mui/material/Select"
+import MenuItem from "@mui/material/MenuItem"
 import Table from "@mui/material/Table"
 import TableHead from "@mui/material/TableHead"
 import TableBody from "@mui/material/TableBody"
@@ -87,17 +91,28 @@ export default function FinanceDashboard() {
 
     const [searchInput, setSearchInput] = React.useState("")
     const [search, setSearch] = React.useState("")
-    // "Filter options to review Vendor wise / Customer wise" - narrows the
-    // already-fetched list to one Vendor and/or one Customer, entirely
-    // client-side (same rows the search box already filters via the
-    // server); both can be combined with each other, the search box and
-    // the gap toggle below.
-    const [vendorFilter, setVendorFilter] = React.useState(null)
-    const [customerFilter, setCustomerFilter] = React.useState(null)
+    // "1. Filter by Customer or Vendor, 2. Basis that then Select Customer
+    // or Vendor Name, 3. then filter to select their contract term pending
+    // > or < # months" - a guided, sequential filter, entirely client-side
+    // (same rows the search box already filters via the server).
+    // filterBasis picks which side's Name list/Contract Pending field steps
+    // 2-3 apply to; "" (None) leaves the table unfiltered by any of this.
+    const [filterBasis, setFilterBasis] = React.useState("")
+    const [filterName, setFilterName] = React.useState(null)
+    const [pendingOperator, setPendingOperator] = React.useState(">")
+    const [pendingThreshold, setPendingThreshold] = React.useState("")
     // "Where there is gap between Vendor Contract pending month / Customer
     // contract pending month" - shows only rows where both sides could be
-    // computed and they don't match.
+    // computed and they don't match. Independent of, and combinable with,
+    // the filter above.
     const [onlyGapRows, setOnlyGapRows] = React.useState(false)
+
+    // Switching basis invalidates the previously-picked Name (a Vendor name
+    // isn't a valid Customer name and vice versa).
+    const handleFilterBasisChange = (event) => {
+        setFilterBasis(event.target.value)
+        setFilterName(null)
+    }
 
     React.useEffect(() => {
         dispatch(getVendors({ limit: 1000, page: 1 }))
@@ -157,22 +172,40 @@ export default function FinanceDashboard() {
         }
     })
 
-    // Vendor/Customer filter dropdown options - every distinct name actually
+    // Name dropdown options for step 2 - every distinct name actually
     // present in the (search-filtered) list, not the full Vendor/Customer
     // Management lists, so there's never an option that would just empty
-    // the table out.
-    const vendorFilterOptions = React.useMemo(
-        () => _.uniq(rows.map((row) => row.vendorName).filter(Boolean)).sort(),
-        [rows]
-    )
-    const customerFilterOptions = React.useMemo(
-        () => _.uniq(rows.map((row) => row.customerName).filter(Boolean)).sort(),
-        [rows]
-    )
+    // the table out. Only the one matching the current basis is ever shown.
+    const filterNameOptions = React.useMemo(() => {
+        if (filterBasis === "vendor") {
+            return _.uniq(rows.map((row) => row.vendorName).filter(Boolean)).sort()
+        }
+        if (filterBasis === "customer") {
+            return _.uniq(rows.map((row) => row.customerName).filter(Boolean)).sort()
+        }
+        return []
+    }, [rows, filterBasis])
+
+    // Step 3 - "their contract term pending > or < # months", applied to
+    // whichever side's own Contract Pending field matches the chosen basis.
+    // A row that isn't computable ("-") never matches a threshold - there's
+    // nothing to compare.
+    function matchesPendingThreshold(pendingValue) {
+        if (pendingThreshold === "") return true
+        if (pendingValue === "-") return false
+        const numeric = Number(pendingValue)
+        const threshold = Number(pendingThreshold)
+        return pendingOperator === ">" ? numeric > threshold : numeric < threshold
+    }
 
     const filteredRows = rows.filter((row) => {
-        if (vendorFilter && row.vendorName !== vendorFilter) return false
-        if (customerFilter && row.customerName !== customerFilter) return false
+        if (filterBasis === "customer") {
+            if (filterName && row.customerName !== filterName) return false
+            if (!matchesPendingThreshold(row.customerContractPendingMonths)) return false
+        } else if (filterBasis === "vendor") {
+            if (filterName && row.vendorName !== filterName) return false
+            if (!matchesPendingThreshold(row.vendorContractPendingMonths)) return false
+        }
         if (onlyGapRows && (row.contractGapMonths === "-" || Number(row.contractGapMonths) === 0)) return false
         return true
     })
@@ -191,28 +224,70 @@ export default function FinanceDashboard() {
                     onChange={(event) => setSearchInput(event.target.value)}
                 />
             </Grid>
-            <Grid item xs={12} sm={4}>
+            {/* 1. Filter by Customer or Vendor */}
+            <Grid item xs={12} sm={3}>
+                <FormControl fullWidth size="small">
+                    <InputLabel id="finance-filter-basis-label">Filter by</InputLabel>
+                    <Select
+                        labelId="finance-filter-basis-label"
+                        label="Filter by"
+                        value={filterBasis}
+                        onChange={handleFilterBasisChange}
+                    >
+                        <MenuItem value=""><em>None</em></MenuItem>
+                        <MenuItem value="customer">Customer</MenuItem>
+                        <MenuItem value="vendor">Vendor</MenuItem>
+                    </Select>
+                </FormControl>
+            </Grid>
+            {/* 2. Basis that then Select Customer or Vendor Name */}
+            <Grid item xs={12} sm={3}>
                 <Autocomplete
                     size="small"
-                    options={vendorFilterOptions}
-                    value={vendorFilter}
-                    onChange={(event, newValue) => setVendorFilter(newValue)}
-                    renderInput={(params) => <TextField {...params} label="Filter by Vendor" placeholder="All vendors" />}
+                    disabled={!filterBasis}
+                    options={filterNameOptions}
+                    value={filterName}
+                    onChange={(event, newValue) => setFilterName(newValue)}
+                    renderInput={(params) => (
+                        <TextField
+                            {...params}
+                            label={filterBasis === "vendor" ? "Vendor Name" : "Customer Name"}
+                            placeholder={filterBasis ? "All" : "Pick a filter basis first"}
+                        />
+                    )}
                 />
             </Grid>
-            <Grid item xs={12} sm={4}>
-                <Autocomplete
+            {/* 3. Filter to select their contract term pending > or < # months */}
+            <Grid item xs={6} sm={2}>
+                <FormControl fullWidth size="small" disabled={!filterBasis}>
+                    <InputLabel id="finance-pending-operator-label">Pending</InputLabel>
+                    <Select
+                        labelId="finance-pending-operator-label"
+                        label="Pending"
+                        value={pendingOperator}
+                        onChange={(event) => setPendingOperator(event.target.value)}
+                    >
+                        <MenuItem value=">">&gt; (more than)</MenuItem>
+                        <MenuItem value="<">&lt; (less than)</MenuItem>
+                    </Select>
+                </FormControl>
+            </Grid>
+            <Grid item xs={6} sm={2}>
+                <TextField
+                    fullWidth
                     size="small"
-                    options={customerFilterOptions}
-                    value={customerFilter}
-                    onChange={(event, newValue) => setCustomerFilter(newValue)}
-                    renderInput={(params) => <TextField {...params} label="Filter by Customer" placeholder="All customers" />}
+                    type="number"
+                    disabled={!filterBasis}
+                    label="# Months"
+                    placeholder="e.g. 3"
+                    value={pendingThreshold}
+                    onChange={(event) => setPendingThreshold(event.target.value)}
                 />
             </Grid>
-            <Grid item xs={12} sm={4} sx={{ display: "flex", alignItems: "center" }}>
+            <Grid item xs={12} sm={2} sx={{ display: "flex", alignItems: "center" }}>
                 <FormControlLabel
                     control={<Checkbox size="small" checked={onlyGapRows} onChange={(event) => setOnlyGapRows(event.target.checked)} />}
-                    label={<Typography variant="body2" sx={{ fontSize: "0.75rem" }}>Only show rows with a Contract Gap</Typography>}
+                    label={<Typography variant="body2" sx={{ fontSize: "0.75rem" }}>Only Contract Gap rows</Typography>}
                 />
             </Grid>
             <Grid item xs={12}>
