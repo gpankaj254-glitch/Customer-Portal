@@ -196,7 +196,12 @@ function DashboardContent() {
 
                 {isSalesRole ? (
                     <Grid item xs={12}>
-                        <SalesDashboard />
+                        {/* "Reduce Font of Sales Dashboard" - same compact
+                            treatment ScxDashboard's embedded Sales tab
+                            already uses (see ScxDashboard.js), now applied
+                            to SCX Sales Admin/User's own standalone
+                            dashboard too. */}
+                        <SalesDashboard compact />
                     </Grid>
                 ) : isNoc ? (
                     <Grid item xs={12}>

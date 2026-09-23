@@ -56,7 +56,9 @@ export default function ManagementDashboard() {
                 </Tabs>
             </Grid>
             <Grid item xs={12}>
-                {activeTab === 0 && <SalesDashboard />}
+                {/* "Reduce Font of Sales Dashboard" - matches this tab's own
+                    already-compact surrounding chrome (the Tabs row above). */}
+                {activeTab === 0 && <SalesDashboard compact />}
                 {activeTab === 1 && <FinanceDashboard />}
                 {activeTab === 2 && (
                     <Grid container spacing={1.5}>

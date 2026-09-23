@@ -222,7 +222,11 @@ export default function SalesDashboard({ embeddedTab, compact }) {
         <Grid container spacing={1.5}>
             {!embedded && (
                 <Grid item xs={12}>
-                    <Tabs value={activeTab} onChange={(event, newValue) => setOwnTab(newValue)}>
+                    <Tabs
+                        value={activeTab}
+                        onChange={(event, newValue) => setOwnTab(newValue)}
+                        sx={compact ? { minHeight: 34, "& .MuiTab-root": { minHeight: 34, py: 0.5, fontSize: "0.75rem" } } : undefined}
+                    >
                         <Tab label="Summary" />
                         <Tab label="Opportunities" />
                         <Tab label="Supplier" />
