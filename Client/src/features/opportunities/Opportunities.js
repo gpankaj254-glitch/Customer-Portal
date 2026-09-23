@@ -28,6 +28,25 @@ const deletedOpportunityColumns = [
     { id: "opportunityId", label: "Opportunity #" },
 ]
 
+// "Reduce Font of Whole Sales management display" - applied here on the
+// page container (same compacting approach as Tickets.js/Inventory.js/
+// Sites.js) so it covers every tab: the Opportunity List table, Create
+// Opportunity's form, an expanded row's Customer/Supplier Communication
+// tabs (OpportunityDetails), Deleted Opportunities and Bulk Upload.
+const compactSx = {
+    "& .MuiTabs-root": { minHeight: 34 },
+    "& .MuiTab-root": { minHeight: 34, py: 0.5, fontSize: "0.75rem" },
+    "& .MuiTableCell-root": { fontSize: "0.75rem", padding: "6px 10px" },
+    "& .MuiTypography-body1, & .MuiTypography-body2, & .MuiTypography-subtitle1, & .MuiTypography-subtitle2, & .MuiTypography-h6": { fontSize: "0.75rem" },
+    "& .MuiTypography-h5": { fontSize: "1rem" },
+    "& .MuiInputBase-root, & .MuiInputLabel-root, & .MuiFormControlLabel-label, & .MuiButton-root, & .MuiAlert-root, & .MuiFormHelperText-root": { fontSize: "0.75rem" },
+    "& .MuiTablePagination-displayedRows, & .MuiTablePagination-selectLabel": { fontSize: "0.75rem" },
+    "& .MuiOutlinedInput-input": { padding: "8px 12px" },
+    "& .MuiChip-root": { height: 20 },
+    "& .MuiChip-label": { fontSize: "0.68rem" },
+    "& .MuiIconButton-root .MuiSvgIcon-root": { fontSize: "1.1rem" },
+}
+
 function OpportunitiesContent() {
 
     const dispatch = useDispatch()
@@ -136,7 +155,7 @@ function OpportunitiesContent() {
     }
 
     return (
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4, ...compactSx }}>
             <Grid container spacing={3}>
 
                 <Grid item xs={12}>
