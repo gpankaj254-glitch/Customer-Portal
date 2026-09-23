@@ -5,11 +5,12 @@ import Paper from "@mui/material/Paper"
 import Tabs from "@mui/material/Tabs"
 import Tab from "@mui/material/Tab"
 import TextField from "@mui/material/TextField"
+import Typography from "@mui/material/Typography"
 
 import InventoryTable from "./InventoryTable"
 import CreateCircuit from "./CreateCircuit"
 import BulkUploadCircuits from "./BulkUploadCircuits"
-import { selectPagination, selectSearch, getSites, setSearch } from "./inventorySlice"
+import { selectPagination, selectSearch, getSites, setSearch, selectTotalCircuits } from "./inventorySlice"
 import { getVendors } from "../vendors/vendorSlice"
 import { fetchDeletedCircuits, fetchRestoreCircuit, fetchPermanentlyDeleteCircuit } from "./circuitAPI"
 import { useSelector, useDispatch } from "react-redux"
@@ -59,6 +60,7 @@ function InventoryContent() {
 
     const pagination = useSelector(selectPagination)
     const search = useSelector(selectSearch)
+    const totalCircuits = useSelector(selectTotalCircuits)
     const currentUser = useSelector(selectUser)
     // "Remove Create circuit option from NOC" - SCX Admin only now (SCX
     // Service Delivery doesn't hold createCircuits either; it creates
@@ -97,14 +99,24 @@ function InventoryContent() {
     }, [searchInput])
 
     const searchBox = (
-        <TextField
-            fullWidth
-            label="Search inventory"
-            placeholder="Search any site or circuit field - name, address, Vendor Circuit ID, SCloudX Order Reference, etc."
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            sx={{ mb: 2 }}
-        />
+        <>
+            {/* "need Total Count of Circuits in Total and based on search
+                option" / "Display Circuit Count at Top of the list" -
+                narrows along with the search below, since it's driven by
+                the same server-side filter (see site.controller.js's
+                getSites), not just what's summed from the current page. */}
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                Total Circuits: {totalCircuits}
+            </Typography>
+            <TextField
+                fullWidth
+                label="Search inventory"
+                placeholder="Search any site or circuit field - name, address, Vendor Circuit ID, SCloudX Order Reference, etc."
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                sx={{ mb: 2 }}
+            />
+        </>
     )
 
     // "Change Inventory to Live Inventory, Add 2 more tabs - Changed

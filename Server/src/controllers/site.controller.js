@@ -80,7 +80,14 @@ const getSites = catchAsync(async (req, res) => {
   }
 
   const options = pick(req.query, ["sortBy", "limit", "page"]);
-  const result = await siteService.querySites(filter, options);
+  const [result, totalCircuits] = await Promise.all([
+    siteService.querySites(filter, options),
+    // "need Total Count of Circuits in Total and based on search option" -
+    // scoped to the same filter as the site list itself (so it narrows
+    // along with search), not just the current page's sites.
+    siteService.countCircuitsForFilter(filter),
+  ]);
+  result.totalCircuits = totalCircuits;
   result.results = await Promise.all(
     result.results.map(async (site) => {
       const siteObj = site.toJSON();

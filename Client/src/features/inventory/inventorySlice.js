@@ -10,6 +10,11 @@ const initialState = {
     // Set by focusSite (see the Finance dashboard's Site Name link) - the
     // site to auto-expand once it's in siteList (see InventoryTable).
     focusSiteId: "",
+    // "need Total Count of Circuits in Total and based on search option" -
+    // count of active circuits across every site matching the current
+    // search (not just the current page's sites) - see getSites' own
+    // totalCircuits.
+    totalCircuits: 0,
     pagination: {
         page: 0,
         limit: 200,
@@ -65,6 +70,7 @@ export const inventorySlice = createSlice({
                 state.siteList = payload.results
                 state.pagination.totalResults = payload.totalResults
                 state.pagination.totalPages = payload.totalPages
+                state.totalCircuits = payload.totalCircuits ?? 0
                 // state.pagination.totalResults = payload.totalResults
             })
             .addCase(getSites.rejected, (state, {payload}) => {
@@ -82,5 +88,6 @@ export const selectPageStatus = (state) => state.inventory.pageStatus
 export const selectPagination = (state) => state.inventory.pagination
 export const selectSearch = (state) => state.inventory.search
 export const selectFocusSiteId = (state) => state.inventory.focusSiteId
+export const selectTotalCircuits = (state) => state.inventory.totalCircuits
 
 export default inventorySlice.reducer

@@ -66,6 +66,25 @@ const querySites = async (filter, options) => {
 };
 
 /**
+ * Count every active Circuit belonging to any Site matching the given
+ * filter (the same Site-level filter querySites/getSites uses, search
+ * conditions included) - not just the circuits on the current page's sites.
+ * "need Total Count of Circuits in Total and based on search option" - the
+ * Inventory page's own "Total Circuits" figure, which narrows the same way
+ * the site list itself does as the user searches.
+ * @param {Object} filter - the same Mongo filter passed to querySites
+ * @returns {Promise<number>}
+ */
+const countCircuitsForFilter = async (filter) => {
+  const matchingSites = await Site.find(filter).select("_id").lean();
+  if (matchingSites.length === 0) {
+    return 0;
+  }
+  const siteIds = matchingSites.map((site) => String(site._id));
+  return Circuit.countDocuments({ active: true, "site.id": { $in: siteIds } });
+};
+
+/**
  * Get site by id
  * @param {ObjectId} siteId
  * @returns {Promise<Site>}
@@ -405,6 +424,7 @@ const bulkUploadSites = async (fileBuffer) => {
 module.exports = {
   createSite,
   querySites,
+  countCircuitsForFilter,
   getSiteById,
   updateSiteById,
   deactivateSiteById,
