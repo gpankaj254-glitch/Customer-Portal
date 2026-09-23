@@ -21,6 +21,7 @@ import {
     selectSalesDashboardSummaryStatus,
     selectSalesDashboardSummaryError,
     setAutoExpandOpportunityId,
+    setSearch as setOpportunitySearch,
 } from "./opportunitySlice"
 import { togglePage } from "../landing/landingSlice"
 import { pages } from "../../consts"
@@ -89,11 +90,19 @@ function displaySiteLocation(row) {
 // Management with that row auto-expanded - setAutoExpandOpportunityId is
 // the same mechanism CreateOpportunity already uses locally, just reachable
 // across the page switch via Redux (see opportunitySlice.js).
+// "In NOC, Open Ticket click, it searches that Ticket ID and Opens that
+// only. but in Sales Opportunity, it displays the list also along with that
+// particular ID" - mirrors ticketSlice's own focusTicket exactly (it sets
+// `search` to the ticket ID, not just an expand target), which is what
+// actually narrows Tickets down to the one row rather than just scrolling
+// to it in the full list - so this also sets the Opportunity List's own
+// search to this row's Opportunity # alongside the auto-expand id.
 function OpenOpportunitiesTable({ rows }) {
     const compact = React.useContext(CompactContext)
     const dispatch = useDispatch()
 
     const handleOpenOpportunity = (row) => {
+        dispatch(setOpportunitySearch(row.opportunityId))
         dispatch(setAutoExpandOpportunityId(row.id))
         dispatch(togglePage(pages.SALES_OPPORTUNITIES))
     }
