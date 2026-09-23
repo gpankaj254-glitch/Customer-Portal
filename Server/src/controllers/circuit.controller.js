@@ -64,12 +64,15 @@ const getCircuits = catchAsync(async (req, res) => {
     // This endpoint is currently only used by the Finance dashboard's circuit
     // table (see FinanceDashboard.js) - the search fields are kept to exactly
     // the columns shown there. Matching on a field the table doesn't display
-    // (e.g. Vendor LEC Name, an order reference) is confusing: a result shows
-    // up with nothing visible in the row to explain why it matched.
+    // (e.g. Vendor LEC Name, Vendor Circuit ID) is confusing: a result shows
+    // up with nothing visible in the row to explain why it matched. Vendor
+    // Circuit ID was replaced by SCX Order Ref Number as a displayed column
+    // ("Remove Vendor Circuit ID and Replace with SCX Order Ref Number"), so
+    // it's replaced here too.
     const orConditions = [
       { "site.name": regex },
       { "customer.name": regex },
-      { vendorCircuitId: regex },
+      { scloudxOrderReference: regex },
       { customerCircuitBillStartDate: regex },
       { customerCircuitContractTerm: regex },
       { vendorCircuitBillStartDate: regex },
