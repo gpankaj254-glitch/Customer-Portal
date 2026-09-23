@@ -127,7 +127,7 @@ function OpportunitiesContent() {
                     <TextField
                         fullWidth
                         label="Search opportunities"
-                        placeholder="Search by name, opportunity #, or customer"
+                        placeholder="Search by name, opportunity #, customer, status, link type, bandwidth, or site address/city/country/PIN"
                         value={opportunitySearchInput}
                         onChange={(event) => setOpportunitySearchInput(event.target.value)}
                         sx={{ mb: 2 }}

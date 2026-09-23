@@ -43,12 +43,25 @@ const getOpportunities = catchAsync(async (req, res) => {
   const filter = activeOnly({});
   const search = _.trim(_.get(req.body, "search", ""));
   if (search) {
+    // "Search should be expanded to the whole data in that display" - every
+    // field the Opportunity List itself actually shows a column for (see
+    // OpportunityTable.js's columns), not just name/opportunityId/customer,
+    // including the Site Address/City/Country/PIN column's own fields.
+    const regex = { $regex: search, $options: "i" };
     _.assign(filter, {
       $or: [
-        { name: { $regex: search, $options: "i" } },
-        { opportunityId: { $regex: search, $options: "i" } },
-        { "customer.name": { $regex: search, $options: "i" } },
-        { prospectName: { $regex: search, $options: "i" } },
+        { name: regex },
+        { opportunityId: regex },
+        { "customer.name": regex },
+        { prospectName: regex },
+        { "customerRequest.requestDate": regex },
+        { "customerRequest.quoteStatus": regex },
+        { "customerRequest.linkType": regex },
+        { "customerRequest.downBandwidth": regex },
+        { "customerRequest.siteAddress": regex },
+        { "customerRequest.city": regex },
+        { "customerRequest.country": regex },
+        { "customerRequest.zipCode": regex },
       ],
     });
   }

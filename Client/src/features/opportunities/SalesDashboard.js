@@ -78,9 +78,9 @@ SectionHeading.propTypes = {
 }
 
 // Same combined column as the Sales Opportunity List's own "Site Address /
-// City / Country" - see OpportunityTable.js's displaySiteLocation.
+// City / Country / PIN" - see OpportunityTable.js's displaySiteLocation.
 function displaySiteLocation(row) {
-    return [row.siteAddress, row.city, row.country].filter(Boolean).join(", ")
+    return [row.siteAddress, row.city, row.country, row.zipCode].filter(Boolean).join(", ")
 }
 
 // "In Sales Dashboard - Opportunities, List Columns - ... Also make
@@ -119,7 +119,7 @@ function OpenOpportunitiesTable({ rows }) {
                         <TableCell><Typography variant="subtitle2">Quote Status</Typography></TableCell>
                         <TableCell><Typography variant="subtitle2">Link Type</Typography></TableCell>
                         <TableCell><Typography variant="subtitle2">Download BW</Typography></TableCell>
-                        <TableCell><Typography variant="subtitle2">Site Address / City / Country</Typography></TableCell>
+                        <TableCell><Typography variant="subtitle2">Site Address / City / Country / PIN</Typography></TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>

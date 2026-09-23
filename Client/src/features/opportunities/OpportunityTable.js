@@ -43,11 +43,13 @@ function displayCustomerOrProspect(row) {
 // (Edit Opportunity dialog below and the Opportunity Details tab), just no
 // longer shown as their own list columns; the three new ones are Customer
 // Request fields already captured at creation, just not previously listed.
+// "Add PIN Code In Address+City+Country+PIN" - zipCode appended the same way.
 function displaySiteLocation(row) {
     return [
         _.get(row, "customerRequest.siteAddress"),
         _.get(row, "customerRequest.city"),
         _.get(row, "customerRequest.country"),
+        _.get(row, "customerRequest.zipCode"),
     ].filter(Boolean).join(", ")
 }
 
@@ -63,7 +65,7 @@ const columns = [
     { id: "customerRequest.quoteStatus", label: "Quote Status" },
     { id: "customerRequest.linkType", label: "Link Type" },
     { id: "customerRequest.downBandwidth", label: "Download BW" },
-    { id: "siteLocation", label: "Site Address / City / Country", render: displaySiteLocation },
+    { id: "siteLocation", label: "Site Address / City / Country / PIN", render: displaySiteLocation },
 ]
 
 const currencySelectOptions = currencyOptions.map((option) => ({

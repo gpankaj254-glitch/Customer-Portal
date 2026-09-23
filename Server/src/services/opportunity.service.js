@@ -288,7 +288,7 @@ const updateOpportunityById = async (opportunityId, updateBody, actingUser, rela
  *   broken down per supplier name, sorted by pending count descending.
  * - openOpportunities: one row per "Pending" opportunity (id, opportunityId,
  *   name, customerOrProspect, requestDate, daysPending, quoteStatus,
- *   linkType, downBandwidth, siteAddress, city, country), sorted by
+ *   linkType, downBandwidth, siteAddress, city, country, zipCode), sorted by
  *   daysPending descending - the detail list behind the two Open
  *   Opportunity tiles, same idea as supplierWiseReport. Mirrors the Sales
  *   Opportunity List's own columns so SalesDashboard's own Opportunities
@@ -344,6 +344,8 @@ const getSalesDashboardSummary = async () => {
         siteAddress: customerRequest.siteAddress || "",
         city: customerRequest.city || "",
         country: customerRequest.country || "",
+        // "Add PIN Code In Address+City+Country+PIN".
+        zipCode: customerRequest.zipCode || "",
       });
     }
 
