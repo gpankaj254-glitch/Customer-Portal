@@ -230,9 +230,9 @@ const getAuthorizedTicket = async (ticketId, user) => {
  * Closure Details editable; Completed is fully frozen) - "Give rights to
  * SCX Admin to update Ticket for Closed or Completed Ticket also" lifts
  * that for SCX Admin specifically, who can still edit every normal field on
- * either. The status itself still only moves forward one step at most
- * (stays put, or Closed -> Completed) - this doesn't add a way to reopen a
- * ticket back to an earlier status.
+ * either, and ("As SCX Admin, I still cannot change Status of Closed
+ * Ticket") can also set Status to any value at all, including reopening it
+ * - not just the same/Completed everyone else is limited to.
  * @param {Object} ticketBody
  * @param {Object} user
  * @returns {Promise<Ticket>}
@@ -291,8 +291,11 @@ const updateTicket = async (ticketBody, user) => {
     // Once Closed (or Completed, for SCX Admin), the rest of the ticket is
     // frozen for every other role - only Ticket Closure details may still
     // be edited, via the Closed Tickets tab, and status can only stay put
-    // or move on to Completed, never back to an earlier open status.
-    if (status !== ticket.status && status !== "Completed") {
+    // or move on to Completed, never back to an earlier open status. SCX
+    // Admin isn't held to that - "As SCX Admin, I still cannot change
+    // Status of Closed Ticket" - any status value is accepted, including
+    // reopening it.
+    if (!isScxAdmin && status !== ticket.status && status !== "Completed") {
       throw new ApiError(httpStatus.BAD_REQUEST, "This ticket's status can only stay the same or move to Completed");
     }
     CLOSURE_DETAIL_FIELDS.forEach((field) => {
@@ -314,6 +317,10 @@ const updateTicket = async (ticketBody, user) => {
       if (vendorTicketCreateDate !== undefined) ticket.vendorTicketCreateDate = vendorTicketCreateDate;
       if (vendorTicketStatus !== undefined) ticket.vendorTicketStatus = vendorTicketStatus;
       if (vendorTicketClosureDate !== undefined) ticket.vendorTicketClosureDate = vendorTicketClosureDate;
+      // Reopening (any status other than Closed/Completed) has to clear
+      // .closed too, or appendTicketDescription/addTicketAttachments (etc.)
+      // would keep rejecting the now-reopened ticket as still closed.
+      ticket.closed = status === "Closed" || status === "Completed";
     }
     ticket.status = status;
     return updateAndSave(ticket, status, "", user);
@@ -362,7 +369,14 @@ const updateTicket = async (ticketBody, user) => {
 
   ticket.status = status;
   ticket.closed = status === "Closed";
-  if (status === "Closed" && !ticket.downTime) {
+  // Stamp Closed Date/downtime once, the first real time this ticket is
+  // closed - guarded on closedAt itself (not downTime, which a genuinely
+  // historical/imported ticket can legitimately compute to exactly 0, a
+  // falsy value that let this re-run and silently overwrite a real
+  // closedAt/downTime with "now" every time an SCX Admin reopens and
+  // re-closes a ticket, since that path re-enters here rather than the
+  // Closed-ticket branch above).
+  if (status === "Closed" && !ticket.closedAt) {
     const created = _.get(ticket, "history[0].updatedAt");
     if (created) {
       // Closing may now be dated before creation (see above) - never store a negative downtime.

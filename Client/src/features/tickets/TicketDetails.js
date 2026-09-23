@@ -166,13 +166,15 @@ export default function TicketDetails({ ticket, mode }) {
     // Closed; Completed freezes it too, except for SCX Admin, same
     // exception as mainFieldsLocked above.
     const closureFieldsLocked = mode === "completed" && currentUser.role !== roles.SCLOUDX_ADMIN
-    // The Status dropdown itself stays locked even for SCX Admin once a
-    // ticket is Closed/Completed - the server only ever accepts it
-    // unchanged or moving Closed -> Completed (see updateTicket), and this
-    // dropdown's own option list (tab0StatusOptions) isn't scoped down to
-    // just those choices, so leaving it enabled could offer a pick the
-    // server would then reject.
-    const statusFieldLocked = mode !== "open"
+    // The Status dropdown stays locked once a ticket is Closed/Completed
+    // for every other role - the server only ever accepts it unchanged or
+    // moving Closed -> Completed for them. SCX Admin gets the same
+    // exception as mainFieldsLocked ("As SCX Admin, I still cannot change
+    // Status of Closed Ticket") - the server accepts any value from Admin,
+    // including reopening the ticket, so tab0StatusOptions' full list
+    // (every status, not just Open-mode's subset) is a safe, usable set to
+    // offer here.
+    const statusFieldLocked = mode !== "open" && currentUser.role !== roles.SCLOUDX_ADMIN
     // The locally selected, not-yet-saved status - drives whether Closure
     // Code appears (Open mode only) the moment "Closed" is picked, ahead of
     // the eventual save.
