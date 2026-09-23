@@ -716,7 +716,18 @@ const validateBulkUploadCircuits = async (fileBuffer) => {
  * its site's `circuits` array. Mirrors createCircuitBySite's per-row logic,
  * batched - and skips the isCodeTaken re-check createCircuitBySite does,
  * since validateBulkUploadCircuits already confirmed every code is free
- * (the schema's unique index on `code` still catches a genuine race).
+ * among Live circuits.
+ * validateBulkUploadCircuits only blocks a Vendor Circuit ID that's still
+ * held by a Live circuit ("This duplicate validation should be checked only
+ * for Live circuits, not Closed[Ceased] or Changed") - but `code` itself
+ * still has a hard unique index in Mongo, regardless of status, so a row
+ * that's allowed through because the existing circuit is Ceased/Changed
+ * would otherwise crash insertMany with a raw duplicate-key error. Freeing
+ * the superseded circuit's `code` first (its own vendorCircuitId/status/etc.
+ * are untouched, and it's still found by search - see
+ * findSiteIdsMatchingSearch, which also matches on vendorCircuitId) lets the
+ * new circuit take over the canonical code, same as a physical circuit ID
+ * being decommissioned and reissued.
  * @param {Array<{site: Object, circuitBody: Object}>} validRows
  * @returns {Promise<Array<Circuit>>}
  */
@@ -749,6 +760,23 @@ const bulkCreateCircuitsBySite = async (validRows) => {
     circuitToCreate.site = extractNameAndCode(site);
     return circuitToCreate;
   });
+
+  // Re-check for a live collision right before inserting (not just relying
+  // on validateBulkUploadCircuits's earlier snapshot), and only ever free a
+  // code held by a Ceased/Changed circuit - if a race means it's actually
+  // Live by now, leave it alone and let insertMany's own unique index
+  // rejection surface it, rather than silently displacing a Live circuit.
+  const docCodes = docs.map((doc) => doc.code);
+  const collidingCircuits = await Circuit.find({ code: { $in: docCodes } }).select("code status");
+  const supersededIds = collidingCircuits
+    .filter((circuit) => (circuit.status || "Live") !== "Live")
+    .map((circuit) => circuit._id);
+  if (supersededIds.length > 0) {
+    await Circuit.updateMany(
+      { _id: { $in: supersededIds } },
+      [{ $set: { code: { $concat: ["$code", "#superseded-", { $toString: "$_id" }] } } }]
+    );
+  }
 
   // insertMany returns documents in the same order as the input array, so
   // index i here always corresponds to validRows[i].
