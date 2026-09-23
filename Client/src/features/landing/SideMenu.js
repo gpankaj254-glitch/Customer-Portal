@@ -92,6 +92,16 @@ const RENAMED_ROLE_LABEL_OVERRIDES = {
     [sideMenuItems.TICKETS]: "NOC Management",
 }
 
+// "reduce / Optimise fonts of all Left side Tabs, Make it more presentable"
+// - every item's label was rendered with Typography variant="h4" (2.125rem
+// by default), wildly oversized for a nav list; body2 (0.875rem) is the
+// standard size MUI's own drawer/list examples use. minWidth on the icon
+// slot is also trimmed from its 56px default, and the icon itself scaled
+// down to match - together this reads as a normal, compact side nav
+// instead of a list of oversized headings.
+const menuItemIconSx = { minWidth: 36, "& .MuiSvgIcon-root": { fontSize: "1.3rem" } }
+const menuItemTextSx = { fontSize: "0.875rem", fontWeight: 500 }
+
 const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== "open" })(
     ({ theme, open }) => ({
         "& .MuiDrawer-paper": {
@@ -167,26 +177,26 @@ export default function SideMenu(props) {
           
                 <Divider />
 
-                <List component="nav">
+                <List component="nav" sx={{ py: 0.5 }}>
                     <React.Fragment>
                         {effectiveMainListItems.map((item) => (
-                            _.includes(permissions, item) && (<ListItemButton key = {item} selected = {page === item} onClick = {(event) => handleToggle(event, item)}>
-                                <ListItemIcon>
+                            _.includes(permissions, item) && (<ListItemButton key = {item} selected = {page === item} onClick = {(event) => handleToggle(event, item)} sx={{ py: 0.75, minHeight: 38 }}>
+                                <ListItemIcon sx={menuItemIconSx}>
                                     {getMenuItemIcon(item)}
                                 </ListItemIcon>
-                                <Typography variant="h4">{getLabel(item)}
+                                <Typography sx={menuItemTextSx}>{getLabel(item)}
                                 </Typography>
                                 {/* <ListItemText primary={getLabel(item)} /> */}
                             </ListItemButton>)
                         ))}
                         <Divider sx={{ my: 1 }} />
                         {effectiveSecondaryListItems.map((item) => (
-                            _.includes(permissions, item) && (<ListItemButton key = {item} selected = {page === item} onClick = {(event) => handleToggle(event, item)}>
-                                <ListItemIcon>
+                            _.includes(permissions, item) && (<ListItemButton key = {item} selected = {page === item} onClick = {(event) => handleToggle(event, item)} sx={{ py: 0.75, minHeight: 38 }}>
+                                <ListItemIcon sx={menuItemIconSx}>
                                     {getMenuItemIcon(item)}
                                 </ListItemIcon>
                                 <Box overflow="inherit">
-                                    <Typography variant="h4">{getLabel(item)}
+                                    <Typography sx={menuItemTextSx}>{getLabel(item)}
                                     </Typography>
                                 </Box>
 
