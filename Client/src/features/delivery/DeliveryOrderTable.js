@@ -90,12 +90,16 @@ function buildColumns(dashboardView) {
     return columns
 }
 
-// The name of the first milestone not yet Completed - i.e. whichever one is
-// currently under way, given the sequential gating (see OrderDetails.js).
-// "Completed" once every milestone is Completed; blank if there are none.
+// The name of the first milestone not yet Completed/Not Required - i.e.
+// whichever one is currently under way, given the sequential gating (see
+// OrderDetails.js's own previousDone, which treats the two the same way for
+// unlocking - a milestone marked "Not Required" is done as far as progress
+// is concerned, so it shouldn't keep showing here as the order's "current"
+// one). "Completed" once every milestone is Completed/Not Required; blank
+// if there are none.
 function currentMilestoneStatus(row) {
     const milestones = row.milestones || []
-    const inProgress = milestones.find((milestone) => milestone.status !== "Completed")
+    const inProgress = milestones.find((milestone) => !["Completed", "Not Required"].includes(milestone.status))
     if (inProgress) {
         return inProgress.name
     }

@@ -71,7 +71,16 @@ const getSummary = async (actingUser) => {
   const [activeCustomers, activeSites, activeCircuits, openTickets, openTicketsOverTwoDays] = await Promise.all([
     customerScoped ? null : Customer.countDocuments({ active: true }),
     Site.countDocuments({ ...scopeFilter, active: true }),
-    Circuit.countDocuments({ ...scopeFilter, active: true }),
+    // "Active Circuits should be only with Status Live" - a legacy circuit
+    // with no stored status field is still "Live" (the schema default only
+    // applies once Mongoose hydrates a document, not to a raw query filter -
+    // same fallback as circuit.controller.js's getCircuits), so it's matched
+    // here too rather than silently dropped.
+    Circuit.countDocuments({
+      ...scopeFilter,
+      active: true,
+      $or: [{ status: "Live" }, { status: { $in: [null, ""] } }, { status: { $exists: false } }],
+    }),
     Ticket.countDocuments({ ...scopeFilter, active: true, closed: false }),
     Ticket.countDocuments({ ...scopeFilter, active: true, closed: false, createdAt: { $lte: twoDaysAgo } }),
   ]);
