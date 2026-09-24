@@ -103,6 +103,15 @@ function InventoryContent() {
     // deliveryOrder.service.js's createCircuitFromOrder).
     const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
     const canCreate = isAdmin
+    // "Remove Live Site Inventory, Changed Site Inventory and Ceased Site
+    // Inventory for Management, and Sales roles" - these three site-centric
+    // tabs stay for everyone else; the two circuit-centric tabs above them
+    // are unaffected.
+    const hideSiteInventoryTabs = [
+        roles.SCLOUDX_MANAGEMENT,
+        roles.SCLOUDX_SALES_ADMIN,
+        roles.SCLOUDX_SALES_USER,
+    ].includes(currentUser.role)
 
     // Local, uncommitted text box value - kept separate from the Redux search
     // term so we can debounce before actually dispatching a fetch.
@@ -184,33 +193,35 @@ function InventoryContent() {
                 />
             ),
         },
-        {
-            label: "Live Site Inventory",
-            content: (
-                <>
-                    {searchBox}
-                    <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Live" />
-                </>
-            ),
-        },
-        {
-            label: "Changed Site Inventory",
-            content: (
-                <>
-                    {searchBox}
-                    <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Changed" />
-                </>
-            ),
-        },
-        {
-            label: "Ceased Site Inventory",
-            content: (
-                <>
-                    {searchBox}
-                    <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Ceased" />
-                </>
-            ),
-        },
+        ...(hideSiteInventoryTabs ? [] : [
+            {
+                label: "Live Site Inventory",
+                content: (
+                    <>
+                        {searchBox}
+                        <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Live" />
+                    </>
+                ),
+            },
+            {
+                label: "Changed Site Inventory",
+                content: (
+                    <>
+                        {searchBox}
+                        <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Changed" />
+                    </>
+                ),
+            },
+            {
+                label: "Ceased Site Inventory",
+                content: (
+                    <>
+                        {searchBox}
+                        <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Ceased" />
+                    </>
+                ),
+            },
+        ]),
     ]
 
     if (canCreate) {
