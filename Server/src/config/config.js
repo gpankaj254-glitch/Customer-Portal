@@ -28,10 +28,10 @@ const envVarsSchema = Joi.object()
     JWT_VERIFY_EMAIL_EXPIRATION_MINUTES: Joi.number()
       .default(10)
       .description("minutes after which verify email token expires"),
-    // SMTP_HOST: Joi.string().description("server that will send the emails"),
-    // SMTP_PORT: Joi.number().description("port to connect to the email server"),
-    // SMTP_USERNAME: Joi.string().description("username for email server"),
-    // SMTP_PASSWORD: Joi.string().description("password for email server"),
+    SMTP_HOST: Joi.string().description("SMTP relay host that will send the emails (O365: smtp.office365.com)"),
+    SMTP_PORT: Joi.number().description("port to connect to the SMTP relay (O365: 587, STARTTLS)"),
+    SMTP_USERNAME: Joi.string().description("mailbox to authenticate as - must have Authenticated SMTP enabled on it"),
+    SMTP_PASSWORD: Joi.string().allow("").description("password (or app password) for SMTP_USERNAME - never committed, set via a real env var"),
     EMAIL_FROM: Joi.string().description(
       "the from field in the emails sent by the app"
     ),
@@ -92,14 +92,16 @@ module.exports = {
     verifyEmailExpirationMinutes: envVars.JWT_VERIFY_EMAIL_EXPIRATION_MINUTES,
   },
   email: {
-    // smtp: {
-    //   host: envVars.SMTP_HOST,
-    //   port: envVars.SMTP_PORT,
-    //   auth: {
-    //     user: envVars.SMTP_USERNAME,
-    //     pass: envVars.SMTP_PASSWORD,
-    //   },
-    // },
+    // O365/Exchange Online SMTP relay - see utils/mailer.js. SMTP_PASSWORD
+    // is the one piece that's never in configVars.js's committed defaults;
+    // it must be set as a real env var (locally in Server/.env, gitignored,
+    // or directly in the production host) before mail can actually send.
+    smtp: {
+      host: envVars.SMTP_HOST,
+      port: envVars.SMTP_PORT,
+      user: envVars.SMTP_USERNAME,
+      pass: envVars.SMTP_PASSWORD,
+    },
     from: envVars.EMAIL_FROM,
     toScloudX: envVars.EMAIL_TO_SCLOUDX,
     toCustomer: envVars.EMAIL_TO_CUSTOMER,

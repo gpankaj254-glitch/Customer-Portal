@@ -1,15 +1,36 @@
-const sgMail = require("@sendgrid/mail");
-const _ = require("lodash");
+const nodemailer = require("nodemailer");
 const config = require("../config/config");
 const logger = require("../config/logger");
 
-sgMail.setApiKey(config.apiKey);
+// O365/Exchange Online SMTP relay (smtp.office365.com:587, STARTTLS) via the
+// enterprise-support@connect2cloudx.com mailbox - Authenticated SMTP was
+// enabled for it directly, since Microsoft disables Basic Auth SMTP
+// tenant-wide by default. Lazily created (not at module load) so a missing/
+// placeholder SMTP_PASSWORD in local dev doesn't throw before sendMail is
+// ever actually called - nodemailer itself only validates auth on connect,
+// not on createTransport.
+let transporter = null;
+function getTransporter() {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: config.email.smtp.host,
+      port: config.email.smtp.port,
+      secure: config.email.smtp.port === 465,
+      auth: {
+        user: config.email.smtp.user,
+        pass: config.email.smtp.pass,
+      },
+    });
+  }
+  return transporter;
+}
 
 /**
- * Send an email via SendGrid. Failures are logged and swallowed - a
- * notification email must never break the request that triggered it (a
- * user/ticket create or update must still succeed even if SendGrid is down,
- * misconfigured, or the sender address isn't verified).
+ * Send an email via the configured SMTP relay (O365/Exchange Online).
+ * Failures are logged and swallowed - a notification email must never break
+ * the request that triggered it (a user/ticket create or update must still
+ * succeed even if SMTP is down, misconfigured, or the mailbox's password
+ * hasn't been set yet).
  * @param {Object} message
  * @param {string|string[]} message.to
  * @param {string} message.subject
@@ -45,8 +66,8 @@ const sendMail = async ({ to, subject, text, html }) => {
     : html || `<p>${text}</p>`;
 
   try {
-    await sgMail.send({
-      to: actualRecipients,
+    await getTransporter().sendMail({
+      to: actualRecipients.join(", "),
       from: config.email.from,
       subject: actualSubject,
       text: actualText,
@@ -55,8 +76,7 @@ const sendMail = async ({ to, subject, text, html }) => {
     logger.info(`Email sent: "${actualSubject}" -> ${actualRecipients.join(", ")}`);
     return true;
   } catch (error) {
-    const details = _.get(error, "response.body") || error.message;
-    logger.error(`Failed to send email "${actualSubject}": ${JSON.stringify(details)}`);
+    logger.error(`Failed to send email "${actualSubject}": ${error.message}`);
     return false;
   }
 };

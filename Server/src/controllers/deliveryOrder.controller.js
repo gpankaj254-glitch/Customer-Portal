@@ -3,7 +3,7 @@ const _ = require("lodash");
 const ApiError = require("../utils/ApiError");
 const pick = require("../utils/pick");
 const catchAsync = require("../utils/catchAsync");
-const { deliveryOrderService } = require("../services");
+const { deliveryOrderService, vendorService } = require("../services");
 const { activeOnly } = require("../utils/filters");
 
 const createDeliveryOrder = catchAsync(async (req, res) => {
@@ -33,20 +33,28 @@ const getDeliveryOrders = catchAsync(async (req, res) => {
 
   if (search) {
     const regex = { $regex: search, $options: "i" };
-    _.assign(filter, {
-      $or: [
-        { orderId: regex },
-        { serialNumber: regex },
-        { "customer.name": regex },
-        { newCustomerName: regex },
-        { scloudxOrderReference: regex },
-        { siteAddress: regex },
-        { city: regex },
-        { customerOrderReference: regex },
-        { vendorCircuitId: regex },
-        { notes: regex },
-      ],
-    });
+    const orConditions = [
+      { orderId: regex },
+      { serialNumber: regex },
+      { "customer.name": regex },
+      { newCustomerName: regex },
+      { scloudxOrderReference: regex },
+      { siteAddress: regex },
+      { city: regex },
+      { customerOrderReference: regex },
+      { vendorCircuitId: regex },
+      { notes: regex },
+    ];
+    // Vendor isn't stored by name on the order itself (only vendorId), so
+    // matching it needs a lookup into Vendor first - same pattern as
+    // circuit.controller.js's getCircuits. "Vendor" is a displayed column
+    // on both View Open Order and Delivered Orders but wasn't searchable
+    // at all until now.
+    const matchingVendorIds = await vendorService.findVendorIdsMatchingSearch(search);
+    if (matchingVendorIds.length > 0) {
+      orConditions.push({ vendorId: { $in: matchingVendorIds } });
+    }
+    _.assign(filter, { $or: orConditions });
   }
 
   const options = pick(req.query, ["sortBy", "limit", "page"]);

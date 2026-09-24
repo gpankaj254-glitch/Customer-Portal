@@ -25,19 +25,31 @@ module.exports = {
   // , Number of minutes after which a verify email token expires
   JWT_VERIFY_EMAIL_EXPIRATION_MINUTES: 10,
 
-  // , SMTP configuration options for the email service
-  // , For testing, you can use a fake SMTP service like Ethereal: https://ethereal.email/create
-  // SMTP_HOST: "smtp.scloudx.com",
-  // SMTP_PORT: 587,
-  // SMTP_USERNAME: "shreya.gupta@scloudx.com",
-  // SMTP_PASSWORD: "replace-with-a-real-password",
-  // Verified in SendGrid as a Single Sender.
-  EMAIL_FROM: "portal@connect2cloudx.com",
+  // , SMTP configuration for the email service - O365/Exchange Online
+  // relay, via the enterprise-support@connect2cloudx.com mailbox
+  // (Authenticated SMTP enabled directly on it). SMTP_PASSWORD is left
+  // blank here on purpose - it's never committed, only ever set via a real
+  // env var (Server/.env locally, gitignored; the real env var directly in
+  // production).
+  SMTP_HOST: "smtp.office365.com",
+  SMTP_PORT: 587,
+  SMTP_USERNAME: "enterprise-support@connect2cloudx.com",
+  SMTP_PASSWORD: "",
+  EMAIL_FROM: "enterprise-support@connect2cloudx.com",
   EMAIL_TO_SCLOUDX: ["gpankaj254@gmail.com"],
   EMAIL_TO_CUSTOMER: ["shreya.gupta@scloudx.com"],
-  // Outside production, every email this app sends is redirected here
-  // instead of its real recipient(s) - see utils/mailer.js.
-  EMAIL_TEST_RECIPIENT: "portal@connect2cloudx.com",
+  // Every email this app sends is redirected here instead of its real
+  // recipient(s) - see utils/mailer.js. "Right now all Emails should go
+  // from enterprise-support@connect2cloudx.com to
+  // enterprise-support@connect2cloudx.com" - EMAIL_TEST_MODE below forces
+  // this on everywhere (including production) until the O365 SMTP switch
+  // is verified end-to-end; flip EMAIL_TEST_MODE back off (or unset it) to
+  // resume sending to real recipients.
+  EMAIL_TEST_RECIPIENT: "enterprise-support@connect2cloudx.com",
+  // "true" forces every email to test mode regardless of NODE_ENV - see
+  // EMAIL_TEST_RECIPIENT above. Unset/"false" would default to test mode
+  // only outside production.
+  EMAIL_TEST_MODE: "true",
   // Public base URL of the frontend - used to build links in emails.
   // Production must override this (via a real env var / .env) with its
   // real domain, e.g. "https://app.scloudx.com".

@@ -186,7 +186,13 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboard
     }
 
     return (
-        <Paper sx={{ width: "100%", overflow: "hidden", ...compactSx }}>
+        <Paper sx={{ width: "100%", overflow: "hidden", ...compactSx, p: 1 }}>
+            {/* "Add # rows at top" - counts whatever's currently shown, so
+                it narrows along with the search above (same convention as
+                Inventory's own "Number of Circuits"). */}
+            <Typography variant="subtitle1" sx={{ mb: 1, px: 1 }}>
+                Number of Orders: {displayRows.length}
+            </Typography>
             <TableContainer sx={{ maxHeight: 600 }}>
                 <Table stickyHeader size="small" aria-label="delivery orders table">
                     <TableHead>

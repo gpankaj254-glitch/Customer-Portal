@@ -98,7 +98,7 @@ export default function DeliveryOrders() {
         <TextField
             fullWidth
             label="Search delivery orders"
-            placeholder="Search by Order ID, Serial Number, customer, SCloudX Order Ref, site address, city, Customer PO, Vendor Circuit ID or notes"
+            placeholder="Search by Order ID, Serial Number, customer, SCloudX Order Ref, site address, city, Customer PO, Vendor, Vendor Circuit ID or notes"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             sx={{ mb: 2 }}
