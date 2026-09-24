@@ -126,7 +126,11 @@ export default function DeliveryOrders() {
         content: (
             <>
                 {searchBox}
-                <DeliveryOrderTable rows={deliveredOrderList} canEdit={canManage} canDelete={isAdmin} />
+                {/* "Make Delivered Order Non Editable to everyone except SCX
+                    Admin" - narrower than canManage (which also covers SCX
+                    Service Delivery) on this one tab only; View Open Order
+                    keeps the wider canManage. */}
+                <DeliveryOrderTable rows={deliveredOrderList} canEdit={isAdmin} canDelete={isAdmin} />
             </>
         ),
     })
