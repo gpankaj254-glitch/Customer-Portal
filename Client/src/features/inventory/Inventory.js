@@ -80,6 +80,12 @@ function InventoryContent() {
         setValue(newValue)
         setLiveCircuitSearchSeed("")
         setCircuitTabResetKey((key) => key + 1)
+        // "Whenever any tab is pressed, reset all Search selections" - Live/
+        // Changed/Ceased Site Inventory all share this one search box/Redux
+        // term (searchBox below), so switching straight between them left
+        // the old term applied to whichever one was landed on.
+        setSearchInput("")
+        dispatch(setSearch(""))
     }
 
     const handleOpenChangeOrder = (changeOrderNumber) => {

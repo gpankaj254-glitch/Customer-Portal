@@ -16,7 +16,6 @@ import TableBody from "@mui/material/TableBody"
 import TableRow from "@mui/material/TableRow"
 import TableCell from "@mui/material/TableCell"
 import TableContainer from "@mui/material/TableContainer"
-import Link from "@mui/material/Link"
 import Alert from "@mui/material/Alert"
 import Button from "@mui/material/Button"
 import DownloadIcon from "@mui/icons-material/Download"
@@ -25,10 +24,7 @@ import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
 import { getCircuitsList, selectCircuitsList, selectCircuitsListStatus, selectCircuitsListError } from "../inventory/circuitSlice"
 import { getVendors, selectVendorList } from "../vendors/vendorSlice"
-import { focusSite } from "../inventory/inventorySlice"
 import { pageStatusVals } from "../inventory/utils"
-import { togglePage } from "../landing/landingSlice"
-import { pages } from "../../consts"
 import { downloadCsv } from "../../utils/csv"
 import { getFormattedStoredDate } from "../../utils/dates"
 
@@ -59,24 +55,28 @@ const autocompletePaperSx = {
 // Fixed column widths (see the Table's tableLayout: "fixed" below) so every
 // row lines up under its header instead of each column auto-sizing to its
 // own widest value.
+// "Remove Site name, Add Column - Product, Bandwidth and Vendor name" - Site
+// Name (and its click-through to Inventory Management) is dropped entirely;
+// Product/Bandwidth are new, Vendor Name already existed here.
 const columns = [
-    { id: "siteName", label: "Site Name", width: "10%" },
     { id: "customerName", label: "Customer Name", width: "10%" },
     { id: "vendorName", label: "Vendor Name", width: "9%" },
+    { id: "product", label: "Product", width: "8%" },
+    { id: "bandwidth", label: "Bandwidth", width: "8%" },
     // "Remove Vendor Circuit ID and Replace with SCX Order Ref Number" -
     // same slot, see circuit.controller.js's getCircuits for the matching
     // search-field swap.
     { id: "scloudxOrderReference", label: "SCX Order Ref Number", width: "9%" },
-    { id: "customerCircuitBillStartDate", label: "Customer Bill Start Date", width: "10%" },
-    { id: "vendorCircuitBillStartDate", label: "Vendor Bill Start Date", width: "10%" },
-    { id: "customerCircuitContractTerm", label: "Customer Contract Term", width: "9%" },
-    { id: "vendorCircuitContractTerm", label: "Vendor Contract Term", width: "9%" },
-    { id: "customerContractPendingMonths", label: "Customer Contract Pending (Months)", width: "8%" },
-    { id: "vendorContractPendingMonths", label: "Vendor Contract Pending (Months)", width: "8%" },
+    { id: "customerCircuitBillStartDate", label: "Customer Bill Start Date", width: "9%" },
+    { id: "vendorCircuitBillStartDate", label: "Vendor Bill Start Date", width: "9%" },
+    { id: "customerCircuitContractTerm", label: "Customer Contract Term", width: "8%" },
+    { id: "vendorCircuitContractTerm", label: "Vendor Contract Term", width: "8%" },
+    { id: "customerContractPendingMonths", label: "Customer Contract Pending (Months)", width: "7%" },
+    { id: "vendorContractPendingMonths", label: "Vendor Contract Pending (Months)", width: "7%" },
     // "Where there is gap between Vendor Contract pending month / Customer
     // contract pending month (Vendor Contract pending month - Customer
     // contract pending month)" - see computeContractPendingMonths/rows below.
-    { id: "contractGapMonths", label: "Contract Gap (Months)", width: "8%" },
+    { id: "contractGapMonths", label: "Contract Gap (Months)", width: "7%" },
 ]
 
 // Bill Start Date is stored "DD-MM-YYYY" (see circuit.service.js's
@@ -103,13 +103,13 @@ function computeContractPendingMonths(billStartDate, contractTerm) {
     return endDate.diff(moment(), "months")
 }
 
-// SCX Finance's dashboard: a read-only, cross-customer circuit list with
-// billing-relevant columns only (no ticket/status/inventory-management
-// fields), and a search box. The server does the searching (site/customer/
-// vendor name, SCX Order Ref Number, bill start dates, contract terms - see
-// circuit.controller's getCircuits) - this component only resolves each
-// circuit's vendorId into the Vendor Name column, same as the Inventory
-// page's circuit table does.
+// SCX Finance's dashboard: a read-only, cross-customer circuit list scoped
+// to Live circuits only, with billing-relevant columns (no ticket/status/
+// inventory-management fields), and a search box. The server does the
+// searching (site/customer/vendor name, SCX Order Ref Number, bill start
+// dates, contract terms - see circuit.controller's getCircuits) - this
+// component only resolves each circuit's vendorId into the Vendor Name
+// column, same as the Inventory page's circuit table does.
 export default function FinanceDashboard() {
     const dispatch = useDispatch()
     const circuits = useSelector(selectCircuitsList)
@@ -153,8 +153,10 @@ export default function FinanceDashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
+    // "Show only those circuits with Status 'Live'" - same statuses param
+    // CircuitInventoryTable uses, see circuit.controller.js's getCircuits.
     React.useEffect(() => {
-        dispatch(getCircuitsList({ search }))
+        dispatch(getCircuitsList({ search, statuses: ["Live"] }))
     }, [dispatch, search])
 
     // Debounce the search box: only commit (and trigger the fetch above)
@@ -174,22 +176,15 @@ export default function FinanceDashboard() {
         [vendorList]
     )
 
-    // Sends the user to Inventory Management with this circuit's site
-    // expanded - same pattern as the Dashboard's Ticket ID link (focusTicket).
-    const handleOpenSite = (siteId, siteName) => {
-        dispatch(focusSite({ id: siteId, name: siteName }))
-        dispatch(togglePage(pages.INVENTORY))
-    }
-
     const rows = circuits.map((circuit) => {
         const customerPendingMonths = computeContractPendingMonths(circuit.customerCircuitBillStartDate, circuit.customerCircuitContractTerm)
         const vendorPendingMonths = computeContractPendingMonths(circuit.vendorCircuitBillStartDate, circuit.vendorCircuitContractTerm)
         return {
             id: circuit.id,
-            siteId: _.get(circuit, "site.id", ""),
-            siteName: _.get(circuit, "site.name", ""),
             customerName: _.get(circuit, "customer.name", ""),
             vendorName: vendorNameById.get(circuit.vendorId) || "",
+            product: circuit.product || "",
+            bandwidth: circuit.bandwidth || "",
             scloudxOrderReference: circuit.scloudxOrderReference || "",
             // "Change all dates display in DD-MMM-YY Format" - reformatted
             // for display only; customerPendingMonths/vendorPendingMonths
@@ -446,17 +441,7 @@ export default function FinanceDashboard() {
                                         <TableRow key={row.id}>
                                             {columns.map((column) => (
                                                 <TableCell key={column.id} sx={{ width: column.width }}>
-                                                    {column.id === "siteName" && row.siteId ? (
-                                                        <Link
-                                                            component="button"
-                                                            type="button"
-                                                            underline="hover"
-                                                            onClick={() => handleOpenSite(row.siteId, row.siteName)}
-                                                            sx={{ fontSize: "inherit", verticalAlign: "baseline", textAlign: "left" }}
-                                                        >
-                                                            {row.siteName}
-                                                        </Link>
-                                                    ) : column.id.endsWith("ContractPendingMonths") && row[column.id] !== "-" && Number(row[column.id]) < 0 ? (
+                                                    {column.id.endsWith("ContractPendingMonths") && row[column.id] !== "-" && Number(row[column.id]) < 0 ? (
                                                         // Already past that side's Contract Term end date - flagged red
                                                         // so an expired contract stands out rather than reading as just
                                                         // another number.

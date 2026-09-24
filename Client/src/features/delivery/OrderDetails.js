@@ -575,8 +575,11 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
                                 {values.milestones.map((milestone, index) => {
                                     // "non edit unless previous task is completed" - the
                                     // first milestone has no previous task, so it's the
-                                    // only one always available.
-                                    const previousDone = index === 0 || values.milestones[index - 1].status === "Completed"
+                                    // only one always available. "Not Required" counts as
+                                    // done here too - a skipped milestone must still let
+                                    // the next one unlock, or picking it would permanently
+                                    // block the rest of the checklist.
+                                    const previousDone = index === 0 || ["Completed", "Not Required"].includes(values.milestones[index - 1].status)
                                     const milestoneDisabled = readOnly || !previousDone
                                     return (
                                         <TableRow key={milestone.name}>

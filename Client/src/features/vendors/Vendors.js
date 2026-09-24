@@ -50,7 +50,11 @@ function VendorsContent() {
     // search term so we can debounce before actually dispatching a fetch.
     const [vendorSearchInput, setVendorSearchInput] = React.useState(vendorSearch)
 
+    // "Whenever any tab is pressed, reset all Search selections" - cleared
+    // on every tab click so a stale search never carries over on return.
     const handleChange = (event, newValue) => {
+        setVendorSearchInput("")
+        dispatch(setVendorSearch(""))
         setValue(newValue)
     }
 

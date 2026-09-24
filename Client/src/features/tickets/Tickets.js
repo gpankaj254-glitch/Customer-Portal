@@ -56,18 +56,16 @@ function TicketsContent() {
 
     const dispatch = useDispatch()
     const [value, setValue] = React.useState(0)
-    // "Same issue - Ticket ID → NOC" - ScxDashboard's Ticket ID link seeds
-    // Tickets' shared search (via focusTicket) to jump straight to one
-    // ticket, but that search then stuck around in Redux indefinitely, even
-    // after navigating away and back. "View Open Ticket" is always index 0
-    // (the tab a Ticket ID link lands on - see the tabs array below), so a
-    // direct click back onto it always starts from the full, unfiltered
-    // list instead - same fix already applied to Inventory's Circuit tabs
-    // and Sales Opportunities' Opportunity List tab.
+    // "Whenever any tab is pressed, reset all Search selections ... old
+    // Search Text is displayed in search bar" - View Open/Closed/Completed
+    // Tickets all share this one Redux search (see TicketsTable's mode
+    // prop), so it's cleared on every tab click, not just a return to View
+    // Open Ticket - otherwise switching straight from Open to Closed/
+    // Completed left the old search term applied there too. Also covers
+    // "Same issue - Ticket ID → NOC" (ScxDashboard's Ticket ID link seeds
+    // this search via focusTicket).
     const handleChange = (event, newValue) => {
-        if (newValue === 0) {
-            dispatch(setSearch(""))
-        }
+        dispatch(setSearch(""))
         setValue(newValue)
     }
 

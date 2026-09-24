@@ -11,14 +11,19 @@
 export const orderStatusOptions = ["SCX", "LEC", "Customer", "OnHold", "Delivered"]
 
 // Blank by default (not "In process") - a milestone starts untouched, not
-// implicitly started.
-export const milestoneStatusOptions = ["In process", "Completed"]
+// implicitly started. "Not Required" is for a milestone that doesn't apply
+// to this particular order (see OrderDetails.js's previousDone, which
+// treats it the same as "Completed" for unlocking the next milestone -
+// otherwise marking one "Not Required" would permanently block the rest of
+// the checklist).
+export const milestoneStatusOptions = ["In process", "Completed", "Not Required"]
 
 export const milestoneNames = [
     "Internal order process",
     "Ordering on LEC",
     "LEC design team task",
     "Site survey",
+    "Site/ City Permission",
     "Scope of work",
     "Civil work",
     "Inbuilding work",

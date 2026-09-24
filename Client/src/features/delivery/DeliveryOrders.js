@@ -53,7 +53,13 @@ export default function DeliveryOrders() {
     const [value, setValue] = React.useState(0)
     const [searchInput, setSearchInput] = React.useState(search)
 
+    // "Whenever any tab is pressed, reset all Search selections" - View
+    // Open Order and Delivered Orders share this one search box/Redux term,
+    // so switching straight between them (not just away and back) left the
+    // old term applied to whichever list was landed on.
     const handleChange = (event, newValue) => {
+        setSearchInput("")
+        dispatch(setSearch(""))
         setValue(newValue)
     }
 

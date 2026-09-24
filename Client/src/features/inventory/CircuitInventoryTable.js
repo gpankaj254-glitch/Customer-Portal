@@ -1,4 +1,5 @@
 import * as React from "react"
+import Box from "@mui/material/Box"
 import Paper from "@mui/material/Paper"
 import Table from "@mui/material/Table"
 import TableHead from "@mui/material/TableHead"
@@ -10,49 +11,19 @@ import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import Link from "@mui/material/Link"
 import Alert from "@mui/material/Alert"
+import Button from "@mui/material/Button"
+import DownloadIcon from "@mui/icons-material/Download"
 import PropTypes from "prop-types"
 import _ from "lodash"
+import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
 import { getCircuitsList, selectCircuitsList, selectCircuitsListStatus, selectCircuitsListError } from "./circuitSlice"
 import { getVendors, selectVendorList } from "../vendors/vendorSlice"
 import { pageStatusVals } from "./utils"
 import { combineAddress } from "../../utils/address"
 import { getFormattedStoredDate } from "../../utils/dates"
-
-// "Circuit Status Date" - the single date that matters for a circuit's
-// current status: Live reuses its Customer Bill Start Date (there's no
-// separate "went Live" date captured), Ceased uses Bill Stop Date, Changed
-// uses Change Date - same mapping as CircuitTable.js's own
-// formatCircuitStatus, just split out as its own column here instead of
-// folded into one combined status string.
-function getStatusDate(circuit) {
-    if (circuit.status === "Ceased") {
-        return circuit.billStopDate
-    }
-    if (circuit.status === "Changed") {
-        return circuit.changeDate
-    }
-    return circuit.customerCircuitBillStartDate
-}
-
-// "If Circuit Status is Ceased, Display Change Type - 'Customer Cease', if
-// Circuit type is Changed, Display -'Change Type + Change Order Number'" - a
-// Ceased circuit has no changeType of its own (that field's only ever set
-// on a Changed circuit), so it gets this fixed label instead of a blank
-// cell; a Changed circuit shows its actual Change Type alongside its
-// Change Order Number. Flat-string form, used for the search haystack below
-// only - the actual cell (see the Change Type column's JSX further down)
-// renders the same information but with Change Order Number as its own
-// clickable Link, so it's built there separately rather than from this.
-function getChangeTypeDisplay(circuit) {
-    if (circuit.status === "Ceased") {
-        return "Customer Cease"
-    }
-    if (circuit.status === "Changed") {
-        return [circuit.changeType, circuit.changeOrderNumber].filter(Boolean).join(" - ")
-    }
-    return ""
-}
+import { downloadCsv } from "../../utils/csv"
+import { getCircuitStatusDate, getCircuitChangeTypeDisplay, circuitCsvColumns } from "../../utils/circuitDisplay"
 
 // "if I put 100 Mbps+USA+Verizon) it should filter all circuits with 100
 // Mbps BW in USA country and Verizon Vendor" - each "+"-separated term must
@@ -145,8 +116,8 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
         status: circuit.status || "Live",
         changeType: circuit.changeType || "",
         changeOrderNumber: circuit.changeOrderNumber || "",
-        changeTypeDisplay: getChangeTypeDisplay(circuit),
-        statusDateDisplay: getFormattedStoredDate(getStatusDate(circuit)),
+        changeTypeDisplay: getCircuitChangeTypeDisplay(circuit),
+        statusDateDisplay: getFormattedStoredDate(getCircuitStatusDate(circuit)),
     })), [circuits, vendorNameById])
 
     const searchTerm = searchInput.trim().toLowerCase()
@@ -154,6 +125,18 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
         () => rows.filter((row) => matchesMultiTermSearch(row, searchTerm)),
         [rows, searchTerm]
     )
+
+    // "Download Circuit Inventory Option - CSV in all Tabs" - exports
+    // exactly what's currently on screen (search applied), same columns as
+    // the table below (changeType/statusDate map to this row shape's own
+    // changeTypeDisplay/statusDateDisplay field names).
+    const csvFieldByColumnId = { changeType: "changeTypeDisplay", statusDate: "statusDateDisplay" }
+    const handleDownloadCsv = () => {
+        const csvColumns = circuitCsvColumns(showChangeType)
+        const headers = csvColumns.map((column) => column.label)
+        const csvRows = filteredRows.map((row) => csvColumns.map((column) => row[csvFieldByColumnId[column.id] || column.id]))
+        downloadCsv(`circuit-inventory-${moment().format("YYYY-MM-DD")}.csv`, headers, csvRows)
+    }
 
     if (error) {
         return <Alert severity="error">{error}</Alert>
@@ -163,12 +146,23 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
 
     return (
         <Paper sx={{ width: "100%", overflow: "hidden", p: 2 }}>
-            {/* "Also Display Number if rows total/ filtered as 'Number of
-                Circuits' at top" - counts whatever's currently shown, so it
-                narrows along with the search below. */}
-            <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                Number of Circuits: {filteredRows.length}
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+                {/* "Also Display Number if rows total/ filtered as 'Number
+                    of Circuits' at top" - counts whatever's currently
+                    shown, so it narrows along with the search below. */}
+                <Typography variant="subtitle1">
+                    Number of Circuits: {filteredRows.length}
+                </Typography>
+                <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<DownloadIcon />}
+                    onClick={handleDownloadCsv}
+                    disabled={filteredRows.length === 0}
+                >
+                    Download CSV
+                </Button>
+            </Box>
             <TextField
                 fullWidth
                 label="Search"

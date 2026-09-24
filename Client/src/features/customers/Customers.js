@@ -45,7 +45,11 @@ function CustomersContent() {
     // search term so we can debounce before actually dispatching a fetch.
     const [customerSearchInput, setCustomerSearchInput] = React.useState(customerSearch)
 
+    // "Whenever any tab is pressed, reset all Search selections" - cleared
+    // on every tab click so a stale search never carries over on return.
     const handleChange = (event, newValue) => {
+        setCustomerSearchInput("")
+        dispatch(setCustomerSearch(""))
         setValue(newValue)
     }
 

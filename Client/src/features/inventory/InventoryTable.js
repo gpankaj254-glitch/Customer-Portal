@@ -11,12 +11,17 @@ import TableRow from "@mui/material/TableRow"
 import PropTypes from "prop-types"
 import {changeLimit, changePage, getSites, selectGetSiteError, selectSiteList, selectPageStatus, selectFocusSiteId, clearFocusSite} from "./inventorySlice"
 import { useSelector, useDispatch } from "react-redux"
-import { Alert, Collapse, IconButton, Typography} from "@mui/material"
+import { Alert, Box, Button, Collapse, IconButton, Typography} from "@mui/material"
+import DownloadIcon from "@mui/icons-material/Download"
 import { pageStatusVals} from "./utils"
 import _ from "lodash"
+import moment from "moment"
 import {  KeyboardArrowDown, KeyboardArrowUp } from "@mui/icons-material"
 import CircuitTable from "./CircuitTable"
 import { combineAddress } from "../../utils/address"
+import { downloadCsv } from "../../utils/csv"
+import { circuitCsvColumns, buildCircuitCsvRow } from "../../utils/circuitDisplay"
+import { getVendors, selectVendorList } from "../vendors/vendorSlice"
 
 const columns = [
     { id: "icon", label: ""},
@@ -82,6 +87,54 @@ export default function InventoryTable(props) {
 
     const dispatch = useDispatch()
     const focusSiteId = useSelector(selectFocusSiteId)
+    const vendorList = useSelector(selectVendorList)
+    const vendorNameById = React.useMemo(() => new Map(vendorList.map((vendor) => [vendor.id, vendor.name])), [vendorList])
+
+    // Vendor Name is only otherwise fetched here when the viewer holds
+    // createCircuits (see Inventory.js) - self-contained fetch (same
+    // pattern as CircuitInventoryTable.js) so the CSV's Vendor Name column
+    // is populated for every role that can see this table, not just Admin.
+    React.useEffect(() => {
+        dispatch(getVendors({ limit: 1000, page: 1 }))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    // "Download Circuit Inventory Option - CSV in all Tabs ... Live Site
+    // Inventory, Changed Site Inventory and Ceased Site Inventory" - flattens
+    // the currently-loaded (already statusFilter-matching) sites' own nested
+    // circuitList into the same circuit-level CSV shape CircuitInventoryTable
+    // downloads, rather than a site-level export - "Circuit Inventory" is
+    // circuit data regardless of which tab (site- or circuit-centric) it's
+    // downloaded from.
+    const csvRows = React.useMemo(() => {
+        const rows = []
+        siteList.forEach((site) => {
+            const customerName = _.get(site, "customer.name", "")
+            const address = combineAddress(_.get(site, "location", {}))
+            const circuits = statusFilter
+                ? (site.circuitList || []).filter((circuit) => matchesStatusFilter(circuit, statusFilter))
+                : (site.circuitList || [])
+            circuits.forEach((circuit) => {
+                rows.push(buildCircuitCsvRow(circuit, {
+                    customerName,
+                    address,
+                    vendorName: vendorNameById.get(circuit.vendorId) || "",
+                }))
+            })
+        })
+        return rows
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [siteList, statusFilter, vendorNameById])
+
+    const handleDownloadCsv = () => {
+        // Change Type is meaningful for a Changed or Ceased circuit only -
+        // same as CircuitInventoryTable's own showChangeType (Live has
+        // nothing to show there).
+        const csvColumns = circuitCsvColumns(statusFilter === "Changed" || statusFilter === "Ceased")
+        const headers = csvColumns.map((column) => column.label)
+        const rows = csvRows.map((row) => csvColumns.map((column) => row[column.id]))
+        downloadCsv(`circuit-inventory-${moment().format("YYYY-MM-DD")}.csv`, headers, rows)
+    }
 
     // Arriving from another page for a specific site (see the Finance
     // dashboard's Site Name link, via inventorySlice's focusSite): expand
@@ -158,6 +211,18 @@ export default function InventoryTable(props) {
     } else if (status === pageStatusVals.fetched) {
         return (
             <Paper sx={{ width: "100%", overflow: "hidden" }}>
+                {/* "Download Circuit Inventory Option - CSV in all Tabs" */}
+                <Box sx={{ display: "flex", justifyContent: "flex-end", p: 1 }}>
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<DownloadIcon />}
+                        onClick={handleDownloadCsv}
+                        disabled={csvRows.length === 0}
+                    >
+                        Download CSV
+                    </Button>
+                </Box>
                 <TableContainer sx={{ height: 1 }}>
                     <Table stickyHeader aria-label="sticky table">
                         <TableHead>

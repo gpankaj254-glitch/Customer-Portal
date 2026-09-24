@@ -91,19 +91,14 @@ function OpportunitiesContent() {
         dispatch(setAutoExpandOpportunityId(opportunityId))
     }
 
+    // "Whenever any tab is pressed, reset all Search selections" - cleared
+    // on every tab click (not just a return to Opportunity List), so a
+    // SalesDashboard Opportunity # link's seeded search (via Redux - a
+    // different page, unlike Inventory's own circuit tabs) never lingers
+    // regardless of which tab is clicked next.
     const handleChange = (event, newValue) => {
-        // "Whenever any hyperlink take to other tab with search option,
-        // that search option remain whenever i go to any other tab.
-        // Whenever we click on any tab, it should reset ... so search bar
-        // is always clear" - SalesDashboard's Opportunity # link seeds this
-        // tab's search via Redux (a different page, unlike Inventory's own
-        // circuit tabs), so it otherwise persists here indefinitely once
-        // set; a direct click back onto Opportunity List (index 0) always
-        // starts from the full, unfiltered list instead.
-        if (newValue === 0) {
-            setOpportunitySearchInput("")
-            dispatch(setOpportunitySearch(""))
-        }
+        setOpportunitySearchInput("")
+        dispatch(setOpportunitySearch(""))
         setValue(newValue)
     }
 
