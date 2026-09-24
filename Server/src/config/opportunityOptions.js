@@ -19,7 +19,7 @@ const supplierQuoteStatusOptions = ["Pending", "Submitted", "Reopened", "No Bid"
 
 const linkTypeOptions = ["Primary", "Secondary"];
 
-const ipRequirementOptions = ["/30", "/29", "/28"];
+const ipRequirementOptions = ["/30", "/29", "/28", "/27"];
 
 const interfaceOptions = ["RJ45", "Fiber SMF", "Fiber MMF"];
 

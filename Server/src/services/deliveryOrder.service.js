@@ -25,17 +25,24 @@ function isValidBulkDate(value) {
 }
 
 // "500M" -> "500 Mbps", the shorthand some order sheets use, aligned with
-// the dropdown's own option text. "1Gbps"/"1 Gbps" -> "1 Gbps (1,000 Mbps)"
-// (found by prefix in bandwidthOptions itself, not hardcoded, so it still
-// works if a new Gbps option is ever added). Anything else (already
+// the dropdown's own option text. "1Gbps"/"1 Gbps"/"1G"/"1000M" -> "1 Gbps
+// (1,000 Mbps)" (found by prefix/substring in bandwidthOptions itself, not
+// hardcoded, so it still works if a new Gbps option is ever added) - a
+// plain "NNNN Mbps" is never itself a valid option once NNNN reaches
+// 1000+, only the "X Gbps (NNNN Mbps)" form is. Anything else (already
 // "500 Mbps", a typo, etc.) passes through unchanged and, if it still isn't
 // one of bandwidthOptions, is caught by the "is a valid option" check below.
 function normalizeBulkBandwidth(value) {
   const mbpsMatch = /^(\d+)\s*M$/i.exec(value);
   if (mbpsMatch) {
-    return `${mbpsMatch[1]} Mbps`;
+    const asMbps = `${mbpsMatch[1]} Mbps`;
+    if (bandwidthOptions.includes(asMbps)) {
+      return asMbps;
+    }
+    const matchedGbpsOption = bandwidthOptions.find((option) => option.includes(`(${Number(mbpsMatch[1]).toLocaleString()} Mbps)`));
+    return matchedGbpsOption || asMbps;
   }
-  const gbpsMatch = /^(\d+)\s*Gbps$/i.exec(value);
+  const gbpsMatch = /^(\d+)\s*G(bps)?$/i.exec(value);
   if (gbpsMatch) {
     const matchedOption = bandwidthOptions.find((option) => option.startsWith(`${gbpsMatch[1]} Gbps`));
     if (matchedOption) {
@@ -614,6 +621,7 @@ const CLOSED_BULK_UPLOAD_COLUMNS = [
   "Customer Name",
   "SCloudX Order Ref",
   "Order Type",
+  "Existing Order Number",
   "Site Address",
   "City",
   "State",
@@ -652,6 +660,16 @@ const CLOSED_BULK_UPLOAD_COLUMNS = [
  * optional and scoped to the matched Customer (same lookup pattern as
  * circuit.service.js's own bulk upload) - an unmatched or blank name just
  * leaves the order unlinked to a Site record rather than failing the row.
+ * "Existing Order Number" is the same idea as CreateDeliveryOrder's own
+ * Existing Order Number field (Order Type other than New) - here it's the
+ * OTHER order's SCloudX Order Ref (matching what the UI searches/displays by
+ * - see CreateDeliveryOrder.js), not the system orderId. It's resolved to
+ * that order's real orderId in a second pass after every row in this same
+ * upload has been created (bulkCreateClosedDeliveryOrders below), since one
+ * row's Existing Order Number can itself be another row in the very same
+ * file. An unresolvable reference (typo'd, or genuinely not in this system)
+ * just leaves relatedOrderId blank rather than failing the row - same
+ * leniency as Existing Site Name.
  * Does not write anything - the caller only inserts if there are zero
  * failedRows, keeping the upload all-or-nothing.
  * @param {Buffer} fileBuffer
@@ -709,6 +727,7 @@ const validateBulkUploadClosedDeliveryOrders = async (fileBuffer) => {
     const customerName = _.get(record, "Customer Name", "").trim();
     const scloudxOrderReference = _.get(record, "SCloudX Order Ref", "").trim();
     const orderType = _.get(record, "Order Type", "").trim() || "New";
+    const relatedOrderReference = _.get(record, "Existing Order Number", "").trim();
     const vendorName = _.get(record, "Vendor Name", "").trim();
     const product = _.get(record, "Product", "").trim();
     const bandwidth = normalizeBulkBandwidth(_.get(record, "BW", "").trim());
@@ -762,6 +781,7 @@ const validateBulkUploadClosedDeliveryOrders = async (fileBuffer) => {
         newCustomerName: matchedCustomer && matchedCustomer.active ? "" : customerName,
         scloudxOrderReference,
         orderType,
+        relatedOrderReference,
         siteAddress: _.get(record, "Site Address", "").trim(),
         city: _.get(record, "City", "").trim(),
         state: _.get(record, "State", "").trim(),
@@ -805,12 +825,21 @@ const validateBulkUploadClosedDeliveryOrders = async (fileBuffer) => {
  * Status "Completed". handoverDate is also set to Delivery Date, same as
  * what updateDeliveryOrderById stamps when Status is saved as Completed via
  * the UI's own "Save and Complete".
+ *
+ * relatedOrderId (Existing Order Number) is resolved in a second pass after
+ * every row here has been created, not inline in the loop below - one row's
+ * Existing Order Number can itself be another row created earlier or later
+ * in this very same file, so the full scloudxOrderReference -> orderId map
+ * has to be built first. A reference that still doesn't resolve (against
+ * either this batch or the rest of the system) just leaves relatedOrderId
+ * blank rather than failing the row.
  * @param {Array} validRows
  * @param {Object} user - acting user, for createdBy
  * @returns {Promise<Array<DeliveryOrder>>}
  */
 const bulkCreateClosedDeliveryOrders = async (validRows, user) => {
   const created = [];
+  const orderIdByReference = new Map();
   for (const row of validRows) {
     // eslint-disable-next-line no-await-in-loop
     const orderId = await generateOrderNumber();
@@ -857,8 +886,36 @@ const bulkCreateClosedDeliveryOrders = async (validRows, user) => {
       createdBy: extractUserDetails(user),
       updatedBy: extractUserDetails(user),
     });
+    orderIdByReference.set(row.scloudxOrderReference.trim().toLowerCase(), order.orderId);
     created.push(order);
   }
+
+  const rowsNeedingLink = validRows
+    .map((row, index) => ({ row, order: created[index] }))
+    .filter(({ row }) => row.relatedOrderReference);
+  if (rowsNeedingLink.length > 0) {
+    const unresolvedReferences = rowsNeedingLink
+      .map(({ row }) => row.relatedOrderReference.trim().toLowerCase())
+      .filter((reference) => !orderIdByReference.has(reference));
+    if (unresolvedReferences.length > 0) {
+      const existingOrders = await DeliveryOrder.find({ active: true }).select("orderId scloudxOrderReference");
+      existingOrders.forEach((existingOrder) => {
+        const reference = (existingOrder.scloudxOrderReference || "").trim().toLowerCase();
+        if (reference && !orderIdByReference.has(reference)) {
+          orderIdByReference.set(reference, existingOrder.orderId);
+        }
+      });
+    }
+    for (const { row, order } of rowsNeedingLink) {
+      const resolvedOrderId = orderIdByReference.get(row.relatedOrderReference.trim().toLowerCase());
+      if (resolvedOrderId) {
+        order.relatedOrderId = resolvedOrderId;
+        // eslint-disable-next-line no-await-in-loop
+        await order.save();
+      }
+    }
+  }
+
   return created;
 };
 

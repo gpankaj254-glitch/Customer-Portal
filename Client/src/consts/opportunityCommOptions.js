@@ -10,6 +10,6 @@ export const supplierQuoteStatusOptions = ["Pending", "Submitted", "Reopened", "
 
 export const linkTypeOptions = ["Primary", "Secondary"]
 
-export const ipRequirementOptions = ["/30", "/29", "/28"]
+export const ipRequirementOptions = ["/30", "/29", "/28", "/27"]
 
 export const interfaceOptions = ["RJ45", "Fiber SMF", "Fiber MMF"]

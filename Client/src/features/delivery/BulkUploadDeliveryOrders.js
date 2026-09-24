@@ -48,6 +48,7 @@ const CLOSED_ORDER_TEMPLATE_HEADERS = [
     "Customer Name",
     "SCloudX Order Ref",
     "Order Type",
+    "Existing Order Number",
     "Site Address",
     "City",
     "State",
@@ -98,10 +99,13 @@ const MODES = [
         thunk: bulkUploadClosedDeliveryOrders,
         description: "For importing historical orders that are already finished. Same Customer Name/Vendor Name/Product/BW/IP "
             + "rules as New Orders, plus: Order Date and Delivery Date are both required (dd-mm-yyyy). Order Type "
-            + "defaults to New if left blank. Existing Site Name is optional - if it doesn't match one of the "
-            + "customer's sites, the order is still created, just not linked to a Site record. Every order is "
-            + "created with status Completed and all 10 milestones already marked Completed. If any row fails "
-            + "validation, the entire file is rejected and nothing is uploaded.",
+            + "defaults to New if left blank. Existing Order Number is optional (only meaningful when Order Type isn't "
+            + "New) - it's the OTHER order's own SCloudX Order Ref, and is matched against every other order in this "
+            + "same file as well as the rest of the system; an unresolvable reference just leaves the order unlinked "
+            + "rather than failing the row, same as Existing Site Name below. Existing Site Name is optional - if it "
+            + "doesn't match one of the customer's sites, the order is still created, just not linked to a Site "
+            + "record. Every order is created with status Completed and all 10 milestones already marked Completed. "
+            + "If any row fails validation, the entire file is rejected and nothing is uploaded.",
     },
 ]
 
