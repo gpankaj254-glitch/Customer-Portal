@@ -8,6 +8,7 @@ import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 
 import InventoryTable from "./InventoryTable"
+import CircuitInventoryTable from "./CircuitInventoryTable"
 import CreateCircuit from "./CreateCircuit"
 import BulkUploadCircuits from "./BulkUploadCircuits"
 import { selectPagination, selectSearch, getSites, setSearch, selectTotalCircuits } from "./inventorySlice"
@@ -49,6 +50,27 @@ function InventoryContent() {
     const dispatch = useDispatch()
     const [openInventoryTable, setOpenInventoryTable] = React.useState(true)
     const [value, setValue] = React.useState(0)
+    // "Make 'Change Order Number' Clickable and in clicking this it should
+    // display Information from Live Circuit Inventory for that Change Order
+    // Number" - a Change Order Number is itself the SCX Order Ref Number of
+    // the new circuit it refers to, so jumping to the Live Circuit
+    // Inventory tab (index 0 - see the tabs array below) with its search
+    // seeded to that value finds it via the same search CircuitInventoryTable
+    // already does. Local state (not Redux) since both tabs live on this
+    // same page, unlike the Ticket ID/Opportunity # links elsewhere, which
+    // cross a top-level page switch.
+    const [liveCircuitSearchSeed, setLiveCircuitSearchSeed] = React.useState("")
+    // "Whenever any hyperlink take to other tab with search option, that
+    // search option remain whenever i go to any other tab. Whenever we
+    // click on any tab, it should reset ... so search bar is always clear"
+    // - CircuitInventoryTable keeps its own search as local state, and
+    // React reuses that same component instance across tab switches (same
+    // component type/position in the tree), so it never naturally resets on
+    // its own. Bumping this key on every direct tab click forces a fresh
+    // remount - and a fresh CircuitInventoryTable always starts with an
+    // empty search unless handleOpenChangeOrder just seeded one, which
+    // doesn't go through handleChange and so doesn't bump this.
+    const [circuitTabResetKey, setCircuitTabResetKey] = React.useState(0)
 
     function handleToggleInventoryTable(){
         setOpenInventoryTable(!openInventoryTable)
@@ -56,6 +78,13 @@ function InventoryContent() {
 
     const handleChange = (event, newValue) => {
         setValue(newValue)
+        setLiveCircuitSearchSeed("")
+        setCircuitTabResetKey((key) => key + 1)
+    }
+
+    const handleOpenChangeOrder = (changeOrderNumber) => {
+        setLiveCircuitSearchSeed(changeOrderNumber)
+        setValue(0)
     }
 
     const pagination = useSelector(selectPagination)
@@ -119,13 +148,38 @@ function InventoryContent() {
         </>
     )
 
-    // "Change Inventory to Live Inventory, Add 2 more tabs - Changed
-    // Inventory / Ceased Inventory" - all three reuse the same already-
-    // fetched siteList (see InventoryTable.js's statusFilter), just each
-    // scoped to a different Circuit Status.
+    // "Reorganise Inventory Management tabs in Order - Live Circuit
+    // Inventory, Ceased Circuit Inventory, Live Site Inventory, Changed Site
+    // Inventory (Rename Changed Inventory), Ceased Site Inventory (Rename
+    // Ceased Inventory)" - the two circuit-centric tabs (one row per
+    // circuit, across every site - see CircuitInventoryTable.js) now lead,
+    // followed by the three site-centric ones (each reusing the same
+    // already-fetched siteList, scoped to a different Circuit Status via
+    // InventoryTable.js's statusFilter).
     const tabs = [
         {
-            label: "Live Inventory",
+            label: "Live Circuit Inventory",
+            content: (
+                <CircuitInventoryTable
+                    key={`live-circuit-${circuitTabResetKey}`}
+                    statuses={["Live"]}
+                    initialSearch={liveCircuitSearchSeed}
+                />
+            ),
+        },
+        {
+            label: "Ceased Circuit Inventory",
+            content: (
+                <CircuitInventoryTable
+                    key={`ceased-circuit-${circuitTabResetKey}`}
+                    statuses={["Changed", "Ceased"]}
+                    showChangeType
+                    onOpenChangeOrder={handleOpenChangeOrder}
+                />
+            ),
+        },
+        {
+            label: "Live Site Inventory",
             content: (
                 <>
                     {searchBox}
@@ -134,7 +188,7 @@ function InventoryContent() {
             ),
         },
         {
-            label: "Changed Inventory",
+            label: "Changed Site Inventory",
             content: (
                 <>
                     {searchBox}
@@ -143,7 +197,7 @@ function InventoryContent() {
             ),
         },
         {
-            label: "Ceased Inventory",
+            label: "Ceased Site Inventory",
             content: (
                 <>
                     {searchBox}

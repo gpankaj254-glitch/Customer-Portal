@@ -108,15 +108,23 @@ export async function fetchSitesOfCustomer(data) {
 }
 
 // Flat, cross-customer circuit list (not scoped to one site) - used by the
-// SCX Finance dashboard table. "search" is the same server-side text search
-// used elsewhere (site name, customer name, vendor name, Vendor Circuit ID,
-// bill start dates, contract terms, etc).
+// SCX Finance dashboard table and the Inventory module's Live/Ceased Circuit
+// Inventory tabs. "search" is the same server-side text search used
+// elsewhere (site name, customer name, vendor name, Vendor Circuit ID, bill
+// start dates, contract terms, etc). "statuses" (e.g. ["Live"] or
+// ["Changed", "Ceased"]) is a plain array, not a Mongo "$in" - the server
+// builds that itself (see circuit.controller.js's getCircuits) since
+// express-mongo-sanitize strips any "$"-prefixed key a client sends.
 export async function fetchCircuitsList(data, rejectWithValue) {
     try {
-        const { search } = data || {}
+        const { search, statuses } = data || {}
+        const body = { search: search || "" }
+        if (statuses) {
+            body.statuses = statuses
+        }
         const response = await axios.post(
             `${baseURL}/circuit/get?limit=1000&page=1&sortBy=site.name:asc`,
-            { search: search || "" },
+            body,
             {headers: headers()}
         )
         return response.data

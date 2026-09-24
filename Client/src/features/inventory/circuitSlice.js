@@ -7,6 +7,14 @@ const initialState = {
     circuitsList: [],
     circuitsListStatus: pageStatusVals.idle,
     circuitsListError: null,
+    // Tracks the most recently dispatched getCircuitsList request - the
+    // Inventory module's Live/Ceased Circuit Inventory tabs each mount their
+    // own CircuitInventoryTable with a different `statuses` filter, so
+    // switching tabs quickly can fire a new request before the previous
+    // one (a different status filter, possibly a much larger result set)
+    // has resolved; without this, whichever response happens to land last
+    // wins, even if it's the stale one for a tab the user has already left.
+    latestCircuitsListRequestId: null,
 }
 
 export const createCircuit = createAsyncThunk(
@@ -75,15 +83,26 @@ export const circuitSlice = createSlice({
     reducers: {},
     extraReducers: (builder) => {
         builder
-            .addCase(getCircuitsList.pending, (state) => {
+            .addCase(getCircuitsList.pending, (state, action) => {
                 state.circuitsListStatus = pageStatusVals.loading
                 state.circuitsListError = null
+                state.latestCircuitsListRequestId = action.meta.requestId
             })
             .addCase(getCircuitsList.fulfilled, (state, action) => {
+                // A newer request has since been dispatched (e.g. the user
+                // already switched to a different Circuit Inventory tab) -
+                // this response is stale, discard it rather than clobbering
+                // whatever the newer, still-in-flight request will return.
+                if (action.meta.requestId !== state.latestCircuitsListRequestId) {
+                    return
+                }
                 state.circuitsListStatus = pageStatusVals.fetched
                 state.circuitsList = action.payload.results || []
             })
             .addCase(getCircuitsList.rejected, (state, action) => {
+                if (action.meta.requestId !== state.latestCircuitsListRequestId) {
+                    return
+                }
                 state.circuitsListStatus = pageStatusVals.error
                 state.circuitsListError = action.payload
             })

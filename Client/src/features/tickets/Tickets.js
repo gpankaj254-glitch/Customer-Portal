@@ -8,8 +8,8 @@ import Paper from "@mui/material/Paper"
 import Tabs from "@mui/material/Tabs"
 import Tab from "@mui/material/Tab"
 import TicketsTable from "./TicketsTable"
-import { selectPagination } from "./ticketSlice"
-import { useSelector } from "react-redux"
+import { selectPagination, setSearch } from "./ticketSlice"
+import { useSelector, useDispatch } from "react-redux"
 import CreateTicket from "./CreateTicket"
 import BulkUploadTickets from "./BulkUploadTickets"
 import { selectUser } from "../auth/authSlice"
@@ -54,9 +54,20 @@ function TicketsContent() {
     // const [openTicketsTable, setOpenTicketsTable] = React.useState(true)
 	
 
+    const dispatch = useDispatch()
     const [value, setValue] = React.useState(0)
+    // "Same issue - Ticket ID → NOC" - ScxDashboard's Ticket ID link seeds
+    // Tickets' shared search (via focusTicket) to jump straight to one
+    // ticket, but that search then stuck around in Redux indefinitely, even
+    // after navigating away and back. "View Open Ticket" is always index 0
+    // (the tab a Ticket ID link lands on - see the tabs array below), so a
+    // direct click back onto it always starts from the full, unfiltered
+    // list instead - same fix already applied to Inventory's Circuit tabs
+    // and Sales Opportunities' Opportunity List tab.
     const handleChange = (event, newValue) => {
-        console.log(newValue)
+        if (newValue === 0) {
+            dispatch(setSearch(""))
+        }
         setValue(newValue)
     }
 

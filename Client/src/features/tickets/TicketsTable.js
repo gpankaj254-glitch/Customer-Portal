@@ -170,6 +170,19 @@ export default function TicketsTable(props) {
 
     const dispatch = useDispatch()
 
+    // Keeps the visible search box in sync with Redux `search` whenever it
+    // changes from outside normal typing - focusTicket (a Ticket ID link)
+    // seeding it, or Tickets.js's own reset-on-tab-click clearing it (see
+    // "Same issue - Ticket ID → NOC", mirroring the same fix already
+    // applied to Inventory's Circuit tabs and Sales Opportunities). Normal
+    // typing already keeps the two in sync itself (the debounce effect
+    // below dispatches setSearch once searchInput settles), so this is a
+    // no-op then.
+    React.useEffect(() => {
+        setSearchInput(search)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search])
+
     const handleConfirmDelete = async () => {
         setDeleting(true)
         try {

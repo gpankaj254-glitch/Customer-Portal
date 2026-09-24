@@ -55,9 +55,31 @@ const getCircuits = catchAsync(async (req, res) => {
   // filterByCustomerId (and queryCircuits -> Circuit.paginate) treats the
   // filter object as a literal Mongo query - a raw "search" key would just
   // fail to match anything instead of actually searching. Mirrors getSites.
+  // statuses is pulled out the same way, and for the same reason it has to
+  // be a plain array here rather than the client sending { status: { $in:
+  // [...] } } directly - express-mongo-sanitize (see app.js) strips any
+  // "$"-prefixed key out of the request body as a NoSQL-injection guard, so
+  // a client-supplied $in silently disappears, leaving status: {} and a
+  // Mongoose cast error. The $in itself has to be built here instead.
   const search = _.trim(_.get(req.body, "search", ""));
-  const baseFilter = _.omit(req.body, "search");
+  const statuses = _.get(req.body, "statuses");
+  const baseFilter = _.omit(req.body, ["search", "statuses"]);
   const filter = activeOnly(filterByCustomerId(req.user, baseFilter));
+
+  if (Array.isArray(statuses) && statuses.length > 0) {
+    // A circuit whose status was never explicitly set still counts as
+    // "Live" - the schema default only applies once Mongoose hydrates a
+    // document (see circuit.model.js), not to this query itself, so a bare
+    // {status: {$in: ["Live"]}} would silently miss every legacy circuit
+    // that has no stored status field at all. Mirrors CircuitTable.js's own
+    // client-side (circuit.status || "Live") fallback. Combined via $and
+    // (not a plain filter.$or, which the search block below would then
+    // clobber) so both can coexist if a caller ever sends both.
+    const statusCondition = statuses.includes("Live")
+      ? { $or: [{ status: { $in: statuses } }, { status: { $in: [null, ""] } }, { status: { $exists: false } }] }
+      : { status: { $in: statuses } };
+    filter.$and = [...(filter.$and || []), statusCondition];
+  }
 
   if (search) {
     const regex = { $regex: search, $options: "i" };
@@ -84,11 +106,24 @@ const getCircuits = catchAsync(async (req, res) => {
     if (matchingVendorIds.length > 0) {
       orConditions.push({ vendorId: { $in: matchingVendorIds } });
     }
-    _.assign(filter, { $or: orConditions });
+    filter.$and = [...(filter.$and || []), { $or: orConditions }];
   }
 
   const options = pick(req.query, ["sortBy", "limit", "page"]);
   const result = await circuitService.queryCircuits(filter, options);
+  // "Live Circuit Inventory"/"Ceased Circuit Inventory" (the Inventory
+  // module's circuit-centric tabs) show each circuit's Site Address, which
+  // isn't stored on the circuit itself (only site.id/name/code) - batch-
+  // enriched here the same way getSites attaches each site's circuits.
+  // Harmless extra field for every other caller of this endpoint (e.g. the
+  // Finance dashboard's circuit table), which just ignores it.
+  const siteIds = [...new Set(result.results.map((circuit) => circuit.site.id).filter(Boolean))];
+  const locationsBySiteId = await siteService.getLocationsBySiteIds(siteIds);
+  result.results = result.results.map((circuit) => {
+    const circuitObj = circuit.toJSON();
+    circuitObj.location = locationsBySiteId.get(circuitObj.site.id) || null;
+    return circuitObj;
+  });
   res.send(result);
 });
 

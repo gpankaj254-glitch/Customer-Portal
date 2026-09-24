@@ -66,6 +66,25 @@ const querySites = async (filter, options) => {
 };
 
 /**
+ * Batch-fetch just the `location` field for a set of Site ids, keyed by id -
+ * used to enrich a flat circuit list (see circuit.controller.js's
+ * getCircuits, behind the Live/Ceased Circuit Inventory tabs) with each
+ * circuit's site address without a query per row. A circuit only stores
+ * site.id/name/code, not the address itself.
+ * @param {string[]} siteIds
+ * @returns {Promise<Map<string, Object>>}
+ */
+const getLocationsBySiteIds = async (siteIds) => {
+  if (siteIds.length === 0) {
+    return new Map();
+  }
+  const sites = await Site.find({ _id: { $in: siteIds } })
+    .select("location")
+    .lean();
+  return new Map(sites.map((site) => [String(site._id), site.location]));
+};
+
+/**
  * Count every active Circuit belonging to any Site matching the given
  * filter (the same Site-level filter querySites/getSites uses, search
  * conditions included) - not just the circuits on the current page's sites.
@@ -425,6 +444,7 @@ module.exports = {
   createSite,
   querySites,
   countCircuitsForFilter,
+  getLocationsBySiteIds,
   getSiteById,
   updateSiteById,
   deactivateSiteById,
