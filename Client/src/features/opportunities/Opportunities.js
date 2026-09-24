@@ -1,10 +1,15 @@
 import * as React from "react"
+import Box from "@mui/material/Box"
 import Container from "@mui/material/Container"
 import Grid from "@mui/material/Grid"
 import Paper from "@mui/material/Paper"
 import Tabs from "@mui/material/Tabs"
 import Tab from "@mui/material/Tab"
 import TextField from "@mui/material/TextField"
+import Button from "@mui/material/Button"
+import DownloadIcon from "@mui/icons-material/Download"
+import _ from "lodash"
+import moment from "moment"
 
 import OpportunityTable from "./OpportunityTable"
 import {
@@ -20,15 +25,107 @@ import CreateOpportunity from "./CreateOpportunity"
 import BulkUploadOpportunities from "./BulkUploadOpportunities"
 import { getCustomers } from "../customers/customerSlice"
 import { getVendors } from "../vendors/vendorSlice"
-import { fetchDeletedOpportunities, fetchRestoreOpportunity, fetchPermanentlyDeleteOpportunity } from "./opportunityAPI"
+import { fetchDeletedOpportunities, fetchRestoreOpportunity, fetchPermanentlyDeleteOpportunity, fetchGetOpportunities } from "./opportunityAPI"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
 import DeletedRecordsPanel from "../../components/DeletedRecordsPanel"
+import { downloadCsv } from "../../utils/csv"
+import { getFormattedDateTime } from "../../utils/dates"
 
 const deletedOpportunityColumns = [
     { id: "name", label: "Opportunity Name" },
     { id: "opportunityId", label: "Opportunity #" },
 ]
+
+// "Give CSV Download Option for ... Sales management - Opportunity List Tab
+// Covering complete information" - every meaningful Opportunity field
+// (Customer Request detail, latest Quote, and a Supplier Communications
+// summary), not just OpportunityTable's own list columns.
+const opportunityCsvColumns = [
+    { id: "opportunityId", label: "Opportunity #" },
+    { id: "name", label: "Name" },
+    { id: "customerOrProspect", label: "Customer / Prospect" },
+    { id: "stage", label: "Stage" },
+    { id: "value", label: "Value" },
+    { id: "expectedCloseDate", label: "Expected Close Date" },
+    { id: "owner", label: "Owner" },
+    { id: "description", label: "Description" },
+    { id: "requestDate", label: "Request Date" },
+    { id: "linkType", label: "Link Type" },
+    { id: "siteAddress", label: "Site Address" },
+    { id: "city", label: "City" },
+    { id: "state", label: "State" },
+    { id: "country", label: "Country" },
+    { id: "zipCode", label: "Zip Code" },
+    { id: "product", label: "Product" },
+    { id: "ipRequirement", label: "IP Requirement" },
+    { id: "interface", label: "Interface" },
+    { id: "downBandwidth", label: "Download BW" },
+    { id: "upBandwidth", label: "Upload BW" },
+    { id: "contractTerm", label: "Contract Term" },
+    { id: "quoteSubmitDate", label: "Quote Submit Date" },
+    { id: "quoteStatus", label: "Quote Status" },
+    { id: "currency", label: "Currency" },
+    { id: "nrc", label: "NRC" },
+    { id: "mrc", label: "MRC" },
+    { id: "supplierCommunications", label: "Supplier Communications" },
+    { id: "convertedOrderNumber", label: "Converted Order Number" },
+    { id: "convertedOrderValue", label: "Converted Order Value" },
+    { id: "convertedAt", label: "Converted At" },
+    { id: "createdAt", label: "Created At" },
+    { id: "updatedAt", label: "Updated At" },
+]
+
+function buildOpportunityCsvRow(opportunity) {
+    const row = {
+        opportunityId: opportunity.opportunityId || "",
+        name: opportunity.name || "",
+        customerOrProspect: _.get(opportunity, "customer.name") || opportunity.prospectName || "",
+        stage: opportunity.stage || "",
+        value: opportunity.value ?? "",
+        expectedCloseDate: opportunity.expectedCloseDate || "",
+        owner: _.get(opportunity, "owner.name", ""),
+        description: opportunity.description || "",
+        requestDate: _.get(opportunity, "customerRequest.requestDate", ""),
+        linkType: _.get(opportunity, "customerRequest.linkType", ""),
+        siteAddress: _.get(opportunity, "customerRequest.siteAddress", ""),
+        city: _.get(opportunity, "customerRequest.city", ""),
+        state: _.get(opportunity, "customerRequest.state", ""),
+        country: _.get(opportunity, "customerRequest.country", ""),
+        zipCode: _.get(opportunity, "customerRequest.zipCode", ""),
+        product: _.get(opportunity, "customerRequest.product", ""),
+        ipRequirement: _.get(opportunity, "customerRequest.ipRequirement", ""),
+        interface: _.get(opportunity, "customerRequest.interface", ""),
+        downBandwidth: _.get(opportunity, "customerRequest.downBandwidth", ""),
+        upBandwidth: _.get(opportunity, "customerRequest.upBandwidth", ""),
+        contractTerm: _.get(opportunity, "customerRequest.contractTerm", ""),
+        quoteSubmitDate: _.get(opportunity, "customerRequest.quoteSubmitDate", ""),
+        quoteStatus: _.get(opportunity, "customerRequest.quoteStatus", ""),
+        currency: _.get(opportunity, "customerRequest.currency", ""),
+        nrc: _.get(opportunity, "customerRequest.nrc") ?? "",
+        mrc: _.get(opportunity, "customerRequest.mrc") ?? "",
+        // One CSV cell per opportunity, not one row per supplier - each
+        // entry summarized as "Supplier - Status (MRC)" and joined, so the
+        // whole repeatable list still fits this flat, one-row-per-
+        // opportunity export.
+        supplierCommunications: (opportunity.supplierCommunications || [])
+            .map((communication) => {
+                const parts = [communication.supplier, communication.quoteStatus].filter(Boolean)
+                const label = parts.join(" - ")
+                return communication.mrc !== null && communication.mrc !== undefined
+                    ? `${label} (MRC ${communication.mrc})`
+                    : label
+            })
+            .filter(Boolean)
+            .join("; "),
+        convertedOrderNumber: _.get(opportunity, "convertedOrder.orderNumber", ""),
+        convertedOrderValue: _.get(opportunity, "convertedOrder.orderValue") ?? "",
+        convertedAt: getFormattedDateTime(_.get(opportunity, "convertedOrder.convertedAt")),
+        createdAt: getFormattedDateTime(opportunity.createdAt),
+        updatedAt: getFormattedDateTime(opportunity.updatedAt),
+    }
+    return opportunityCsvColumns.map((column) => row[column.id])
+}
 
 // "Reduce Font of Whole Sales management display" - applied here on the
 // page container (same compacting approach as Tickets.js/Inventory.js/
@@ -68,7 +165,11 @@ function OpportunitiesContent() {
     // createOpportunities right) - Create Opportunity is left out of the tab
     // list entirely rather than shown and then rejected by the server.
     const isManagement = currentUser.role === roles.SCLOUDX_MANAGEMENT
+    // "Sales Management CSV to SCX Admin, SCX Sales Admin and Management
+    // users" - isAdmin above already covers Admin + Sales Admin.
+    const canDownloadCsv = isAdmin || isManagement
     const [value, setValue] = React.useState(0)
+    const [downloadingCsv, setDownloadingCsv] = React.useState(false)
     // Local, uncommitted text box value - kept separate from the Redux
     // search term so we can debounce before actually dispatching a fetch.
     const [opportunitySearchInput, setOpportunitySearchInput] = React.useState(opportunitySearch)
@@ -100,6 +201,33 @@ function OpportunitiesContent() {
         setOpportunitySearchInput("")
         dispatch(setOpportunitySearch(""))
         setValue(newValue)
+    }
+
+    // "Give CSV Download Option for ... Sales management - Opportunity List
+    // Tab Covering complete information" - opportunityList in Redux only
+    // ever holds the current on-screen page (pagination.limit defaults to
+    // 20, unlike Inventory/Sites' effectively-unlimited fetches), so
+    // "complete information" needs its own fetch of every opportunity
+    // matching the current search, independent of what's currently
+    // displayed - same direct-fetch-outside-Redux pattern DeletedRecordsPanel
+    // uses (fetchGetOpportunities's own rejectWithValue just returns the
+    // plain error string here rather than a real action wrapper).
+    const handleDownloadCsv = async () => {
+        setDownloadingCsv(true)
+        try {
+            const result = await fetchGetOpportunities(
+                { limit: 5000, page: 1, search: opportunitySearch },
+                (payload) => payload
+            )
+            const rows = (result && result.results ? result.results : []).map(buildOpportunityCsvRow)
+            downloadCsv(
+                `sales-opportunities-${moment().format("YYYY-MM-DD")}.csv`,
+                opportunityCsvColumns.map((column) => column.label),
+                rows
+            )
+        } finally {
+            setDownloadingCsv(false)
+        }
     }
 
     // Populate the customer dropdown used by CreateOpportunity, and the
@@ -137,14 +265,28 @@ function OpportunitiesContent() {
             label: "Opportunity List",
             content: (
                 <>
-                    <TextField
-                        fullWidth
-                        label="Search opportunities"
-                        placeholder="Search by name, opportunity #, customer, status, link type, bandwidth, or site address/city/country/PIN"
-                        value={opportunitySearchInput}
-                        onChange={(event) => setOpportunitySearchInput(event.target.value)}
-                        sx={{ mb: 2 }}
-                    />
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
+                        <TextField
+                            fullWidth
+                            label="Search opportunities"
+                            placeholder="Search by name, opportunity #, customer, request date, status, link type, bandwidth, or site address/city/country/PIN"
+                            value={opportunitySearchInput}
+                            onChange={(event) => setOpportunitySearchInput(event.target.value)}
+                            sx={{ mb: 2 }}
+                        />
+                        {canDownloadCsv && (
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<DownloadIcon />}
+                                onClick={handleDownloadCsv}
+                                disabled={downloadingCsv}
+                                sx={{ flexShrink: 0, mt: 0.5, whiteSpace: "nowrap" }}
+                            >
+                                {downloadingCsv ? "Preparing..." : "Download CSV"}
+                            </Button>
+                        )}
+                    </Box>
                     <OpportunityTable
                         pagination={pagination}
                         autoExpandOpportunityId={autoExpandOpportunityId}

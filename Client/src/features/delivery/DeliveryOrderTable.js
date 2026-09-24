@@ -71,22 +71,34 @@ const baseColumns = [
 // Management module (DeliveryOrders.js), which keeps Order ID/Customer PO
 // and has no need for a milestone summary since OrderDetails' own tabs
 // already show all of this.
-function buildColumns(dashboardView) {
-    if (!dashboardView) {
-        return baseColumns
+//
+// "In Delivered Orders List, Replace Status with Delivery Date" - every row
+// there is already Status "Completed" (that's what makes it a Delivered
+// Order), so the column is swapped for the actually-varying Delivery Date
+// instead. Only the plain Delivered Orders tab (showDeliveryDate) - View
+// Open Order and every dashboard view keep Status, since it still varies
+// there.
+function buildColumns(dashboardView, showDeliveryDate) {
+    let columns = baseColumns
+    if (dashboardView) {
+        columns = baseColumns.filter(
+            (column) => column.id !== "orderId" && column.id !== "customerOrderReference"
+        )
+        const scloudxRefIndex = columns.findIndex((column) => column.id === "scloudxOrderReference")
+        columns.splice(scloudxRefIndex + 1, 0, { id: "endUser", label: "End User Name" })
+        const vendorIndex = columns.findIndex((column) => column.id === "vendorName")
+        columns.splice(vendorIndex + 1, 0, { id: "lmpName", label: "LMP Name" })
+        // Narrow, with word-wrap on the cell below - a milestone name like
+        // "Configuration provisioning and testing" would otherwise stretch
+        // the column (same fix already used for Vendor/Customer Circuit ID
+        // elsewhere - see CircuitTable.js).
+        columns.push({ id: "milestoneStatus", label: "Milestone Status", width: "10%" })
     }
-    const columns = baseColumns.filter(
-        (column) => column.id !== "orderId" && column.id !== "customerOrderReference"
-    )
-    const scloudxRefIndex = columns.findIndex((column) => column.id === "scloudxOrderReference")
-    columns.splice(scloudxRefIndex + 1, 0, { id: "endUser", label: "End User Name" })
-    const vendorIndex = columns.findIndex((column) => column.id === "vendorName")
-    columns.splice(vendorIndex + 1, 0, { id: "lmpName", label: "LMP Name" })
-    // Narrow, with word-wrap on the cell below - a milestone name like
-    // "Configuration provisioning and testing" would otherwise stretch the
-    // column (same fix already used for Vendor/Customer Circuit ID
-    // elsewhere - see CircuitTable.js).
-    columns.push({ id: "milestoneStatus", label: "Milestone Status", width: "10%" })
+    if (showDeliveryDate) {
+        columns = columns.map((column) => (
+            column.id === "status" ? { id: "deliveryDateText", label: "Delivery Date" } : column
+        ))
+    }
     return columns
 }
 
@@ -113,9 +125,10 @@ function currentMilestoneStatus(row) {
 // especially) for a small popup dialog. `canEdit`/`canDelete` render
 // OrderDetails read-only and hide the Delete icon for a read-only viewer
 // (SCX Management). `dashboardView` swaps in the Dashboard-only column set
-// above.
-export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboardView }) {
-    const columns = buildColumns(dashboardView)
+// above. `showDeliveryDate` swaps the Status column for Delivery Date - set
+// by DeliveryOrders.js on the Delivered Orders tab only.
+export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboardView, showDeliveryDate }) {
+    const columns = buildColumns(dashboardView, showDeliveryDate)
     const dispatch = useDispatch()
     const errorMessage = useSelector(selectGetOrdersError)
     const pagination = useSelector(selectPagination)
@@ -139,6 +152,7 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboard
         customerNameText: customerName(row),
         vendorName: vendorNameById.get(row.vendorId) || "",
         orderDateText: formatDate(row.orderDate),
+        deliveryDateText: formatDate(row.deliveryDate),
         milestoneStatus: dashboardView ? currentMilestoneStatus(row) : "",
     }))
 
@@ -279,10 +293,12 @@ DeliveryOrderTable.propTypes = {
     canEdit: PropTypes.bool,
     canDelete: PropTypes.bool,
     dashboardView: PropTypes.bool,
+    showDeliveryDate: PropTypes.bool,
 }
 
 DeliveryOrderTable.defaultProps = {
     canEdit: false,
     canDelete: false,
     dashboardView: false,
+    showDeliveryDate: false,
 }

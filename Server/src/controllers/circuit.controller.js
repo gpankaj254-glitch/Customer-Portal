@@ -90,11 +90,14 @@ const getCircuits = catchAsync(async (req, res) => {
     // up with nothing visible in the row to explain why it matched. Vendor
     // Circuit ID was replaced by SCX Order Ref Number as a displayed column
     // ("Remove Vendor Circuit ID and Replace with SCX Order Ref Number"), so
-    // it's replaced here too.
+    // it's replaced here too. Site Name was later dropped as a column and
+    // Product/Bandwidth added ("Remove Site name, Add Column - Product,
+    // Bandwidth"), so this list is refreshed to match.
     const orConditions = [
-      { "site.name": regex },
       { "customer.name": regex },
       { scloudxOrderReference: regex },
+      { product: regex },
+      { bandwidth: regex },
       { customerCircuitBillStartDate: regex },
       { customerCircuitContractTerm: regex },
       { vendorCircuitBillStartDate: regex },

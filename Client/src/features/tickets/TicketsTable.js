@@ -310,7 +310,7 @@ export default function TicketsTable(props) {
             <Paper sx={{ width: "100%", overflow: "hidden", p: 2 }}>
                 <TextField
                     fullWidth
-                    placeholder="Search Ticket"
+                    placeholder="Search by Ticket ID, Customer Reference, Problem Type, Status or Circuit Name"
                     value={searchInput}
                     onChange={(event) => setSearchInput(event.target.value)}
                     sx={{ mb: 2 }}

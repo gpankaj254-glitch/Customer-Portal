@@ -98,7 +98,7 @@ export default function DeliveryOrders() {
         <TextField
             fullWidth
             label="Search delivery orders"
-            placeholder="Search by Order ID, customer, SCloudX Order Ref, site address, city, Customer PO, Vendor Circuit ID or notes"
+            placeholder="Search by Order ID, Serial Number, customer, SCloudX Order Ref, site address, city, Customer PO, Vendor Circuit ID or notes"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             sx={{ mb: 2 }}
@@ -129,8 +129,10 @@ export default function DeliveryOrders() {
                 {/* "Make Delivered Order Non Editable to everyone except SCX
                     Admin" - narrower than canManage (which also covers SCX
                     Service Delivery) on this one tab only; View Open Order
-                    keeps the wider canManage. */}
-                <DeliveryOrderTable rows={deliveredOrderList} canEdit={isAdmin} canDelete={isAdmin} />
+                    keeps the wider canManage. "Replace Status with Delivery
+                    Date" - every row here is already Status "Completed", so
+                    Delivery Date is the actually-varying column instead. */}
+                <DeliveryOrderTable rows={deliveredOrderList} canEdit={isAdmin} canDelete={isAdmin} showDeliveryDate />
             </>
         ),
     })

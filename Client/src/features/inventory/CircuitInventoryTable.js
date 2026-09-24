@@ -66,7 +66,7 @@ function matchesMultiTermSearch(row, rawSearch) {
 // Number is itself an SCX Order Ref Number on the new circuit it refers to,
 // so the existing search already finds it via scloudxOrderReference), the
 // Ceased tab takes onOpenChangeOrder (called with that value on click).
-export default function CircuitInventoryTable({ statuses, showChangeType, initialSearch, onOpenChangeOrder }) {
+export default function CircuitInventoryTable({ statuses, showChangeType, initialSearch, onOpenChangeOrder, canDownloadCsv }) {
     const dispatch = useDispatch()
     const circuits = useSelector(selectCircuitsList)
     const status = useSelector(selectCircuitsListStatus)
@@ -153,15 +153,19 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                 <Typography variant="subtitle1">
                     Number of Circuits: {filteredRows.length}
                 </Typography>
-                <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<DownloadIcon />}
-                    onClick={handleDownloadCsv}
-                    disabled={filteredRows.length === 0}
-                >
-                    Download CSV
-                </Button>
+                {/* "Give CSV Download options for Inventory ... only to SCX
+                    Admin User" */}
+                {canDownloadCsv && (
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<DownloadIcon />}
+                        onClick={handleDownloadCsv}
+                        disabled={filteredRows.length === 0}
+                    >
+                        Download CSV
+                    </Button>
+                )}
             </Box>
             <TextField
                 fullWidth
@@ -271,10 +275,14 @@ CircuitInventoryTable.propTypes = {
     // Called with a Changed row's Change Order Number when its link is
     // clicked - only meaningful (and only rendered) on the Ceased tab.
     onOpenChangeOrder: PropTypes.func,
+    // "Give CSV Download options for Inventory ... only to SCX Admin User" -
+    // set by Inventory.js from the viewer's own role.
+    canDownloadCsv: PropTypes.bool,
 }
 
 CircuitInventoryTable.defaultProps = {
     showChangeType: false,
     initialSearch: "",
     onOpenChangeOrder: undefined,
+    canDownloadCsv: false,
 }

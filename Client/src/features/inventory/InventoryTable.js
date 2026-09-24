@@ -69,6 +69,9 @@ export default function InventoryTable(props) {
     const pagination = props.pagination
     const details = props.details
     const statusFilter = props.statusFilter
+    // "Give CSV Download options for Inventory ... only to SCX Admin User" -
+    // set by Inventory.js from the viewer's own role.
+    const canDownloadCsv = props.canDownloadCsv
 
     // "Live Inventory"/"Changed Inventory"/"Ceased Inventory" - reuses the
     // same already-fetched siteList for all three (no separate fetch per
@@ -211,18 +214,21 @@ export default function InventoryTable(props) {
     } else if (status === pageStatusVals.fetched) {
         return (
             <Paper sx={{ width: "100%", overflow: "hidden" }}>
-                {/* "Download Circuit Inventory Option - CSV in all Tabs" */}
-                <Box sx={{ display: "flex", justifyContent: "flex-end", p: 1 }}>
-                    <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<DownloadIcon />}
-                        onClick={handleDownloadCsv}
-                        disabled={csvRows.length === 0}
-                    >
-                        Download CSV
-                    </Button>
-                </Box>
+                {/* "Download Circuit Inventory Option - CSV in all Tabs" -
+                    "only to SCX Admin User" */}
+                {canDownloadCsv && (
+                    <Box sx={{ display: "flex", justifyContent: "flex-end", p: 1 }}>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<DownloadIcon />}
+                            onClick={handleDownloadCsv}
+                            disabled={csvRows.length === 0}
+                        >
+                            Download CSV
+                        </Button>
+                    </Box>
+                )}
                 <TableContainer sx={{ height: 1 }}>
                     <Table stickyHeader aria-label="sticky table">
                         <TableHead>
@@ -285,4 +291,7 @@ InventoryTable.propTypes = {
     // (only ones with a matching circuit) and which of that site's circuits
     // show once expanded. Omitted (falsy) shows everything, unfiltered.
     statusFilter: PropTypes.string,
+    // "Give CSV Download options for Inventory ... only to SCX Admin User" -
+    // set by Inventory.js from the viewer's own role.
+    canDownloadCsv: PropTypes.bool,
 }

@@ -276,7 +276,7 @@ export default function FinanceDashboard() {
                     fullWidth
                     size="small"
                     label="Search circuits"
-                    placeholder="Search by site, customer, vendor, SCX Order Ref Number, bill start date or contract term"
+                    placeholder="Search by customer, vendor, SCX Order Ref Number, product, bandwidth, bill start date or contract term"
                     value={searchInput}
                     onChange={(event) => setSearchInput(event.target.value)}
                 />

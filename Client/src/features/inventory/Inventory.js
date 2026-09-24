@@ -179,6 +179,7 @@ function InventoryContent() {
                     key={`live-circuit-${circuitTabResetKey}`}
                     statuses={["Live"]}
                     initialSearch={liveCircuitSearchSeed}
+                    canDownloadCsv={isAdmin}
                 />
             ),
         },
@@ -190,6 +191,7 @@ function InventoryContent() {
                     statuses={["Changed", "Ceased"]}
                     showChangeType
                     onOpenChangeOrder={handleOpenChangeOrder}
+                    canDownloadCsv={isAdmin}
                 />
             ),
         },
@@ -199,7 +201,7 @@ function InventoryContent() {
                 content: (
                     <>
                         {searchBox}
-                        <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Live" />
+                        <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Live" canDownloadCsv={isAdmin} />
                     </>
                 ),
             },
@@ -208,7 +210,7 @@ function InventoryContent() {
                 content: (
                     <>
                         {searchBox}
-                        <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Changed" />
+                        <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Changed" canDownloadCsv={isAdmin} />
                     </>
                 ),
             },
@@ -217,7 +219,7 @@ function InventoryContent() {
                 content: (
                     <>
                         {searchBox}
-                        <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Ceased" />
+                        <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Ceased" canDownloadCsv={isAdmin} />
                     </>
                 ),
             },

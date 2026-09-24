@@ -1,10 +1,15 @@
 import * as React from "react"
+import Box from "@mui/material/Box"
 import Container from "@mui/material/Container"
 import Grid from "@mui/material/Grid"
 import Paper from "@mui/material/Paper"
 import Tabs from "@mui/material/Tabs"
 import Tab from "@mui/material/Tab"
 import TextField from "@mui/material/TextField"
+import Button from "@mui/material/Button"
+import DownloadIcon from "@mui/icons-material/Download"
+import _ from "lodash"
+import moment from "moment"
 
 import CreateSite from "./CreateSite"
 import SiteTable from "./SiteTable"
@@ -12,6 +17,7 @@ import BulkUploadSites from "./BulkUploadSites"
 import {
     selectPagination,
     selectSearch,
+    selectSiteList,
     getSites,
     setSearch,
 } from "./siteSlice"
@@ -21,6 +27,30 @@ import { getCustomers } from "../customers/customerSlice"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
 import DeletedRecordsPanel from "../../components/DeletedRecordsPanel"
+import { downloadCsv } from "../../utils/csv"
+import { getFormattedDateTime } from "../../utils/dates"
+
+// "Give CSV Download Option for Site management - Site List Tab ...
+// Covering complete information" - every meaningful Site field (location
+// broken into its own columns rather than one combined address string, so
+// it's usable in a spreadsheet), not just SiteTable's own three display
+// columns (Site Name/Customer/Address).
+const siteCsvColumns = [
+    { id: "code", label: "Site Code" },
+    { id: "name", label: "Site Name" },
+    { id: "customerName", label: "Customer Name" },
+    { id: "customerCode", label: "Customer Code" },
+    { id: "region", label: "Region" },
+    { id: "endUser", label: "End User" },
+    { id: "category", label: "Category" },
+    { id: "address", label: "Address" },
+    { id: "town", label: "Town" },
+    { id: "country", label: "Country" },
+    { id: "postalCode", label: "Postal Code" },
+    { id: "circuitCount", label: "Circuit Count" },
+    { id: "createdAt", label: "Created At" },
+    { id: "updatedAt", label: "Updated At" },
+]
 
 const deletedSiteColumns = [
     { id: "name", label: "Site Name" },
@@ -67,6 +97,7 @@ function SitesContent() {
     const dispatch = useDispatch()
     const pagination = useSelector(selectPagination)
     const search = useSelector(selectSearch)
+    const siteList = useSelector(selectSiteList)
     const currentUser = useSelector(selectUser)
     const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
     // SCX NOC no longer creates sites here. SCX Admin and SCX Service
@@ -116,19 +147,62 @@ function SitesContent() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchInput])
 
+    // "Give CSV Download options for Inventory, and Site list only to SCX
+    // Admin User" - siteList already holds every site matching the current
+    // search (pagination.limit is 1000, effectively "no limit" - see
+    // siteSlice.js), so this exports exactly what's on screen without a
+    // separate fetch.
+    const handleDownloadSitesCsv = () => {
+        const headers = siteCsvColumns.map((column) => column.label)
+        const rows = siteList.map((site) => {
+            const row = {
+                code: site.code || "",
+                name: site.name || "",
+                customerName: _.get(site, "customer.name", ""),
+                customerCode: _.get(site, "customer.code", ""),
+                region: _.get(site, "region.name", ""),
+                endUser: site.customerSiteIdentifier || "",
+                category: site.category || "",
+                address: _.get(site, "location.address", ""),
+                town: _.get(site, "location.town", ""),
+                country: _.get(site, "location.country", ""),
+                postalCode: _.get(site, "location.postalCode", ""),
+                circuitCount: _.get(site, "circuitCount", ""),
+                createdAt: getFormattedDateTime(site.createdAt),
+                updatedAt: getFormattedDateTime(site.updatedAt),
+            }
+            return siteCsvColumns.map((column) => row[column.id])
+        })
+        downloadCsv(`sites-${moment().format("YYYY-MM-DD")}.csv`, headers, rows)
+    }
+
     const tabs = [
         {
             label: "Site List",
             content: (
                 <>
-                    <TextField
-                        fullWidth
-                        label="Search sites"
-                        placeholder="Search by site name, customer, address, town or postal code"
-                        value={searchInput}
-                        onChange={(event) => setSearchInput(event.target.value)}
-                        sx={{ mb: 2 }}
-                    />
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
+                        <TextField
+                            fullWidth
+                            label="Search sites"
+                            placeholder="Search by site name, customer, address, town or postal code"
+                            value={searchInput}
+                            onChange={(event) => setSearchInput(event.target.value)}
+                            sx={{ mb: 2 }}
+                        />
+                        {isAdmin && (
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<DownloadIcon />}
+                                onClick={handleDownloadSitesCsv}
+                                disabled={siteList.length === 0}
+                                sx={{ flexShrink: 0, mt: 0.5 }}
+                            >
+                                Download CSV
+                            </Button>
+                        )}
+                    </Box>
                     <SiteTable pagination={pagination} />
                 </>
             ),
