@@ -36,6 +36,11 @@ const OPPORTUNITY_TEMPLATE_HEADERS = [
     "Down Bandwidth",
     "Up Bandwidth",
     "Contract Term",
+    "Quote Submit Date",
+    "Quote Status",
+    "Currency",
+    "NRC",
+    "MRC",
 ]
 
 const SUPPLIER_RESPONSE_TEMPLATE_HEADERS = [
@@ -50,8 +55,10 @@ const SUPPLIER_RESPONSE_TEMPLATE_HEADERS = [
     "Currency",
     "NRC",
     "MRC",
+    "Bandwidth",
     "Quote Submit Date",
     "Quote Status",
+    "Remarks",
 ]
 
 // Shared shape for both uploaders below - only the thunk, template headers,
@@ -198,8 +205,10 @@ export default function BulkUploadOpportunities() {
                     "Download the blank template, fill in one row per opportunity, then upload it here. Each row's " +
                     "Customer Name + Request Date + Request ID + Link Type + Site Address must be unique - a row that " +
                     "matches an existing opportunity, or another row in the same file, is rejected as a duplicate. A " +
-                    "system-generated Opportunity ID is assigned to every row that passes. If any row fails " +
-                    "validation, the entire file is rejected and nothing is uploaded."
+                    "system-generated Opportunity ID is assigned to every row that passes. Quote Submit Date/Currency/" +
+                    "NRC/MRC are optional and seed the Customer Request's own initial quote; Quote Status defaults to " +
+                    "Pending if left blank. If any row fails validation, the entire file is rejected and nothing is " +
+                    "uploaded."
                 }
                 templateHeaders={OPPORTUNITY_TEMPLATE_HEADERS}
                 templateFilename="opportunity-bulk-upload-template.csv"
@@ -218,8 +227,9 @@ export default function BulkUploadOpportunities() {
                     "is linked to an existing opportunity by Customer Name + Request Date + Request Ref + Link " +
                     "Category + Address - the same combination used to create it. If a row's Supplier already has an " +
                     "entry on that opportunity, its quote details are updated in place; otherwise a new Supplier " +
-                    "Communication entry is added. If any row fails validation or can't be matched to exactly one " +
-                    "opportunity, the entire file is rejected and nothing is uploaded."
+                    "Communication entry is added. Bandwidth and Remarks are optional. If any row fails validation " +
+                    "or can't be matched to exactly one opportunity, the entire file is rejected and nothing is " +
+                    "uploaded."
                 }
                 templateHeaders={SUPPLIER_RESPONSE_TEMPLATE_HEADERS}
                 templateFilename="supplier-response-bulk-upload-template.csv"

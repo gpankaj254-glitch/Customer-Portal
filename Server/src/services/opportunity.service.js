@@ -12,6 +12,7 @@ const {
   linkTypeOptions,
   ipRequirementOptions,
   interfaceOptions,
+  quoteStatusOptions,
   supplierQuoteStatusOptions,
 } = require("../config/opportunityOptions");
 const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
@@ -531,6 +532,11 @@ const OPPORTUNITY_BULK_UPLOAD_COLUMNS = [
   "Down Bandwidth",
   "Up Bandwidth",
   "Contract Term",
+  "Quote Submit Date",
+  "Quote Status",
+  "Currency",
+  "NRC",
+  "MRC",
 ];
 
 /**
@@ -541,6 +547,12 @@ const OPPORTUNITY_BULK_UPLOAD_COLUMNS = [
  * rather than creating a second Customer Request for the same thing. Only
  * inserts anything if every row passes (all-or-nothing), same convention as
  * ticket.service.js's bulkUploadTickets.
+ * Quote Submit Date/Quote Status/Currency/NRC/MRC seed the Customer
+ * Request's own initial quote (Quote Status defaults to "Pending" like a
+ * normal create, same as the Supplier Response upload's own Quote Status
+ * default) - createOpportunity below turns these into the Customer
+ * Request's first statusHistory entry automatically, same as creating one
+ * through the UI.
  * @param {Buffer} fileBuffer
  * @param {Object} actingUser
  * @returns {Promise<{success: boolean, totalRows: number, insertedCount: number, failedRows: Array}>}
@@ -612,11 +624,18 @@ const bulkUploadOpportunities = async (fileBuffer, actingUser) => {
     const downBandwidth = _.get(record, "Down Bandwidth", "").trim();
     const upBandwidth = _.get(record, "Up Bandwidth", "").trim();
     const contractTerm = _.get(record, "Contract Term", "").trim();
+    const quoteSubmitDate = _.get(record, "Quote Submit Date", "").trim();
+    const quoteStatus = _.get(record, "Quote Status", "").trim() || "Pending";
+    const currency = _.get(record, "Currency", "").trim();
 
     if (!name) errors.push("Opportunity Name is required");
     if (linkType && !linkTypeOptions.includes(linkType)) errors.push(`Link Type "${linkType}" is not a valid option`);
     if (product && !productOptions.includes(product)) errors.push(`Product "${product}" is not a valid option`);
     if (ipRequirement && !ipRequirementOptions.includes(ipRequirement)) errors.push(`IP Requirement "${ipRequirement}" is not a valid option`);
+    if (!quoteStatusOptions.includes(quoteStatus)) errors.push(`Quote Status "${quoteStatus}" is not a valid option`);
+    if (currency && !currencyCodes.includes(currency)) errors.push(`Currency "${currency}" is not a valid option`);
+    const nrc = parseOptionalNumber(_.get(record, "NRC", ""), "NRC", errors);
+    const mrc = parseOptionalNumber(_.get(record, "MRC", ""), "MRC", errors);
     if (interfaceType && !interfaceOptions.includes(interfaceType)) errors.push(`Interface "${interfaceType}" is not a valid option`);
     if (downBandwidth && !bandwidthOptions.includes(downBandwidth)) errors.push(`Down Bandwidth "${downBandwidth}" is not a valid option`);
     if (upBandwidth && !bandwidthOptions.includes(upBandwidth)) errors.push(`Up Bandwidth "${upBandwidth}" is not a valid option`);
@@ -670,6 +689,11 @@ const bulkUploadOpportunities = async (fileBuffer, actingUser) => {
             downBandwidth,
             upBandwidth,
             contractTerm,
+            quoteSubmitDate,
+            quoteStatus,
+            currency,
+            nrc,
+            mrc,
           },
         },
       });
@@ -714,8 +738,10 @@ const SUPPLIER_RESPONSE_BULK_UPLOAD_COLUMNS = [
   "Currency",
   "NRC",
   "MRC",
+  "Bandwidth",
   "Quote Submit Date",
   "Quote Status",
+  "Remarks",
 ];
 
 /**
@@ -728,7 +754,10 @@ const SUPPLIER_RESPONSE_BULK_UPLOAD_COLUMNS = [
  * Supplier matches an existing Supplier Communication entry (case
  * insensitive) updates that entry in place (logging a new status history
  * line only if the status actually changed); otherwise a new entry is
- * added. All-or-nothing per file, like bulkUploadOpportunities.
+ * added. All-or-nothing per file, like bulkUploadOpportunities. Bandwidth
+ * and Remarks are plain fields on the entry itself (not part of
+ * statusHistory - only status/currency/NRC/MRC changes are logged there,
+ * matching the single-entry Edit Supplier Communication form).
  * @param {Buffer} fileBuffer
  * @param {Object} actingUser
  * @returns {Promise<{success: boolean, totalRows: number, updatedCount: number, opportunitiesAffected: number, failedRows: Array}>}
@@ -793,10 +822,13 @@ const bulkUploadSupplierResponses = async (fileBuffer, actingUser) => {
     const currency = _.get(record, "Currency", "").trim();
     const quoteSubmitDate = _.get(record, "Quote Submit Date", "").trim();
     const quoteStatus = _.get(record, "Quote Status", "").trim() || "Pending";
+    const bandwidth = _.get(record, "Bandwidth", "").trim();
+    const remarks = _.get(record, "Remarks", "").trim();
 
     if (!supplier) errors.push("Supplier is required");
     if (currency && !currencyCodes.includes(currency)) errors.push(`Currency "${currency}" is not a valid option`);
     if (!supplierQuoteStatusOptions.includes(quoteStatus)) errors.push(`Quote Status "${quoteStatus}" is not a valid option`);
+    if (bandwidth && !bandwidthOptions.includes(bandwidth)) errors.push(`Bandwidth "${bandwidth}" is not a valid option`);
     const nrc = parseOptionalNumber(_.get(record, "NRC", ""), "NRC", errors);
     const mrc = parseOptionalNumber(_.get(record, "MRC", ""), "MRC", errors);
 
@@ -820,7 +852,7 @@ const bulkUploadSupplierResponses = async (fileBuffer, actingUser) => {
       if (!groupsByOpportunityId.has(opportunityKey)) {
         groupsByOpportunityId.set(opportunityKey, { opportunity: matchedOpportunity, rows: [] });
       }
-      groupsByOpportunityId.get(opportunityKey).rows.push({ supplier, quoteRequestDate, currency, lec, nrc, mrc, quoteSubmitDate, quoteStatus });
+      groupsByOpportunityId.get(opportunityKey).rows.push({ supplier, quoteRequestDate, currency, lec, nrc, mrc, bandwidth, quoteSubmitDate, quoteStatus, remarks });
     }
   }
 
@@ -845,8 +877,10 @@ const bulkUploadSupplierResponses = async (fileBuffer, actingUser) => {
           lec: row.lec,
           nrc: row.nrc,
           mrc: row.mrc,
+          bandwidth: row.bandwidth,
           quoteSubmitDate: row.quoteSubmitDate,
           quoteStatus: row.quoteStatus,
+          remarks: row.remarks,
           statusHistory: [{
             status: row.quoteStatus,
             changedAt: now,
@@ -868,8 +902,10 @@ const bulkUploadSupplierResponses = async (fileBuffer, actingUser) => {
         existing.lec = row.lec;
         existing.nrc = row.nrc;
         existing.mrc = row.mrc;
+        existing.bandwidth = row.bandwidth;
         existing.quoteSubmitDate = row.quoteSubmitDate;
         existing.quoteStatus = row.quoteStatus;
+        existing.remarks = row.remarks;
         if (statusChanged || priceChanged) {
           existing.statusHistory = _.concat(existing.statusHistory || [], {
             status: row.quoteStatus,

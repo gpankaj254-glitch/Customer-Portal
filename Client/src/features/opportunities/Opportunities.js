@@ -105,16 +105,27 @@ function buildOpportunityCsvRow(opportunity) {
         nrc: _.get(opportunity, "customerRequest.nrc") ?? "",
         mrc: _.get(opportunity, "customerRequest.mrc") ?? "",
         // One CSV cell per opportunity, not one row per supplier - each
-        // entry summarized as "Supplier - Status (MRC)" and joined, so the
-        // whole repeatable list still fits this flat, one-row-per-
-        // opportunity export.
+        // entry summarized with every Supplier Communication field worth
+        // having (LEC, Currency, NRC/MRC, Bandwidth, both dates, Remarks -
+        // blank ones dropped rather than shown as empty), several suppliers
+        // semicolon-joined, so the whole repeatable list still fits this
+        // flat, one-row-per-opportunity export.
         supplierCommunications: (opportunity.supplierCommunications || [])
             .map((communication) => {
                 const parts = [communication.supplier, communication.quoteStatus].filter(Boolean)
-                const label = parts.join(" - ")
-                return communication.mrc !== null && communication.mrc !== undefined
-                    ? `${label} (MRC ${communication.mrc})`
-                    : label
+                const fields = [
+                    ["LEC", communication.lec],
+                    ["Currency", communication.currency],
+                    ["NRC", communication.nrc !== null && communication.nrc !== undefined ? communication.nrc : ""],
+                    ["MRC", communication.mrc !== null && communication.mrc !== undefined ? communication.mrc : ""],
+                    ["BW", communication.bandwidth],
+                    ["Quote Request Date", communication.quoteRequestDate],
+                    ["Quote Submit Date", communication.quoteSubmitDate],
+                    ["Remarks", communication.remarks],
+                ]
+                    .filter(([, fieldValue]) => fieldValue !== "" && fieldValue !== null && fieldValue !== undefined)
+                    .map(([fieldLabel, fieldValue]) => `${fieldLabel}: ${fieldValue}`)
+                return [parts.join(" - "), ...fields].filter(Boolean).join(" | ")
             })
             .filter(Boolean)
             .join("; "),
