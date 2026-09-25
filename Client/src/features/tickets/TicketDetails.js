@@ -1175,13 +1175,22 @@ export default function TicketDetails({ ticket, mode }) {
                                 <TextField fullWidth label="Network Downtime (HH:MM)" value={formatMinutesToHHMM(networkDownTimeMinutes)} disabled />
                             </Grid>
 
+                            {/* "Display all fields of Ticket closure Details" -
+                                the full RFO record is always visible here now
+                                (not just the subset that varies by Yes/No),
+                                so nothing entered on the RFO Request tab is
+                                hidden from this tab's own view. */}
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle2" sx={{ mt: 1 }}>
+                                    RFO Request received = {rfoRequested}
+                                    {rfoRequested === "Yes" ? " - shown below as entered on the RFO Request tab (read-only here)" : ""}
+                                </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <TextField fullWidth label="RFO Request Date (IST)" value={rfoRequestDate ? getFormattedDate(rfoRequestDate) : "Not requested"} disabled />
+                            </Grid>
                             {rfoRequested === "Yes" ? (
                                 <>
-                                    <Grid item xs={12}>
-                                        <Typography variant="subtitle2" sx={{ mt: 1 }}>
-                                            RFO Request received = Yes - shown below as entered on the RFO Request tab (read-only here)
-                                        </Typography>
-                                    </Grid>
                                     <Grid item xs={12} sm={4}>
                                         <TextField fullWidth label="RFO Problem Start Date/Time" value={rfoProblemStartDateTime} disabled />
                                     </Grid>
@@ -1194,6 +1203,9 @@ export default function TicketDetails({ ticket, mode }) {
                                     <Grid item xs={12} sm={4}>
                                         <TextField fullWidth label="RFO Code" value={rfoCode} disabled />
                                     </Grid>
+                                    <Grid item xs={12} sm={8}>
+                                        <TextField fullWidth multiline minRows={2} label="RFO Description" value={rfoDescription} disabled />
+                                    </Grid>
                                 </>
                             ) : (
                                 <>
@@ -1201,7 +1213,11 @@ export default function TicketDetails({ ticket, mode }) {
                                         Mode" - defaulted to Problem Start Date/Time and
                                         Ticket Closure Date/Time respectively (see this
                                         component's own rfoProblemStartDateTime/
-                                        rfoProblemStopDateTime state), still freely editable. */}
+                                        rfoProblemStopDateTime state), still freely editable.
+                                        RFO Status/Description aren't part of the "No"
+                                        edit fields (there's no RFO to report a status or
+                                        description on), but still shown read-only so every
+                                        field on this record stays visible either way. */}
                                     <Grid item xs={12} sm={4}>
                                         <TextField
                                             fullWidth
@@ -1239,6 +1255,12 @@ export default function TicketDetails({ ticket, mode }) {
                                                 ))}
                                             </Select>
                                         </FormControl>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField fullWidth label="RFO Status" value={rfoRequestStatus} disabled />
+                                    </Grid>
+                                    <Grid item xs={12} sm={8}>
+                                        <TextField fullWidth multiline minRows={2} label="RFO Description" value={rfoDescription} disabled />
                                     </Grid>
                                 </>
                             )}
