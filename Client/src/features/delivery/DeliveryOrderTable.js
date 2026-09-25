@@ -37,7 +37,10 @@ import { getFormattedDateOnly as formatDate } from "../../utils/dates"
 // has read-only view access to Delivery Orders elsewhere.
 const ACTIVITY_LOG_ROLES = [roles.SCLOUDX_ADMIN, roles.SCLOUDX_SERVICE_DELIVERY, roles.SCLOUDX_MANAGEMENT]
 
-function customerName(row) {
+// Exported (not just used locally) so DeliveryOrderCharts.js's Customer
+// wise/Milestone wise breakdowns stay in exact sync with this table's own
+// display - no separate re-implementation to drift out of step.
+export function customerName(row) {
     return _.get(row, "customer.name") || row.newCustomerName || ""
 }
 
@@ -109,7 +112,7 @@ function buildColumns(dashboardView, showDeliveryDate) {
 // is concerned, so it shouldn't keep showing here as the order's "current"
 // one). "Completed" once every milestone is Completed/Not Required; blank
 // if there are none.
-function currentMilestoneStatus(row) {
+export function currentMilestoneStatus(row) {
     const milestones = row.milestones || []
     const inProgress = milestones.find((milestone) => !["Completed", "Not Required"].includes(milestone.status))
     if (inProgress) {

@@ -8,6 +8,7 @@ import SalesDashboard from "../opportunities/SalesDashboard"
 import FinanceDashboard from "./FinanceDashboard"
 import ScxDashboard from "./ScxDashboard"
 import DeliveryOrderTable from "../delivery/DeliveryOrderTable"
+import DeliveryOrderCharts from "./DeliveryOrderCharts"
 import { getDeliveryOrders, selectOpenOrderList } from "../delivery/deliveryOrderSlice"
 import { getVendors } from "../vendors/vendorSlice"
 import { selectUser } from "../auth/authSlice"
@@ -62,6 +63,7 @@ export default function ManagementDashboard() {
                 {activeTab === 1 && <FinanceDashboard />}
                 {activeTab === 2 && (
                     <Grid container spacing={1.5}>
+                        <DeliveryOrderCharts orders={openOrderList} />
                         <Grid item xs={12}>
                             <Typography component="h2" variant="h5" sx={{ fontSize: "0.85rem", fontWeight: 600 }}>View Open Orders</Typography>
                         </Grid>

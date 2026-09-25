@@ -43,6 +43,7 @@ import SalesDashboard from "../opportunities/SalesDashboard"
 import { getDeliveryOrders, selectOpenOrderList } from "../delivery/deliveryOrderSlice"
 import { getVendors } from "../vendors/vendorSlice"
 import DeliveryOrderTable from "../delivery/DeliveryOrderTable"
+import DeliveryOrderCharts from "./DeliveryOrderCharts"
 import { pages, roles } from "../../consts"
 import { pageStatusVals } from "../tickets/utils"
 import { getFormattedDateTimeGMT } from "../../utils/dates"
@@ -430,6 +431,7 @@ export default function ScxDashboard({ embedded }) {
 
             {isAdmin && activeTab === deliveryTabIndex && (
                 <>
+                    <DeliveryOrderCharts orders={openOrderList} />
                     <SectionHeading>View Open Orders</SectionHeading>
                     <Grid item xs={12}>
                         <DeliveryOrderTable rows={openOrderList} canEdit canDelete dashboardView />

@@ -42,6 +42,7 @@ import ManagementDashboard from "./ManagementDashboard"
 import { getDeliveryOrders, selectOpenOrderList } from "../delivery/deliveryOrderSlice"
 import { getVendors } from "../vendors/vendorSlice"
 import DeliveryOrderTable from "../delivery/DeliveryOrderTable"
+import DeliveryOrderCharts from "./DeliveryOrderCharts"
 
 const openTicketColumns = [
     "Ticket ID",
@@ -217,6 +218,7 @@ function DashboardContent() {
                     </Grid>
                 ) : isDeliveryRole ? (
                     <>
+                        <DeliveryOrderCharts orders={openOrderList} />
                         <Grid item xs={12}>
                             <Typography component="h2" variant="h5" sx={{ mt: 0.5, fontSize: "0.85rem", fontWeight: 600 }}>View Open Orders</Typography>
                         </Grid>
