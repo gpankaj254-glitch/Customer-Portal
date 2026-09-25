@@ -126,8 +126,10 @@ function currentMilestoneStatus(row) {
 // OrderDetails read-only and hide the Delete icon for a read-only viewer
 // (SCX Management). `dashboardView` swaps in the Dashboard-only column set
 // above. `showDeliveryDate` swaps the Status column for Delivery Date - set
-// by DeliveryOrders.js on the Delivered Orders tab only.
-export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboardView, showDeliveryDate }) {
+// by DeliveryOrders.js on the Delivered Orders tab only. `liveCircuitOrderRefs`
+// is passed straight through to each row's own OrderDetails, for its Existing
+// Order Number dropdown.
+export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboardView, showDeliveryDate, liveCircuitOrderRefs }) {
     const columns = buildColumns(dashboardView, showDeliveryDate)
     const dispatch = useDispatch()
     const errorMessage = useSelector(selectGetOrdersError)
@@ -252,7 +254,7 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboard
                                 <TableRow>
                                     <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={columns.length + 2}>
                                         <Collapse in={open === row.id} unmountOnExit>
-                                            <OrderDetails order={row} readOnly={!canEdit} vendorName={row.vendorName} />
+                                            <OrderDetails order={row} readOnly={!canEdit} vendorName={row.vendorName} liveCircuitOrderRefs={liveCircuitOrderRefs} />
                                         </Collapse>
                                     </TableCell>
                                 </TableRow>
@@ -300,6 +302,9 @@ DeliveryOrderTable.propTypes = {
     canDelete: PropTypes.bool,
     dashboardView: PropTypes.bool,
     showDeliveryDate: PropTypes.bool,
+    // Map of normalized SCX Order Ref -> original-case ref, one entry per
+    // distinct Live circuit - see DeliveryOrders.js.
+    liveCircuitOrderRefs: PropTypes.instanceOf(Map),
 }
 
 DeliveryOrderTable.defaultProps = {
@@ -307,4 +312,5 @@ DeliveryOrderTable.defaultProps = {
     canDelete: false,
     dashboardView: false,
     showDeliveryDate: false,
+    liveCircuitOrderRefs: new Map(),
 }

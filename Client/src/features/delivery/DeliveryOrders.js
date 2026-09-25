@@ -19,6 +19,7 @@ import {
 } from "./deliveryOrderSlice"
 import { fetchDeletedDeliveryOrders, fetchRestoreDeliveryOrder, fetchPermanentlyDeleteDeliveryOrder } from "./deliveryOrderAPI"
 import { getVendors } from "../vendors/vendorSlice"
+import { getCircuitsList, selectCircuitsList } from "../inventory/circuitSlice"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
 import DeletedRecordsPanel from "../../components/DeletedRecordsPanel"
@@ -49,6 +50,7 @@ export default function DeliveryOrders() {
     const deliveredOrderList = useSelector(selectDeliveredOrderList)
     const pagination = useSelector(selectPagination)
     const search = useSelector(selectSearch)
+    const circuitsList = useSelector(selectCircuitsList)
 
     const [value, setValue] = React.useState(0)
     const [searchInput, setSearchInput] = React.useState(search)
@@ -82,6 +84,31 @@ export default function DeliveryOrders() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
+    // "we need 216 Order ref Numbers in Dropdown option of Existing Order
+    // Ref Number field" - every distinct Live circuit's own SCX Order Ref
+    // is offered, not just the ones that happen to already have a Delivery
+    // Order behind them - fetched once here (not per expanded order row)
+    // and passed down as a Map of normalized ref -> original-case ref, so
+    // each of New Order/every expanded order's Order Info tab can build its
+    // own option list (resolving each ref to a real order's orderId where
+    // one exists - see OrderDetails.js/CreateDeliveryOrder.js's own
+    // relatedOrderOptions).
+    React.useEffect(() => {
+        dispatch(getCircuitsList({ statuses: ["Live"] }))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+    const liveCircuitOrderRefs = React.useMemo(() => {
+        const map = new Map()
+        circuitsList.forEach((circuit) => {
+            const ref = (circuit.scloudxOrderReference || "").trim()
+            const key = ref.toLowerCase()
+            if (ref && !map.has(key)) {
+                map.set(key, ref)
+            }
+        })
+        return map
+    }, [circuitsList])
+
     // Debounce the search box: only commit to Redux (and trigger the fetch
     // above) 400ms after the user stops typing.
     React.useEffect(() => {
@@ -111,14 +138,14 @@ export default function DeliveryOrders() {
             content: (
                 <>
                     {searchBox}
-                    <DeliveryOrderTable rows={openOrderList} canEdit={canManage} canDelete={isAdmin} />
+                    <DeliveryOrderTable rows={openOrderList} canEdit={canManage} canDelete={isAdmin} liveCircuitOrderRefs={liveCircuitOrderRefs} />
                 </>
             ),
         },
     ]
 
     if (canManage) {
-        tabs.push({ label: "New Order", content: <CreateDeliveryOrder /> })
+        tabs.push({ label: "New Order", content: <CreateDeliveryOrder liveCircuitOrderRefs={liveCircuitOrderRefs} /> })
     }
 
     tabs.push({
@@ -132,7 +159,7 @@ export default function DeliveryOrders() {
                     keeps the wider canManage. "Replace Status with Delivery
                     Date" - every row here is already Status "Completed", so
                     Delivery Date is the actually-varying column instead. */}
-                <DeliveryOrderTable rows={deliveredOrderList} canEdit={isAdmin} canDelete={isAdmin} showDeliveryDate />
+                <DeliveryOrderTable rows={deliveredOrderList} canEdit={isAdmin} canDelete={isAdmin} showDeliveryDate liveCircuitOrderRefs={liveCircuitOrderRefs} />
             </>
         ),
     })

@@ -13,6 +13,7 @@ import Select from "@mui/material/Select"
 import Autocomplete from "@mui/material/Autocomplete"
 import Snackbar from "@mui/material/Snackbar"
 import Alert from "@mui/material/Alert"
+import PropTypes from "prop-types"
 import { useDispatch, useSelector } from "react-redux"
 import _ from "lodash"
 import moment from "moment"
@@ -48,7 +49,7 @@ const initialFormValues = {
 // branch, unlike Create Opportunity's Customer/Prospect Name); a customer
 // not yet in the system is created via Customer Management first, same as
 // Vendor above.
-export default function CreateDeliveryOrder() {
+export default function CreateDeliveryOrder({ liveCircuitOrderRefs }) {
     const dispatch = useDispatch()
     const customerList = useSelector(selectCustomerList)
     const vendorList = useSelector(selectVendorList)
@@ -57,10 +58,26 @@ export default function CreateDeliveryOrder() {
     // to fetch again here.
     const openOrderList = useSelector(selectOpenOrderList)
     const deliveredOrderList = useSelector(selectDeliveredOrderList)
-    const relatedOrderOptions = React.useMemo(
-        () => [...openOrderList, ...deliveredOrderList],
-        [openOrderList, deliveredOrderList]
-    )
+    // "we need 216 Order ref Numbers in Dropdown option of Existing Order
+    // Ref Number field" - one option per distinct Live circuit's own SCX
+    // Order Ref, not filtered down to just the ones that already have a
+    // Delivery Order behind them. Picking one resolves to that order's own
+    // orderId when a matching Delivery Order exists (same "relatedOrderId
+    // is the other order's own orderId" convention used everywhere else -
+    // see deliveryOrder.model.js), or the raw SCX Order Ref text itself
+    // when it doesn't (a circuit with no Delivery Order record behind it).
+    const relatedOrderOptions = React.useMemo(() => {
+        const orderIdByRef = new Map()
+        ;[...openOrderList, ...deliveredOrderList].forEach((candidate) => {
+            const ref = (candidate.scloudxOrderReference || "").trim().toLowerCase()
+            if (ref && !orderIdByRef.has(ref)) {
+                orderIdByRef.set(ref, candidate.orderId)
+            }
+        })
+        return Array.from(liveCircuitOrderRefs.entries())
+            .map(([key, ref]) => ({ scloudxOrderReference: ref, relatedOrderId: orderIdByRef.get(key) || ref }))
+            .sort((a, b) => a.scloudxOrderReference.localeCompare(b.scloudxOrderReference))
+    }, [openOrderList, deliveredOrderList, liveCircuitOrderRefs])
 
     const [selectedCustomer, setSelectedCustomer] = React.useState(null)
     const [selectedVendor, setSelectedVendor] = React.useState(null)
@@ -118,6 +135,10 @@ export default function CreateDeliveryOrder() {
         }
         if (!orderDate) {
             setFeedback({ severity: "error", message: "Order Date is required" })
+            return
+        }
+        if (values.orderType !== "New" && !values.relatedOrderId) {
+            setFeedback({ severity: "error", message: "Existing Order Number is required when Order Type isn't New - select an existing Live-circuit order." })
             return
         }
 
@@ -214,13 +235,26 @@ export default function CreateDeliveryOrder() {
                                     // Reference in dropdown, not System Order
                                     // No" - displayed/searched by
                                     // scloudxOrderReference; relatedOrderId
-                                    // itself still stores the system orderId
-                                    // (see deliveryOrder.model.js).
+                                    // itself stores the picked option's own
+                                    // orderId when it has a matching Delivery
+                                    // Order (see deliveryOrder.model.js), or
+                                    // the raw SCX Order Ref text otherwise
+                                    // (see relatedOrderOptions above). "No
+                                    // Free text and No circuit ID to be
+                                    // displayed/handled" - closed dropdown,
+                                    // object options only.
                                     getOptionLabel={(option) => _.get(option, "scloudxOrderReference", "")}
-                                    value={relatedOrderOptions.find((option) => option.orderId === values.relatedOrderId) || null}
-                                    onChange={(event, newValue) => setValues((prev) => ({ ...prev, relatedOrderId: newValue ? newValue.orderId : "" }))}
+                                    value={relatedOrderOptions.find((option) => option.relatedOrderId === values.relatedOrderId) || null}
+                                    onChange={(event, newValue) => setValues((prev) => ({
+                                        ...prev,
+                                        relatedOrderId: newValue ? newValue.relatedOrderId : "",
+                                    }))}
+                                    // Options render smaller - a dropdown
+                                    // list renders in a portal, outside any
+                                    // sx applied to this form.
+                                    ListboxProps={{ sx: { "& .MuiAutocomplete-option": { fontSize: "0.8rem" } } }}
                                     renderInput={(params) => (
-                                        <TextField {...params} label="Existing Order Number" placeholder="Search SCloudX Order Ref" />
+                                        <TextField {...params} required label="Existing Order Number" placeholder="Search SCloudX Order Ref" />
                                     )}
                                 />
                             </Grid>
@@ -395,4 +429,14 @@ export default function CreateDeliveryOrder() {
             </Snackbar>
         </Container>
     )
+}
+
+CreateDeliveryOrder.propTypes = {
+    // Map of normalized SCX Order Ref -> original-case ref, one entry per
+    // distinct Live circuit - see DeliveryOrders.js.
+    liveCircuitOrderRefs: PropTypes.instanceOf(Map),
+}
+
+CreateDeliveryOrder.defaultProps = {
+    liveCircuitOrderRefs: new Map(),
 }

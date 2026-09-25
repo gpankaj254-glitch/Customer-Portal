@@ -140,7 +140,7 @@ function SectionHeading({ children }) {
 // edit surface for a delivery order (replaces a small popup dialog, since
 // the milestone table doesn't fit one). readOnly renders every field
 // disabled and hides Save/Create Site, for SCX Management's view-only access.
-export default function OrderDetails({ order, readOnly, vendorName }) {
+export default function OrderDetails({ order, readOnly, vendorName, liveCircuitOrderRefs }) {
     const dispatch = useDispatch()
     const openOrderList = useSelector(selectOpenOrderList)
     const deliveredOrderList = useSelector(selectDeliveredOrderList)
@@ -182,10 +182,51 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
         })
     }, [values.siteType, linkedCustomerId])
 
-    const relatedOrderOptions = React.useMemo(
+    // Every other order (open or delivered), for resolving a Live circuit's
+    // SCX Order Ref to its own real orderId when a Delivery Order happens
+    // to exist for it, and for resolving an already-saved relatedOrderId
+    // back to its real SCX Order Ref even once its own circuit is no
+    // longer Live (see selectedRelatedOrder below).
+    const allRelatedOrders = React.useMemo(
         () => [...openOrderList, ...deliveredOrderList].filter((candidate) => candidate.id !== order.id),
         [openOrderList, deliveredOrderList, order.id]
     )
+    // "we need 216 Order ref Numbers in Dropdown option of Existing Order
+    // Ref Number field" - one option per distinct Live circuit's own SCX
+    // Order Ref, not filtered down to just the ones that already have a
+    // Delivery Order behind them. Picking one resolves to that order's own
+    // orderId when a matching Delivery Order exists (same "relatedOrderId
+    // is the other order's own orderId" convention used everywhere else -
+    // see deliveryOrder.model.js), or the raw SCX Order Ref text itself
+    // when it doesn't (a circuit with no Delivery Order record behind it).
+    const relatedOrderOptions = React.useMemo(() => {
+        const orderIdByRef = new Map()
+        allRelatedOrders.forEach((candidate) => {
+            const ref = (candidate.scloudxOrderReference || "").trim().toLowerCase()
+            if (ref && !orderIdByRef.has(ref)) {
+                orderIdByRef.set(ref, candidate.orderId)
+            }
+        })
+        return Array.from(liveCircuitOrderRefs.entries())
+            .map(([key, ref]) => ({ scloudxOrderReference: ref, relatedOrderId: orderIdByRef.get(key) || ref }))
+            .sort((a, b) => a.scloudxOrderReference.localeCompare(b.scloudxOrderReference))
+    }, [allRelatedOrders, liveCircuitOrderRefs])
+
+    // What the Autocomplete actually displays as its current value - a
+    // saved relatedOrderId that matches a real order's own orderId
+    // resolves to that order's SCX Order Ref (even if it's no longer in
+    // relatedOrderOptions above, e.g. its circuit isn't Live anymore);
+    // otherwise relatedOrderId is itself the raw SCX Order Ref text that
+    // was saved (an orphan circuit reference - see relatedOrderOptions).
+    const selectedRelatedOrder = React.useMemo(() => {
+        if (!values.relatedOrderId) {
+            return null
+        }
+        const matchingOrder = allRelatedOrders.find((candidate) => candidate.orderId === values.relatedOrderId)
+        return matchingOrder
+            ? { scloudxOrderReference: matchingOrder.scloudxOrderReference, relatedOrderId: matchingOrder.orderId }
+            : { scloudxOrderReference: values.relatedOrderId, relatedOrderId: values.relatedOrderId }
+    }, [allRelatedOrders, values.relatedOrderId])
 
     const handleChange = (name) => (event) => {
         setValues((prev) => ({ ...prev, [name]: event.target.value }))
@@ -242,7 +283,16 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
         notes: values.notes,
     })
 
+    // Existing Order Number is required whenever Order Type isn't New -
+    // Order Type Upgrade/Downgrade/Move/Other can't be saved (plain Save, or
+    // Save and Complete below) without one selected.
+    const relatedOrderMissing = values.orderType !== "New" && !values.relatedOrderId
+
     const handleSave = async () => {
+        if (relatedOrderMissing) {
+            setFeedback({ severity: "error", message: "Existing Order Number is required when Order Type isn't New - select an existing Live-circuit order." })
+            return
+        }
         setSaving(true)
         try {
             await dispatch(updateDeliveryOrder(buildUpdatePayload())).unwrap()
@@ -284,6 +334,10 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
     // every pending edit exactly like Save, but forces Status to "Completed"
     // regardless of the Edit Order tab's current selection.
     const handleSaveAndComplete = async () => {
+        if (relatedOrderMissing) {
+            setFeedback({ severity: "error", message: "Existing Order Number is required when Order Type isn't New - select an existing Live-circuit order." })
+            return
+        }
         if (completeOrderMissingFields.length > 0) {
             setFeedback({ severity: "error", message: `Complete Order Details is missing: ${completeOrderMissingFields.join(", ")}` })
             return
@@ -451,12 +505,26 @@ export default function OrderDetails({ order, readOnly, vendorName }) {
                             // "If Order Type is not New, Show SCX Order
                             // Reference in dropdown, not System Order No" -
                             // displayed/searched by scloudxOrderReference;
-                            // relatedOrderId itself still stores the system
-                            // orderId (see deliveryOrder.model.js).
+                            // relatedOrderId itself stores the picked
+                            // option's own orderId when it has a matching
+                            // Delivery Order (see deliveryOrder.model.js),
+                            // or the raw SCX Order Ref text otherwise (see
+                            // relatedOrderOptions above). "No Free text and
+                            // No circuit ID to be displayed/handled" -
+                            // closed dropdown, object options only, nothing
+                            // typed in is ever committed as a value.
                             getOptionLabel={(option) => _.get(option, "scloudxOrderReference", "")}
-                            value={relatedOrderOptions.find((option) => option.orderId === values.relatedOrderId) || null}
-                            onChange={(event, newValue) => setValues((prev) => ({ ...prev, relatedOrderId: newValue ? newValue.orderId : "" }))}
-                            renderInput={(params) => <TextField {...params} label="Existing Order Number" />}
+                            isOptionEqualToValue={(option, value) => option.relatedOrderId === value.relatedOrderId}
+                            value={selectedRelatedOrder}
+                            onChange={(event, newValue) => setValues((prev) => ({
+                                ...prev,
+                                relatedOrderId: newValue ? newValue.relatedOrderId : "",
+                            }))}
+                            // Options render smaller - compactSx above is
+                            // applied to this panel's own DOM, but the
+                            // dropdown list renders in a portal outside it.
+                            ListboxProps={{ sx: { "& .MuiAutocomplete-option": { fontSize: "0.72rem" } } }}
+                            renderInput={(params) => <TextField {...params} required label="Existing Order Number" />}
                         />
                     </Grid>
                 )}
@@ -856,9 +924,13 @@ OrderDetails.propTypes = {
     order: PropTypes.object.isRequired,
     readOnly: PropTypes.bool,
     vendorName: PropTypes.string,
+    // Map of normalized SCX Order Ref -> original-case ref, one entry per
+    // distinct Live circuit - see DeliveryOrders.js.
+    liveCircuitOrderRefs: PropTypes.instanceOf(Map),
 }
 
 OrderDetails.defaultProps = {
     readOnly: false,
     vendorName: "",
+    liveCircuitOrderRefs: new Map(),
 }
