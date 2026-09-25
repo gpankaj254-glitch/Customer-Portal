@@ -307,6 +307,8 @@ const createCircuitFromOrder = async (order, actingUser) => {
  * Customer if given - "We should Create New Customer during delivery
  * process like Site Creation" (see OrderDetails.js's Create Customer
  * action), replacing newCustomerName once a prospect is formalized.
+ * vendorId/orderDate are validated/applied the same way (SCX Admin-only
+ * on the client - see OrderDetails.js).
  * @param {string} deliveryOrderId
  * @param {Object} updateBody
  * @param {Object} user - acting user, for updatedBy
@@ -329,6 +331,23 @@ const updateDeliveryOrderById = async (deliveryOrderId, updateBody, user) => {
     }
     order.customer = extractNameAndCode(customer);
     order.newCustomerName = "";
+  }
+
+  // "Give Permission to SCX Admin to Update/Modify any Field In Delivery
+  // ... irrespective of its status" - Vendor and Order Date weren't
+  // previously editable at all (unlike customerId above, they had no
+  // resolution path here); the client only exposes them to SCX Admin, but
+  // the server validates/accepts them for whoever sends them, same as
+  // every other EDITABLE_FIELDS entry.
+  if (updateBody.vendorId) {
+    const vendor = await getActiveVendorById(updateBody.vendorId);
+    if (!vendor) {
+      throw new ApiError(httpStatus.BAD_REQUEST, "Vendor not found or inactive");
+    }
+    order.vendorId = vendor.id;
+  }
+  if (updateBody.orderDate) {
+    order.orderDate = new Date(updateBody.orderDate);
   }
 
   Object.assign(order, _.pick(updateBody, EDITABLE_FIELDS));

@@ -19,6 +19,7 @@ import {
 } from "./deliveryOrderSlice"
 import { fetchDeletedDeliveryOrders, fetchRestoreDeliveryOrder, fetchPermanentlyDeleteDeliveryOrder } from "./deliveryOrderAPI"
 import { getVendors } from "../vendors/vendorSlice"
+import { getCustomers } from "../customers/customerSlice"
 import { getCircuitsList, selectCircuitsList } from "../inventory/circuitSlice"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
@@ -78,9 +79,14 @@ export default function DeliveryOrders() {
     // The row/details Vendor Name comes from this list too (see
     // DeliveryOrderTable.js's vendorNameById) - fetched here rather than
     // only from the New Order tab, so it's populated even for someone who
-    // lands straight on View Open Order and never opens New Order.
+    // lands straight on View Open Order and never opens New Order. Same
+    // reasoning for Customers - OrderDetails.js's own Vendor/Customer Name
+    // pickers (SCX Admin only - "Give Permission to SCX Admin to
+    // Update/Modify any Field") need both lists loaded before a row is
+    // ever expanded.
     React.useEffect(() => {
         dispatch(getVendors({ limit: 1000, page: 1 }))
+        dispatch(getCustomers({ limit: 1000, page: 1 }))
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 

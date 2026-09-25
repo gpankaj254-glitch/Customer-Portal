@@ -25,9 +25,10 @@ import _ from "lodash"
 import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
 import { updateDeliveryOrder, selectOpenOrderList, selectDeliveredOrderList } from "./deliveryOrderSlice"
-import { createCustomer } from "../customers/customerSlice"
+import { createCustomer, selectCustomerList } from "../customers/customerSlice"
 import { createSite, updateSite } from "../sites/siteSlice"
 import { fetchSitesOfCustomer } from "../inventory/circuitAPI"
+import { selectVendorList } from "../vendors/vendorSlice"
 import { selectUser } from "../auth/authSlice"
 import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
 import { ipRequirementOptions, interfaceOptions } from "../../consts/opportunityCommOptions"
@@ -48,6 +49,12 @@ function customerName(order) {
 function buildInitialValues(order) {
     const milestoneByName = new Map((order.milestones || []).map((milestone) => [milestone.name, milestone]))
     return {
+        // SCX Admin-only editable ("I cannot change fields like Customer
+        // Name, Vendor Name, Order Date") - everyone else still sees these
+        // three as the fixed read-only display they always were.
+        customerId: _.get(order, "customer.id", ""),
+        vendorId: _.get(order, "vendorId", ""),
+        orderDate: toDateInputValue(_.get(order, "orderDate")),
         serialNumber: _.get(order, "serialNumber", ""),
         scloudxOrderReference: _.get(order, "scloudxOrderReference", ""),
         orderType: _.get(order, "orderType", "New"),
@@ -152,6 +159,19 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
     // DeliveryOrderTable.js - but isn't meant to bypass the milestone
     // sequencing gate below).
     const isScxAdmin = currentUser.role === roles.SCLOUDX_ADMIN
+    // Only needed for the SCX Admin-only Customer Name/Vendor pickers below -
+    // both lists are already fetched by the parent DeliveryOrders.js on
+    // mount, same as vendorName's own vendorNameById lookup.
+    const customerList = useSelector(selectCustomerList)
+    const vendorList = useSelector(selectVendorList)
+    const customerOptions = React.useMemo(
+        () => customerList.slice().sort((a, b) => a.name.localeCompare(b.name)),
+        [customerList]
+    )
+    const vendorOptions = React.useMemo(
+        () => vendorList.slice().sort((a, b) => a.name.localeCompare(b.name)),
+        [vendorList]
+    )
     const openOrderList = useSelector(selectOpenOrderList)
     const deliveredOrderList = useSelector(selectDeliveredOrderList)
     const [values, setValues] = React.useState(() => buildInitialValues(order))
@@ -256,6 +276,12 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
     // selected on the Edit Order tab.
     const buildUpdatePayload = (statusOverride) => ({
         deliveryOrderId: order.id,
+        // Sent unconditionally (not just for SCX Admin) - harmless for
+        // everyone else since the picker/field stays disabled and its
+        // value is never changed from what buildInitialValues loaded.
+        customerId: values.customerId,
+        vendorId: values.vendorId,
+        orderDate: values.orderDate,
         serialNumber: values.serialNumber,
         scloudxOrderReference: values.scloudxOrderReference,
         orderType: values.orderType,
@@ -297,10 +323,20 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
     // Order Type Upgrade/Downgrade/Move/Other can't be saved (plain Save, or
     // Save and Complete below) without one selected.
     const relatedOrderMissing = values.orderType !== "New" && !values.relatedOrderId
+    // Vendor/Order Date are required at the model level (always populated
+    // for every role except SCX Admin, who can now blank either via the
+    // Order Info tab's picker/date field) - blocked on plain Save too, not
+    // just Save and Complete, since it's a save-time model requirement, not
+    // a Complete-specific one.
+    const vendorOrOrderDateMissing = !values.vendorId || !values.orderDate
 
     const handleSave = async () => {
         if (relatedOrderMissing) {
             setFeedback({ severity: "error", message: "Existing Order Number is required when Order Type isn't New - select an existing Live-circuit order." })
+            return
+        }
+        if (vendorOrOrderDateMissing) {
+            setFeedback({ severity: "error", message: "Vendor and Order Date are required." })
             return
         }
         setSaving(true)
@@ -317,12 +353,14 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
     // "Save and Complete button should only work when all fields are
     // filled. All Fields Mandatory" - scoped to the Complete Order Details
     // tab itself (Order Info/Edit Order/Milestones are assumed already done
-    // by the time an order reaches this tab); Notes stays optional, and
-    // Order Date/Vendor Name are always-populated read-only fields, so
-    // neither needs checking. Site is only required when this order is
-    // actually linked to an existing Customer - otherwise the Site
-    // block's own UI already blocks selecting/creating one, so requiring
-    // it here would make such orders impossible to ever complete.
+    // by the time an order reaches this tab); Notes stays optional. Order
+    // Date/Vendor are always-populated for everyone except SCX Admin (see
+    // the Order Info tab), who could otherwise blank either via the new
+    // picker/date field - checked here too so that stays impossible. Site
+    // is only required when this order is actually linked to an existing
+    // Customer - otherwise the Site block's own UI already blocks
+    // selecting/creating one, so requiring it here would make such orders
+    // impossible to ever complete.
     // A real, registered Customer is required (not just a prospect's
     // newCustomerName) - Circuit auto-creation on completion needs one (see
     // deliveryOrder.service.js's createCircuitFromOrder). "Create Customer"
@@ -330,6 +368,8 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
     // resolves the Site requirement.
     const completeOrderMissingFields = []
     if (!linkedCustomerId) completeOrderMissingFields.push("Customer (create/link a registered Customer on the Order Info tab)")
+    if (!values.vendorId) completeOrderMissingFields.push("Vendor")
+    if (!values.orderDate) completeOrderMissingFields.push("Order Date")
     if (!values.deliveryDate) completeOrderMissingFields.push("Delivery Date")
     if (!values.customerBillStartDate) completeOrderMissingFields.push("Customer Bill Start Date")
     if (!values.vendorCircuitId) completeOrderMissingFields.push("Vendor Circuit ID")
@@ -439,7 +479,9 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
     }
 
     const fieldProps = { fullWidth: true, size: "small", disabled: readOnly }
-    const derivedDays = computeDerivedDays(order.orderDate, values.deliveryDate, values.customerDelayDays)
+    // Uses values.orderDate (not order.orderDate) so an SCX Admin's
+    // unsaved Order Date edit is reflected here immediately too.
+    const derivedDays = computeDerivedDays(values.orderDate, values.deliveryDate, values.customerDelayDays)
     // "Completed" isn't offered as a fresh dropdown choice (see
     // consts/deliveryOrderOptions.js), but an order already Completed (via
     // Save and Complete) still needs its current value to display here
@@ -477,7 +519,23 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
                     <TextField {...fieldProps} label="Serial Number" value={values.serialNumber} onChange={handleChange("serialNumber")} />
                 </Grid>
                 <Grid item xs={12} sm={!linkedCustomerId && !readOnly ? 3 : 4}>
-                    <TextField {...fieldProps} label="Customer Name" value={customerName(order)} disabled />
+                    {/* "I cannot change fields like Customer Name ... " -
+                        SCX Admin gets a real picker (any existing Customer,
+                        same options/convention as Create Delivery Order's
+                        own Customer Name field); everyone else keeps the
+                        fixed read-only display this always was. */}
+                    {isScxAdmin && !readOnly ? (
+                        <Autocomplete
+                            size="small"
+                            options={customerOptions}
+                            getOptionLabel={(option) => _.get(option, "name", "")}
+                            value={customerOptions.find((option) => option.id === values.customerId) || null}
+                            onChange={(event, newValue) => setValues((prev) => ({ ...prev, customerId: newValue ? newValue.id : "" }))}
+                            renderInput={(params) => <TextField {...params} label="Customer Name" placeholder="Search existing customers" />}
+                        />
+                    ) : (
+                        <TextField {...fieldProps} label="Customer Name" value={customerName(order)} disabled />
+                    )}
                 </Grid>
                 {/* "We should Create New Customer during delivery process like
                     Site Creation" - only while this order is still a prospect
@@ -490,10 +548,29 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
                     </Grid>
                 )}
                 <Grid item xs={12} sm={4}>
-                    <TextField {...fieldProps} label="Vendor" value={vendorName} disabled />
+                    {isScxAdmin && !readOnly ? (
+                        <Autocomplete
+                            size="small"
+                            options={vendorOptions}
+                            getOptionLabel={(option) => _.get(option, "name", "")}
+                            value={vendorOptions.find((option) => option.id === values.vendorId) || null}
+                            onChange={(event, newValue) => setValues((prev) => ({ ...prev, vendorId: newValue ? newValue.id : "" }))}
+                            renderInput={(params) => <TextField {...params} required label="Vendor" placeholder="Search vendors" />}
+                        />
+                    ) : (
+                        <TextField {...fieldProps} label="Vendor" value={vendorName} disabled />
+                    )}
                 </Grid>
                 <Grid item xs={12} sm={4}>
-                    <TextField {...fieldProps} label="Order Date" value={toDateInputValue(order.orderDate)} type="date" InputLabelProps={{ shrink: true }} disabled />
+                    <TextField
+                        {...fieldProps}
+                        label="Order Date"
+                        value={values.orderDate}
+                        type="date"
+                        InputLabelProps={{ shrink: true }}
+                        disabled={readOnly || !isScxAdmin}
+                        onChange={handleChange("orderDate")}
+                    />
                 </Grid>
                 <Grid item xs={12} sm={4}>
                     <TextField {...fieldProps} label="SCloudX Order Ref" value={values.scloudxOrderReference} onChange={handleChange("scloudxOrderReference")} />

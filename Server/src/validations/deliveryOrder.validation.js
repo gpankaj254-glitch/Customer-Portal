@@ -78,6 +78,11 @@ const updateDeliveryOrder = {
       // Creation" - resolves a real Customer and replaces newCustomerName
       // once a prospect is formalized (see updateDeliveryOrderById).
       customerId: Joi.string(),
+      // "Give Permission to SCX Admin to Update/Modify any Field In
+      // Delivery ... irrespective of its status" - Vendor and Order Date,
+      // SCX Admin-only on the client (see OrderDetails.js).
+      vendorId: Joi.string(),
+      orderDate: Joi.string().isoDate(),
       serialNumber: Joi.string().allow(""),
       scloudxOrderReference: Joi.string(),
       orderType: Joi.string().valid("", ...orderTypeOptions),
