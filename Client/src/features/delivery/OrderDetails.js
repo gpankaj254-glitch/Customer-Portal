@@ -28,11 +28,13 @@ import { updateDeliveryOrder, selectOpenOrderList, selectDeliveredOrderList } fr
 import { createCustomer } from "../customers/customerSlice"
 import { createSite, updateSite } from "../sites/siteSlice"
 import { fetchSitesOfCustomer } from "../inventory/circuitAPI"
+import { selectUser } from "../auth/authSlice"
 import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
 import { ipRequirementOptions, interfaceOptions } from "../../consts/opportunityCommOptions"
 import { countryOptions } from "../../consts/countryOptions"
 import { orderStatusOptions, milestoneStatusOptions, milestoneNames, siteTypeOptions, orderTypeOptions } from "../../consts/deliveryOrderOptions"
 import { combineAddress } from "../../utils/address"
+import { roles } from "../../consts"
 import ConfirmDialog from "../../components/ConfirmDialog"
 
 function toDateInputValue(value) {
@@ -142,6 +144,14 @@ function SectionHeading({ children }) {
 // disabled and hides Save/Create Site, for SCX Management's view-only access.
 export default function OrderDetails({ order, readOnly, vendorName, liveCircuitOrderRefs }) {
     const dispatch = useDispatch()
+    const currentUser = useSelector(selectUser)
+    // "Give Permission to SCX Admin to Update/Modify any Field In Delivery
+    // And NOC Management irrespective of its status" - specifically SCX
+    // Admin, not just anyone with canEdit (SCX Service Delivery also gets
+    // readOnly=false on Open Orders - see DeliveryOrders.js/
+    // DeliveryOrderTable.js - but isn't meant to bypass the milestone
+    // sequencing gate below).
+    const isScxAdmin = currentUser.role === roles.SCLOUDX_ADMIN
     const openOrderList = useSelector(selectOpenOrderList)
     const deliveredOrderList = useSelector(selectDeliveredOrderList)
     const [values, setValues] = React.useState(() => buildInitialValues(order))
@@ -646,9 +656,11 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
                                     // only one always available. "Not Required" counts as
                                     // done here too - a skipped milestone must still let
                                     // the next one unlock, or picking it would permanently
-                                    // block the rest of the checklist.
+                                    // block the rest of the checklist. SCX Admin bypasses
+                                    // this sequencing gate entirely ("any Field ...
+                                    // irrespective of its status").
                                     const previousDone = index === 0 || ["Completed", "Not Required"].includes(values.milestones[index - 1].status)
-                                    const milestoneDisabled = readOnly || !previousDone
+                                    const milestoneDisabled = readOnly || (!previousDone && !isScxAdmin)
                                     return (
                                         <TableRow key={milestone.name}>
                                             <TableCell sx={milestone.name === "Handover" ? { fontWeight: 700, fontStyle: "italic" } : undefined}>

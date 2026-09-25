@@ -159,9 +159,11 @@ export default function TicketDetails({ ticket, mode }) {
     const mainFieldsLocked = mode !== "open" && currentUser.role !== roles.SCLOUDX_ADMIN
     // Adding a new comment/attachment is a separate server-side capability
     // (appendTicketDescription/appendVendorDescription/addTicketAttachments)
-    // that stays closed-ticket-blocked for every role including SCX Admin -
-    // unlike mainFieldsLocked above, this has no Admin exception.
-    const commentsLocked = mode !== "open"
+    // that stays closed-ticket-blocked for every other role - "Give
+    // Permission to SCX Admin to Update/Modify any Field In Delivery And
+    // NOC Management irrespective of its status" gives SCX Admin the same
+    // exception as mainFieldsLocked above.
+    const commentsLocked = mode !== "open" && currentUser.role !== roles.SCLOUDX_ADMIN
     // Ticket Closure details tab - already editable for everyone while
     // Closed; Completed freezes it too, except for SCX Admin, same
     // exception as mainFieldsLocked above.

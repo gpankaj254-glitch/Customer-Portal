@@ -400,7 +400,11 @@ const appendTicketDescription = async (ticketBody, user) => {
   const { ticketId, descriptionAppend } = ticketBody;
   const ticket = await getAuthorizedTicket(ticketId, user);
 
-  if (ticket.closed) {
+  // "Give Permission to SCX Admin to Update/Modify any Field In Delivery
+  // And NOC Management irrespective of its status" - SCX Admin can still
+  // comment on a Closed/Completed ticket, same exception updateTicket
+  // already makes for the rest of the ticket.
+  if (ticket.closed && user.role !== roleTypes.scloudxAdmin) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Cannot add comments to a closed ticket");
   }
 
@@ -426,7 +430,8 @@ const appendVendorDescription = async (ticketBody, user) => {
   const { ticketId, descriptionAppend } = ticketBody;
   const ticket = await getAuthorizedTicket(ticketId, user);
 
-  if (ticket.closed) {
+  // Same SCX Admin exception as appendTicketDescription above.
+  if (ticket.closed && user.role !== roleTypes.scloudxAdmin) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Cannot add comments to a closed ticket");
   }
 
@@ -452,7 +457,8 @@ const appendVendorDescription = async (ticketBody, user) => {
 const addTicketAttachments = async (ticketId, files, user) => {
   const ticket = await getAuthorizedTicket(ticketId, user);
 
-  if (ticket.closed) {
+  // Same SCX Admin exception as appendTicketDescription above.
+  if (ticket.closed && user.role !== roleTypes.scloudxAdmin) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Cannot add attachments to a closed ticket");
   }
 
@@ -489,7 +495,8 @@ const addTicketAttachments = async (ticketId, files, user) => {
 const addVendorAttachments = async (ticketId, files, user) => {
   const ticket = await getAuthorizedTicket(ticketId, user);
 
-  if (ticket.closed) {
+  // Same SCX Admin exception as appendTicketDescription above.
+  if (ticket.closed && user.role !== roleTypes.scloudxAdmin) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Cannot add attachments to a closed ticket");
   }
 
