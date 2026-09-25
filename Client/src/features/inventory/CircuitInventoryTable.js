@@ -34,7 +34,7 @@ import {
 } from "./circuitSlice"
 import { getVendors, selectVendorList } from "../vendors/vendorSlice"
 import { pageStatusVals } from "./utils"
-import { combineAddress } from "../../utils/address"
+import { formatTownCountry } from "../../utils/address"
 import { getFormattedStoredDate, getFormattedDateTime } from "../../utils/dates"
 import { downloadCsv } from "../../utils/csv"
 import { getCircuitStatusDate, getCircuitChangeTypeDisplay, circuitCsvColumns } from "../../utils/circuitDisplay"
@@ -61,9 +61,7 @@ function matchesMultiTermSearch(row, rawSearch) {
         row.bandwidth,
         row.vendorName,
         row.siteName,
-        row.address,
-        _.get(row, "location.country", ""),
-        _.get(row, "location.town", ""),
+        row.townCountry,
         row.status,
         row.changeTypeDisplay,
         row.statusDateDisplay,
@@ -153,7 +151,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
         bandwidth: circuit.bandwidth || "",
         vendorName: vendorNameById.get(circuit.vendorId) || "",
         siteName: _.get(circuit, "site.name", ""),
-        address: combineAddress(circuit.location || {}),
+        townCountry: formatTownCountry(circuit.location || {}),
         location: circuit.location,
         status: circuit.status || "Live",
         changeType: circuit.changeType || "",
@@ -171,8 +169,11 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
     // "Download Circuit Inventory Option - CSV in all Tabs" - exports
     // exactly what's currently on screen (search applied), same columns as
     // the table below (changeType/statusDate map to this row shape's own
-    // changeTypeDisplay/statusDateDisplay field names).
-    const csvFieldByColumnId = { changeType: "changeTypeDisplay", statusDate: "statusDateDisplay" }
+    // changeTypeDisplay/statusDateDisplay field names; address - still
+    // labelled "Address" here since circuitCsvColumns is shared with Site
+    // Inventory's own full-address CSV - now pulls from this row's
+    // townCountry, matching "Remove Address, Just add Town/City+Country").
+    const csvFieldByColumnId = { changeType: "changeTypeDisplay", statusDate: "statusDateDisplay", address: "townCountry" }
     const handleDownloadCsv = () => {
         const csvColumns = circuitCsvColumns(showChangeType)
         const headers = csvColumns.map((column) => column.label)
@@ -276,7 +277,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                             <TableCell><Typography variant="subtitle2">Product</Typography></TableCell>
                             <TableCell><Typography variant="subtitle2">Bandwidth</Typography></TableCell>
                             <TableCell><Typography variant="subtitle2">Vendor Name</Typography></TableCell>
-                            <TableCell><Typography variant="subtitle2">Address</Typography></TableCell>
+                            <TableCell><Typography variant="subtitle2">Town/City + Country</Typography></TableCell>
                             <TableCell><Typography variant="subtitle2">Circuit Status</Typography></TableCell>
                             {showChangeType && (
                                 <TableCell><Typography variant="subtitle2">Change Type</Typography></TableCell>
@@ -308,7 +309,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                                 <TableCell>{row.product}</TableCell>
                                 <TableCell>{row.bandwidth}</TableCell>
                                 <TableCell>{row.vendorName}</TableCell>
-                                <TableCell sx={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>{row.address}</TableCell>
+                                <TableCell sx={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>{row.townCountry}</TableCell>
                                 <TableCell>{row.status}</TableCell>
                                 {showChangeType && (
                                     <TableCell sx={{ wordBreak: "break-word" }}>

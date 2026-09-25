@@ -15,3 +15,10 @@ export function combineAddress (location) {
     })
     return parts.filter(Boolean).join(", ")
 }
+
+// "In Circuit Inventory - Live and Ceased, Remove Address, Just add
+// Town/City+Country" - the short form, just those two parts (not the full
+// street address/postal code combineAddress above builds).
+export function formatTownCountry (location) {
+    return [_.get(location, "town", ""), _.get(location, "country", "")].filter(Boolean).join(", ")
+}
