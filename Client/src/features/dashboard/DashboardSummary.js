@@ -63,19 +63,24 @@ export default function DashboardSummary() {
 
     return (
         <Grid container spacing={1.5}>
-            <Grid item xs={6} sm={3}>
+            {/* Own row (xs=6 each sum to 12) so the bar charts below always
+                start a fresh row rather than sharing this one. */}
+            <Grid item xs={6}>
                 <StatTile compact title="Total Customers" value={_.get(summary, "activeCustomers", 0)} />
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={6}>
                 <StatTile compact title="Total Live Circuits" value={_.get(summary, "activeCircuits", 0)} />
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            {/* "Align all Bar Charts in one row" - xs=4 each (summing to 12)
+                guarantees all three stay on one row from the sm breakpoint
+                up, rather than wrapping under the two stat tiles above. */}
+            <Grid item xs={12} sm={4}>
                 <CountChart compact title="Sales - Open Opportunities" data={salesChartData} />
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid item xs={12} sm={4}>
                 <CountChart compact title="Delivery - Open Orders" data={deliveryChartData} />
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid item xs={12} sm={4}>
                 <CountChart compact title="NOC - Open Tickets" data={nocChartData} />
             </Grid>
         </Grid>

@@ -354,39 +354,51 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                                     </TableCell>
                                 )}
                                 <TableCell>{row.statusDateDisplay}</TableCell>
-                                <TableCell align="right">
+                                <TableCell align="right" sx={{ whiteSpace: "nowrap", p: "0 4px" }}>
+                                    {/* "SCX Admin Live Circuit Inventory reduce
+                                        inter row width, realign Action
+                                        placeholders" - size="small" (matches
+                                        DeliveryOrderTable.js's own compact
+                                        action icons) instead of the default
+                                        40px hit area, which was forcing every
+                                        row taller/wider than the rest of this
+                                        already-compact table. */}
                                     {isAdmin && (
                                         <IconButton
+                                            size="small"
                                             aria-label={`edit ${row.vendorCircuitId || row.code}`}
                                             onClick={() => setCircuitToEdit(row)}
                                         >
-                                            <EditIcon />
+                                            <EditIcon fontSize="small" />
                                         </IconButton>
                                     )}
                                     {canEditStatusForRow(row) && (
                                         <IconButton
+                                            size="small"
                                             aria-label={`edit status ${row.vendorCircuitId || row.code}`}
                                             title="Change Circuit Status"
                                             onClick={() => setCircuitToEditStatus(row)}
                                         >
-                                            <SwapHorizIcon />
+                                            <SwapHorizIcon fontSize="small" />
                                         </IconButton>
                                     )}
                                     {canMove && (
                                         <IconButton
+                                            size="small"
                                             aria-label={`move ${row.vendorCircuitId || row.code}`}
                                             title="Move to another site"
                                             onClick={() => setCircuitToMove(row)}
                                         >
-                                            <DriveFileMoveIcon />
+                                            <DriveFileMoveIcon fontSize="small" />
                                         </IconButton>
                                     )}
                                     {isAdmin && (
                                         <IconButton
+                                            size="small"
                                             aria-label={`delete ${row.vendorCircuitId || row.code}`}
                                             onClick={() => setCircuitToDelete(row)}
                                         >
-                                            <DeleteIcon />
+                                            <DeleteIcon fontSize="small" />
                                         </IconButton>
                                     )}
                                 </TableCell>

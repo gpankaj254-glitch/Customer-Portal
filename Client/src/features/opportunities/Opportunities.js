@@ -7,6 +7,7 @@ import Tabs from "@mui/material/Tabs"
 import Tab from "@mui/material/Tab"
 import TextField from "@mui/material/TextField"
 import Button from "@mui/material/Button"
+import Typography from "@mui/material/Typography"
 import DownloadIcon from "@mui/icons-material/Download"
 import _ from "lodash"
 import moment from "moment"
@@ -276,6 +277,10 @@ function OpportunitiesContent() {
             label: "Opportunity List",
             content: (
                 <>
+                    {/* "All Logins - ... Opportunity List, Display count at top" */}
+                    <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                        Total Opportunities: {pagination.totalResults}
+                    </Typography>
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
                         <TextField
                             fullWidth

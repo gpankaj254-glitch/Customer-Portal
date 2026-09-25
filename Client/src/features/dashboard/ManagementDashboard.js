@@ -65,7 +65,7 @@ export default function ManagementDashboard() {
                 {activeTab === 2 && <FinanceDashboard />}
                 {activeTab === 3 && (
                     <Grid container spacing={1.5}>
-                        <DeliveryOrderCharts orders={openOrderList} />
+                        <DeliveryOrderCharts orders={openOrderList} hideStatusWise />
                         <Grid item xs={12}>
                             <Typography component="h2" variant="h5" sx={{ fontSize: "0.85rem", fontWeight: 600 }}>View Open Orders</Typography>
                         </Grid>

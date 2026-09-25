@@ -5,6 +5,7 @@ import Paper from "@mui/material/Paper"
 import Tabs from "@mui/material/Tabs"
 import Tab from "@mui/material/Tab"
 import TextField from "@mui/material/TextField"
+import Typography from "@mui/material/Typography"
 
 import VendorTable from "./VendorTable"
 import {
@@ -86,6 +87,10 @@ function VendorsContent() {
             label: "Vendor List",
             content: (
                 <>
+                    {/* "All Logins - Vendor List ... Display count at top" */}
+                    <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                        Total Vendors: {pagination.totalResults}
+                    </Typography>
                     <TextField
                         fullWidth
                         label="Search vendors"

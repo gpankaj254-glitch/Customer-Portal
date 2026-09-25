@@ -30,7 +30,11 @@ export function groupCounts(orders, getLabel) {
 // wise reuse DeliveryOrderTable.js's own customerName/currentMilestoneStatus
 // helpers rather than re-deriving them, so a Milestone Status shown here
 // always matches what the table below it shows for the same order.
-export default function DeliveryOrderCharts({ orders }) {
+// hideStatusWise: "SCX Admin/Management Dashboard Delivery, remove Open
+// Order Status wise" - scoped to ManagementDashboard.js's own Delivery tab
+// only; Dashboard.js's Delivery role branch and ScxDashboard.js's Delivery
+// tab keep all five charts (default false).
+export default function DeliveryOrderCharts({ orders, hideStatusWise }) {
     const vendorList = useSelector(selectVendorList)
     const vendorNameById = React.useMemo(
         () => new Map(vendorList.map((vendor) => [vendor.id, vendor.name])),
@@ -57,9 +61,11 @@ export default function DeliveryOrderCharts({ orders }) {
             <Grid item xs={12} sm={6}>
                 <CountChart compact title="Open Orders - Vendor wise" data={vendorWise} />
             </Grid>
-            <Grid item xs={12} sm={6}>
-                <CountChart compact title="Open Orders - Status wise" data={statusWise} />
-            </Grid>
+            {!hideStatusWise && (
+                <Grid item xs={12} sm={6}>
+                    <CountChart compact title="Open Orders - Status wise" data={statusWise} />
+                </Grid>
+            )}
             <Grid item xs={12} sm={6}>
                 <CountChart compact title="Open Orders - Milestone wise" data={milestoneWise} />
             </Grid>
@@ -69,4 +75,9 @@ export default function DeliveryOrderCharts({ orders }) {
 
 DeliveryOrderCharts.propTypes = {
     orders: PropTypes.array.isRequired,
+    hideStatusWise: PropTypes.bool,
+}
+
+DeliveryOrderCharts.defaultProps = {
+    hideStatusWise: false,
 }

@@ -308,6 +308,14 @@ export default function TicketsTable(props) {
         const ticketList = mode === "closed" ? closedTicketList : mode === "completed" ? completedTicketList : opneTicketList
         return (
             <Paper sx={{ width: "100%", overflow: "hidden", p: 2 }}>
+                {/* "All Logins - ... View Open tickets, View Closed Tickets,
+                    Completed Tickets ... Display count at top" - mode-scoped
+                    (each tab mounts its own TicketsTable and dispatches only
+                    its own fetch - see the effect above - so pagination's
+                    totalResults is never shared/stale across tabs here). */}
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                    Total Tickets: {pagination.totalResults}
+                </Typography>
                 <TextField
                     fullWidth
                     placeholder="Search by Ticket ID, Customer Reference, Problem Type, Status or Circuit Name"
