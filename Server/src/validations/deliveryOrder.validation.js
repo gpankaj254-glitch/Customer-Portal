@@ -130,10 +130,21 @@ const deleteDeliveryOrder = {
   }),
 };
 
+// "Pop and show changes being made, take user's Ok to proceed" - confirms a
+// pending Duplicate Circuit ID resolution (see
+// deliveryOrder.service.js's resolveCircuitDuplicate); no body, just the
+// order to act on.
+const resolveCircuitDuplicate = {
+  params: Joi.object().keys({
+    deliveryOrderId: Joi.string().custom(objectId),
+  }),
+};
+
 module.exports = {
   createDeliveryOrder,
   getDeliveryOrders,
   getDeliveryOrder,
   updateDeliveryOrder,
   deleteDeliveryOrder,
+  resolveCircuitDuplicate,
 };

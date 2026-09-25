@@ -12,18 +12,36 @@ import Typography from "@mui/material/Typography"
 import Link from "@mui/material/Link"
 import Alert from "@mui/material/Alert"
 import Button from "@mui/material/Button"
+import IconButton from "@mui/material/IconButton"
+import DeleteIcon from "@mui/icons-material/Delete"
+import EditIcon from "@mui/icons-material/Edit"
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz"
+import DriveFileMoveIcon from "@mui/icons-material/DriveFileMove"
 import DownloadIcon from "@mui/icons-material/Download"
+import Snackbar from "@mui/material/Snackbar"
 import PropTypes from "prop-types"
 import _ from "lodash"
 import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
-import { getCircuitsList, selectCircuitsList, selectCircuitsListStatus, selectCircuitsListError } from "./circuitSlice"
+import {
+    getCircuitsList,
+    selectCircuitsList,
+    selectCircuitsListStatus,
+    selectCircuitsListError,
+    updateCircuit,
+    updateCircuitStatus,
+    deactivateCircuit,
+} from "./circuitSlice"
 import { getVendors, selectVendorList } from "../vendors/vendorSlice"
 import { pageStatusVals } from "./utils"
 import { combineAddress } from "../../utils/address"
-import { getFormattedStoredDate } from "../../utils/dates"
+import { getFormattedStoredDate, getFormattedDateTime } from "../../utils/dates"
 import { downloadCsv } from "../../utils/csv"
 import { getCircuitStatusDate, getCircuitChangeTypeDisplay, circuitCsvColumns } from "../../utils/circuitDisplay"
+import ConfirmDialog from "../../components/ConfirmDialog"
+import EditDialog from "../../components/EditDialog"
+import MoveCircuitDialog from "./MoveCircuitDialog"
+import { useCircuitRowPermissions, buildEditableFields, buildStatusEditableFields, STATUS_FIELD_NAMES } from "./circuitActions"
 
 // "if I put 100 Mbps+USA+Verizon) it should filter all circuits with 100
 // Mbps BW in USA country and Verizon Vendor" - each "+"-separated term must
@@ -66,13 +84,32 @@ function matchesMultiTermSearch(row, rawSearch) {
 // Number is itself an SCX Order Ref Number on the new circuit it refers to,
 // so the existing search already finds it via scloudxOrderReference), the
 // Ceased tab takes onOpenChangeOrder (called with that value on click).
+//
+// "All Actions Available in Live Site Inventory - Circuits should also be
+// available to Live Circuit Inventory according to that User Access List" /
+// "All Actions Available in Changed & Ceased Site Inventory - Circuits
+// should also be available to Ceased Circuit Inventory according to that
+// User Access List" - Edit/Edit Status/Move/Delete, same icons, same
+// dialogs, same role gating as CircuitTable.js (Site Inventory's own
+// per-site circuit table) - see circuitActions.js, shared by both so they
+// can never drift apart.
 export default function CircuitInventoryTable({ statuses, showChangeType, initialSearch, onOpenChangeOrder, canDownloadCsv }) {
     const dispatch = useDispatch()
     const circuits = useSelector(selectCircuitsList)
     const status = useSelector(selectCircuitsListStatus)
     const error = useSelector(selectCircuitsListError)
     const vendorList = useSelector(selectVendorList)
+    const { isAdmin, canMove, canEditStatusForRow } = useCircuitRowPermissions()
     const [searchInput, setSearchInput] = React.useState(initialSearch)
+
+    const [circuitToDelete, setCircuitToDelete] = React.useState(null)
+    const [deleting, setDeleting] = React.useState(false)
+    const [circuitToEdit, setCircuitToEdit] = React.useState(null)
+    const [circuitToEditStatus, setCircuitToEditStatus] = React.useState(null)
+    const [circuitToMove, setCircuitToMove] = React.useState(null)
+    const [saving, setSaving] = React.useState(false)
+    const [savingStatus, setSavingStatus] = React.useState(false)
+    const [feedback, setFeedback] = React.useState(null)
 
     React.useEffect(() => {
         dispatch(getVendors({ limit: 1000, page: 1 }))
@@ -80,8 +117,9 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
     }, [])
 
     const statusKey = statuses.join(",")
+    const refreshCircuits = () => dispatch(getCircuitsList({ statuses }))
     React.useEffect(() => {
-        dispatch(getCircuitsList({ statuses }))
+        refreshCircuits()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [statusKey])
 
@@ -102,8 +140,12 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
         [vendorList]
     )
 
+    // Spreads every raw circuit field first (id, site, customer, vendorId,
+    // code, vendorCircuitId, customerCircuitId, ... - everything the Actions
+    // below need, same shape CircuitTable.js's own rows carry) and layers
+    // the display-only fields on top - no name collisions between the two.
     const rows = React.useMemo(() => circuits.map((circuit) => ({
-        id: circuit.id,
+        ...circuit,
         customerName: _.get(circuit, "customer.name", ""),
         scloudxOrderReference: circuit.scloudxOrderReference || "",
         customerOrderReference: circuit.customerOrderReference || "",
@@ -138,11 +180,60 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
         downloadCsv(`circuit-inventory-${moment().format("YYYY-MM-DD")}.csv`, headers, csvRows)
     }
 
+    const handleConfirmDelete = async () => {
+        setDeleting(true)
+        try {
+            await dispatch(deactivateCircuit(circuitToDelete.id)).unwrap()
+            setFeedback({ severity: "success", message: `Circuit "${circuitToDelete.vendorCircuitId || circuitToDelete.code}" deleted successfully` })
+            refreshCircuits()
+        } catch (err) {
+            setFeedback({ severity: "error", message: err || "Failed to delete circuit" })
+        } finally {
+            setDeleting(false)
+            setCircuitToDelete(null)
+        }
+    }
+
+    // Called when the "Circuit moved" confirmation in the dialog is closed -
+    // the dialog itself shows the success message, so just refresh the list.
+    const handleMoved = () => {
+        setCircuitToMove(null)
+        refreshCircuits()
+    }
+
+    const handleSaveEdit = async (values) => {
+        setSaving(true)
+        try {
+            await dispatch(updateCircuit({ circuitId: circuitToEdit.id, ...values })).unwrap()
+            setFeedback({ severity: "success", message: "Circuit updated successfully" })
+            setCircuitToEdit(null)
+            refreshCircuits()
+        } catch (err) {
+            setFeedback({ severity: "error", message: err || "Failed to update circuit" })
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleSaveStatusEdit = async (values) => {
+        setSavingStatus(true)
+        try {
+            await dispatch(updateCircuitStatus({ circuitId: circuitToEditStatus.id, ..._.pick(values, STATUS_FIELD_NAMES) })).unwrap()
+            setFeedback({ severity: "success", message: "Circuit status updated successfully" })
+            setCircuitToEditStatus(null)
+            refreshCircuits()
+        } catch (err) {
+            setFeedback({ severity: "error", message: err || "Failed to update circuit status" })
+        } finally {
+            setSavingStatus(false)
+        }
+    }
+
     if (error) {
         return <Alert severity="error">{error}</Alert>
     }
 
-    const columnCount = showChangeType ? 10 : 9
+    const columnCount = showChangeType ? 11 : 10
 
     return (
         <Paper sx={{ width: "100%", overflow: "hidden", p: 2 }}>
@@ -191,6 +282,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                                 <TableCell><Typography variant="subtitle2">Change Type</Typography></TableCell>
                             )}
                             <TableCell><Typography variant="subtitle2">Circuit Status Date</Typography></TableCell>
+                            <TableCell align="right"><Typography variant="subtitle2">Actions</Typography></TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -256,11 +348,100 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                                     </TableCell>
                                 )}
                                 <TableCell>{row.statusDateDisplay}</TableCell>
+                                <TableCell align="right">
+                                    {isAdmin && (
+                                        <IconButton
+                                            aria-label={`edit ${row.vendorCircuitId || row.code}`}
+                                            onClick={() => setCircuitToEdit(row)}
+                                        >
+                                            <EditIcon />
+                                        </IconButton>
+                                    )}
+                                    {canEditStatusForRow(row) && (
+                                        <IconButton
+                                            aria-label={`edit status ${row.vendorCircuitId || row.code}`}
+                                            title="Change Circuit Status"
+                                            onClick={() => setCircuitToEditStatus(row)}
+                                        >
+                                            <SwapHorizIcon />
+                                        </IconButton>
+                                    )}
+                                    {canMove && (
+                                        <IconButton
+                                            aria-label={`move ${row.vendorCircuitId || row.code}`}
+                                            title="Move to another site"
+                                            onClick={() => setCircuitToMove(row)}
+                                        >
+                                            <DriveFileMoveIcon />
+                                        </IconButton>
+                                    )}
+                                    {isAdmin && (
+                                        <IconButton
+                                            aria-label={`delete ${row.vendorCircuitId || row.code}`}
+                                            onClick={() => setCircuitToDelete(row)}
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    )}
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
             </TableContainer>
+
+            <ConfirmDialog
+                open={!!circuitToDelete}
+                title="Delete circuit"
+                message={`Are you sure you want to delete circuit "${circuitToDelete && (circuitToDelete.vendorCircuitId || circuitToDelete.code)}"? This cannot be undone.`}
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setCircuitToDelete(null)}
+                loading={deleting}
+            />
+            <EditDialog
+                open={!!circuitToEdit}
+                title="Edit circuit"
+                fields={buildEditableFields(circuitToEdit)}
+                initialValues={circuitToEdit ? _.pick(circuitToEdit, buildEditableFields(circuitToEdit).map((field) => field.name)) : {}}
+                lastEditedNote={
+                    circuitToEdit && circuitToEdit.updatedBy && circuitToEdit.updatedBy.name
+                        ? `Last edited by ${circuitToEdit.updatedBy.name} on ${getFormattedDateTime(circuitToEdit.updatedAt)}`
+                        : null
+                }
+                onSave={handleSaveEdit}
+                onCancel={() => setCircuitToEdit(null)}
+                loading={saving}
+            />
+            <EditDialog
+                open={!!circuitToEditStatus}
+                title="Change Circuit Status"
+                dense
+                fields={buildStatusEditableFields}
+                initialValues={
+                    circuitToEditStatus
+                        ? {
+                            status: circuitToEditStatus.status || "Live",
+                            billStopDate: circuitToEditStatus.billStopDate || "",
+                            changeType: circuitToEditStatus.changeType || "",
+                            changeOrderNumber: circuitToEditStatus.changeOrderNumber || "",
+                            changeDate: circuitToEditStatus.changeDate || "",
+                        }
+                        : {}
+                }
+                onSave={handleSaveStatusEdit}
+                onCancel={() => setCircuitToEditStatus(null)}
+                loading={savingStatus}
+            />
+            <MoveCircuitDialog
+                open={!!circuitToMove}
+                circuit={circuitToMove}
+                site={circuitToMove ? circuitToMove.site : null}
+                onClose={() => setCircuitToMove(null)}
+                onMoved={handleMoved}
+            />
+            <Snackbar open={!!feedback} autoHideDuration={4000} onClose={() => setFeedback(null)}>
+                {feedback && <Alert severity={feedback.severity} onClose={() => setFeedback(null)}>{feedback.message}</Alert>}
+            </Snackbar>
         </Paper>
     )
 }

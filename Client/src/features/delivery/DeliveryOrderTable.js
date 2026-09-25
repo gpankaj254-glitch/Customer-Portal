@@ -266,7 +266,18 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboard
             <TablePagination
                 rowsPerPageOptions={[100, 250, 500, 1000]}
                 component="div"
-                count={pagination.totalResults}
+                // "at bottom - Rows per page: 1-160 of 160 where as it
+                // should be only 9" - pagination.totalResults is one shared
+                // Redux field, but DeliveryOrders.js fires both tabs'
+                // fetches together and each fulfilled response overwrites it
+                // unconditionally (see deliveryOrderSlice.js), so whichever
+                // tab's request resolves second stomps the other tab's own
+                // total. displayRows.length is already this table's own
+                // correct, tab-specific count (same one "Number of Orders"
+                // above uses) - limit always fetches everything in one
+                // request (1000 vs at most a few hundred orders), so it's
+                // never actually a partial page either.
+                count={displayRows.length}
                 rowsPerPage={pagination.limit}
                 page={pagination.page}
                 onPageChange={handleChangePage}

@@ -5,7 +5,7 @@ const { parse } = require("csv-parse/sync");
 const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
 const { ipRequirementOptions, interfaceOptions } = require("../config/opportunityOptions");
 const { milestoneNames, orderTypeOptions, siteTypeOptions } = require("../config/deliveryOrderOptions");
-const { DeliveryOrder, Counter, Customer, Vendor, Site } = require("../models");
+const { DeliveryOrder, Counter, Customer, Vendor, Site, Circuit } = require("../models");
 const ApiError = require("../utils/ApiError");
 const logger = require("../config/logger");
 const { extractNameAndCode, extractUserDetails } = require("../utils/extractors");
@@ -244,17 +244,36 @@ const EDITABLE_FIELDS = [
  * new circuit only after Delivery process is Completed". Idempotent (a
  * second Save and Complete on an already-completed order is a no-op here)
  * and never throws - a failure (no Site linked, duplicate Vendor Circuit
- * ID, etc.) is logged and reported back via circuitCreationError instead of
- * blocking the order from completing. Vendor Circuit ID/Site/a real
- * Customer are all enforced client-side before Save and Complete is even
- * reachable (see OrderDetails.js), so failures here should be rare.
+ * ID on a "New" order, etc.) is logged and reported back via
+ * circuitCreationError instead of blocking the order from completing.
+ * Vendor Circuit ID/Site/a real Customer are all enforced client-side
+ * before Save and Complete is even reachable (see OrderDetails.js), so
+ * failures here should be rare.
+ *
+ * "If Order Type is Not new, For Duplicate Circuit ID Scenario, We need to
+ * change Status of earlier Order Number of that Circuit ID to 'Changed' ...
+ * Pop and show changes being made, take user's Ok to proceed" - a Circuit's
+ * own uniqueness key (code) is Vendor Circuit ID + Site, so an
+ * Upgrade/Downgrade/Move/Other order whose Vendor Circuit ID already
+ * belongs to an existing circuit at the same Site is expected (it's
+ * changing that same physical circuit) rather than an error - but nothing
+ * is touched on the first pass (confirmed left false): the pending change
+ * is only reported back via duplicatePending for the caller to show the
+ * user, and actually applied on a second call with confirmed:true (see
+ * resolveCircuitDuplicate below, reached once the user clicks OK). A "New"
+ * order hitting the same collision is still treated as a genuine error -
+ * only a real Change-type order is eligible to supersede an earlier one.
  * @param {DeliveryOrder} order - already-saved, status "Completed"
  * @param {Object} actingUser
- * @returns {Promise<{circuitId: string, circuitCreationError: string}>}
+ * @param {Object} [options]
+ * @param {boolean} [options.confirmed] - true once the caller has shown the
+ *   pending duplicatePending to the user and they confirmed it
+ * @returns {Promise<{circuitId: string, circuitCreationError: string, duplicatePending: Object|null, supersededCircuitRef: string}>}
  */
-const createCircuitFromOrder = async (order, actingUser) => {
+const createCircuitFromOrder = async (order, actingUser, options = {}) => {
+  const { confirmed = false } = options;
   if (order.circuitId) {
-    return { circuitId: order.circuitId, circuitCreationError: "" };
+    return { circuitId: order.circuitId, circuitCreationError: "", duplicatePending: null, supersededCircuitRef: "" };
   }
   try {
     if (!_.get(order, "customer.id")) {
@@ -268,6 +287,38 @@ const createCircuitFromOrder = async (order, actingUser) => {
     }
     const site = await getActiveSiteById(order.siteId);
     const toDateString = (date) => (date ? moment(date).format(BULK_DATE_FORMAT) : "");
+
+    const code = createCodeFromName(order.vendorCircuitId, site.code);
+    const conflictingCircuit = order.orderType !== "New" ? await Circuit.findOne({ code }) : null;
+
+    if (conflictingCircuit) {
+      const duplicatePending = {
+        existingCircuitId: String(conflictingCircuit._id),
+        existingCircuitRef: conflictingCircuit.scloudxOrderReference,
+        existingCircuitStatus: conflictingCircuit.status || "Live",
+        changeType: order.orderType,
+        changeOrderNumber: order.scloudxOrderReference,
+        changeDate: toDateString(order.deliveryDate),
+      };
+      if (!confirmed) {
+        return { circuitId: "", circuitCreationError: "", duplicatePending, supersededCircuitRef: "" };
+      }
+      // Already-Ceased stays Ceased (a terminal status isn't re-labeled
+      // Changed) - either way its own `code` is freed (suffixed) so the new
+      // circuit below can take over the same Vendor Circuit ID + Site
+      // identity. `code` is a unique-indexed internal lookup key only,
+      // never shown to users, so this never touches its real
+      // vendorCircuitId/customerCircuitId data.
+      if ((conflictingCircuit.status || "Live") !== "Ceased") {
+        conflictingCircuit.status = "Changed";
+        conflictingCircuit.changeType = duplicatePending.changeType;
+        conflictingCircuit.changeOrderNumber = duplicatePending.changeOrderNumber;
+        conflictingCircuit.changeDate = duplicatePending.changeDate;
+      }
+      conflictingCircuit.code = `${conflictingCircuit.code}:superseded-${Date.now()}`;
+      conflictingCircuit.updatedBy = extractUserDetails(actingUser);
+      await conflictingCircuit.save();
+    }
 
     const circuit = await circuitService.createCircuitBySite(site, {
       vendorCircuitId: order.vendorCircuitId,
@@ -288,10 +339,15 @@ const createCircuitFromOrder = async (order, actingUser) => {
     order.circuitId = String(circuit._id);
     order.updatedBy = extractUserDetails(actingUser);
     await order.save();
-    return { circuitId: order.circuitId, circuitCreationError: "" };
+    return {
+      circuitId: order.circuitId,
+      circuitCreationError: "",
+      duplicatePending: null,
+      supersededCircuitRef: conflictingCircuit ? conflictingCircuit.scloudxOrderReference : "",
+    };
   } catch (err) {
     logger.warn(`Circuit auto-creation failed for delivery order ${order.orderId}: ${err.message}`);
-    return { circuitId: "", circuitCreationError: err.message };
+    return { circuitId: "", circuitCreationError: err.message, duplicatePending: null, supersededCircuitRef: "" };
   }
 };
 
@@ -398,7 +454,24 @@ const updateDeliveryOrderById = async (deliveryOrderId, updateBody, user) => {
     // order (createCircuitFromOrder is idempotent) doesn't log a second,
     // duplicate "Circuit created" entry.
     const hadCircuitBefore = !!order.circuitId;
-    const { circuitId, circuitCreationError } = await createCircuitFromOrder(order, user);
+    const { circuitId, circuitCreationError, duplicatePending } = await createCircuitFromOrder(order, user);
+    if (duplicatePending) {
+      // "Pop and show changes being made, take user's Ok to proceed" -
+      // nothing about the order/circuit changes yet; the order itself is
+      // still saved as Completed as normal, but circuit creation pauses
+      // here until the client shows this and the user confirms via
+      // resolveCircuitDuplicate below.
+      appendHistory(
+        order,
+        order.status,
+        `Circuit auto-creation paused - Vendor Circuit ID matches existing circuit ${duplicatePending.existingCircuitRef}; awaiting confirmation to mark it Changed.`,
+        user
+      );
+      await order.save();
+      const result = order.toJSON();
+      result.duplicateCircuitPending = duplicatePending;
+      return result;
+    }
     if (circuitCreationError) {
       appendHistory(order, order.status, `Circuit auto-creation failed: ${circuitCreationError}`, user);
       await order.save();
@@ -412,6 +485,58 @@ const updateDeliveryOrderById = async (deliveryOrderId, updateBody, user) => {
     }
   }
 
+  return order;
+};
+
+/**
+ * Confirms a pending Duplicate Circuit ID resolution reported by
+ * updateDeliveryOrderById (see createCircuitFromOrder's duplicatePending) -
+ * re-runs circuit creation with confirmed:true, which now actually marks
+ * the conflicting circuit Changed (or just frees its code if it's already
+ * Ceased) before creating this order's own new circuit as Live. Reached
+ * once the user clicks OK on the confirm dialog the client shows for
+ * duplicateCircuitPending.
+ * @param {string} deliveryOrderId
+ * @param {Object} user
+ * @returns {Promise<DeliveryOrder|Object>}
+ */
+const resolveCircuitDuplicate = async (deliveryOrderId, user) => {
+  const order = await getActiveDeliveryOrderById(deliveryOrderId);
+  if (!order) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Delivery order not found");
+  }
+  if (order.status !== "Completed") {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Order is not Completed");
+  }
+  if (order.circuitId) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "This order already has a Circuit");
+  }
+
+  const { circuitId, circuitCreationError, duplicatePending, supersededCircuitRef } = await createCircuitFromOrder(order, user, {
+    confirmed: true,
+  });
+
+  if (circuitCreationError) {
+    appendHistory(order, order.status, `Circuit auto-creation failed: ${circuitCreationError}`, user);
+    await order.save();
+    const result = order.toJSON();
+    result.circuitCreationError = circuitCreationError;
+    return result;
+  }
+  if (duplicatePending) {
+    // Shouldn't happen (confirmed:true always resolves one way or the
+    // other) - only reachable if the conflicting circuit disappeared or
+    // something else changed between the two calls in a way createCircuitFromOrder
+    // doesn't already handle.
+    throw new ApiError(httpStatus.BAD_REQUEST, "Nothing pending to confirm for this order");
+  }
+  if (circuitId) {
+    const message = supersededCircuitRef
+      ? `Circuit created automatically (ID: ${circuitId}) - existing circuit ${supersededCircuitRef} marked Changed`
+      : `Circuit created automatically (ID: ${circuitId})`;
+    appendHistory(order, order.status, message, user);
+    await order.save();
+  }
   return order;
 };
 
@@ -944,6 +1069,7 @@ module.exports = {
   getDeliveryOrderById,
   getActiveDeliveryOrderById,
   updateDeliveryOrderById,
+  resolveCircuitDuplicate,
   deactivateDeliveryOrderById,
   restoreDeliveryOrderById,
   permanentlyDeleteDeliveryOrderById,

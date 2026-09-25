@@ -54,6 +54,14 @@ router
   );
 
 router
+  .route("/:deliveryOrderId/resolve-circuit-duplicate")
+  .patch(
+    auth("updateDeliveryOrders"),
+    validate(deliveryOrderValidation.resolveCircuitDuplicate),
+    deliveryOrderController.resolveCircuitDuplicate
+  );
+
+router
   .route("/:deliveryOrderId/restore")
   .patch(
     auth("deleteDeliveryOrders"),

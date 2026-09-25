@@ -42,6 +42,19 @@ export async function fetchUpdateDeliveryOrder(data, rejectWithValue) {
     }
 }
 
+// "Pop and show changes being made, take user's Ok to proceed" - confirms a
+// pending Duplicate Circuit ID resolution (see updateDeliveryOrder's own
+// response, which carries duplicateCircuitPending when this is needed).
+export async function fetchResolveCircuitDuplicate(deliveryOrderId, rejectWithValue) {
+    try {
+        const response = await axios.patch(`${baseURL}/delivery-order/${deliveryOrderId}/resolve-circuit-duplicate`, {}, { headers: headers() })
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
 export async function fetchDeactivateDeliveryOrder(deliveryOrderId, rejectWithValue) {
     try {
         const response = await axios.delete(`${baseURL}/delivery-order/${deliveryOrderId}`, { headers: headers() })

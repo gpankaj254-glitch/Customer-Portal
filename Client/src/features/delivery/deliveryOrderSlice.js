@@ -3,6 +3,7 @@ import {
     fetchCreateDeliveryOrder,
     fetchGetDeliveryOrders,
     fetchUpdateDeliveryOrder,
+    fetchResolveCircuitDuplicate,
     fetchDeactivateDeliveryOrder,
     fetchBulkUploadDeliveryOrders,
     fetchBulkUploadClosedDeliveryOrders,
@@ -60,6 +61,17 @@ export const updateDeliveryOrder = createAsyncThunk(
     "deliveryOrders/fetchUpdateDeliveryOrder",
     async (data, { rejectWithValue }) => {
         const response = await fetchUpdateDeliveryOrder(data, rejectWithValue)
+        return response
+    }
+)
+
+// "Pop and show changes being made, take user's Ok to proceed" - confirms
+// a pending Duplicate Circuit ID resolution reported by updateDeliveryOrder
+// (see OrderDetails.js's duplicatePending state).
+export const resolveCircuitDuplicate = createAsyncThunk(
+    "deliveryOrders/fetchResolveCircuitDuplicate",
+    async (deliveryOrderId, { rejectWithValue }) => {
+        const response = await fetchResolveCircuitDuplicate(deliveryOrderId, rejectWithValue)
         return response
     }
 )
@@ -143,6 +155,22 @@ export const deliveryOrderSlice = createSlice({
                 }
             })
             .addCase(updateDeliveryOrder.rejected, (state) => {
+                state.pageStatus = pageStatusVals.error
+            })
+            // Same shape/placement logic as updateDeliveryOrder.fulfilled -
+            // the order's own status never changes here (it was already
+            // Completed), so this always lands back in deliveredOrderList.
+            .addCase(resolveCircuitDuplicate.fulfilled, (state, { payload }) => {
+                state.pageStatus = pageStatusVals.fetched
+                state.openOrderList = state.openOrderList.filter((order) => order.id !== payload.id)
+                state.deliveredOrderList = state.deliveredOrderList.filter((order) => order.id !== payload.id)
+                if (payload.status === "Completed") {
+                    state.deliveredOrderList = [payload, ...state.deliveredOrderList]
+                } else {
+                    state.openOrderList = sortBySerialNumber([payload, ...state.openOrderList])
+                }
+            })
+            .addCase(resolveCircuitDuplicate.rejected, (state) => {
                 state.pageStatus = pageStatusVals.error
             })
             .addCase(deactivateDeliveryOrder.fulfilled, (state, action) => {

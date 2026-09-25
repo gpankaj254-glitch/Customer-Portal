@@ -74,6 +74,14 @@ const updateDeliveryOrder = catchAsync(async (req, res) => {
   res.send(order);
 });
 
+// "Pop and show changes being made, take user's Ok to proceed" - reached
+// once the user confirms the pending Duplicate Circuit ID dialog
+// (duplicateCircuitPending on the update response above).
+const resolveCircuitDuplicate = catchAsync(async (req, res) => {
+  const order = await deliveryOrderService.resolveCircuitDuplicate(req.params.deliveryOrderId, req.user);
+  res.send(order);
+});
+
 const deactivateDeliveryOrder = catchAsync(async (req, res) => {
   await deliveryOrderService.deactivateDeliveryOrderById(req.params.deliveryOrderId, req.user);
   res.status(httpStatus.NO_CONTENT).send();
@@ -127,6 +135,7 @@ module.exports = {
   getDeliveryOrders,
   getDeletedDeliveryOrders,
   updateDeliveryOrder,
+  resolveCircuitDuplicate,
   deactivateDeliveryOrder,
   restoreDeliveryOrder,
   permanentlyDeleteDeliveryOrder,

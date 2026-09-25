@@ -24,7 +24,7 @@ import PropTypes from "prop-types"
 import _ from "lodash"
 import moment from "moment"
 import { useDispatch, useSelector } from "react-redux"
-import { updateDeliveryOrder, selectOpenOrderList, selectDeliveredOrderList } from "./deliveryOrderSlice"
+import { updateDeliveryOrder, resolveCircuitDuplicate, selectOpenOrderList, selectDeliveredOrderList } from "./deliveryOrderSlice"
 import { createCustomer, selectCustomerList } from "../customers/customerSlice"
 import { createSite, updateSite } from "../sites/siteSlice"
 import { fetchSitesOfCustomer } from "../inventory/circuitAPI"
@@ -190,6 +190,13 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
     // Creation" - same confirm-dialog pattern as the Site block below.
     const [customerConfirmOpen, setCustomerConfirmOpen] = React.useState(false)
     const [creatingCustomer, setCreatingCustomer] = React.useState(false)
+    // "If Order Type is Not new, For Duplicate Circuit ID Scenario ... Pop
+    // and show changes being made, take user's Ok to proceed" - set from
+    // Save and Complete's own response (duplicateCircuitPending) once the
+    // order's Vendor Circuit ID/Site is found to already match an existing
+    // circuit; null the rest of the time.
+    const [duplicatePending, setDuplicatePending] = React.useState(null)
+    const [resolvingDuplicate, setResolvingDuplicate] = React.useState(false)
 
     React.useEffect(() => {
         setValues(buildInitialValues(order))
@@ -400,7 +407,17 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
             // the server attempts this automatically as part of the same
             // request (see createCircuitFromOrder); a failure there doesn't
             // block the order from completing, just surfaces here instead.
-            if (result && result.circuitCreationError) {
+            // "If Order Type is Not new, For Duplicate Circuit ID Scenario ...
+            // Pop and show changes being made, take user's Ok to proceed" -
+            // a duplicateCircuitPending response means the order saved fine
+            // but circuit creation is paused until handleConfirmDuplicateResolution.
+            if (result && result.duplicateCircuitPending) {
+                setDuplicatePending(result.duplicateCircuitPending)
+                setFeedback({
+                    severity: "info",
+                    message: `Order "${order.orderId}" saved and marked Completed - confirm the Circuit change below to finish creating its Circuit.`,
+                })
+            } else if (result && result.circuitCreationError) {
                 setFeedback({
                     severity: "warning",
                     message: `Order "${order.orderId}" marked Completed, but the Circuit wasn't created automatically: ${result.circuitCreationError}. Create it manually via Inventory.`,
@@ -412,6 +429,25 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
             setFeedback({ severity: "error", message: err || "Failed to update order" })
         } finally {
             setSaving(false)
+        }
+    }
+
+    // Reached once the user clicks "Confirm & Create Circuit" on the
+    // duplicatePending dialog below - actually marks the existing circuit
+    // Changed and creates this order's own new circuit as Live.
+    const handleConfirmDuplicateResolution = async () => {
+        setResolvingDuplicate(true)
+        try {
+            await dispatch(resolveCircuitDuplicate(order.id)).unwrap()
+            setFeedback({
+                severity: "success",
+                message: `Circuit "${duplicatePending.existingCircuitRef}" marked Changed, and a new Circuit was created as Live for order "${order.orderId}".`,
+            })
+            setDuplicatePending(null)
+        } catch (err) {
+            setFeedback({ severity: "error", message: err || "Failed to resolve the Circuit duplicate" })
+        } finally {
+            setResolvingDuplicate(false)
         }
     }
 
@@ -1000,6 +1036,22 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
                 onConfirm={handleConfirmCreateSite}
                 onCancel={() => setSiteConfirmOpen(false)}
                 loading={creatingSite}
+            />
+
+            {/* "If Order Type is Not new, For Duplicate Circuit ID Scenario ...
+                Pop and show changes being made, take user's Ok to proceed" */}
+            <ConfirmDialog
+                open={!!duplicatePending}
+                title="Existing circuit will be marked Changed"
+                message={
+                    duplicatePending
+                        ? `Circuit "${duplicatePending.existingCircuitRef}" (currently ${duplicatePending.existingCircuitStatus}) has the same Vendor Circuit ID and Site as this order. Confirming will mark it Changed - Change Type: ${duplicatePending.changeType}, Change Order Number: ${duplicatePending.changeOrderNumber}, Change Date: ${duplicatePending.changeDate} - and then create a new Circuit as Live for this order. Continue?`
+                        : ""
+                }
+                confirmLabel="Confirm & Create Circuit"
+                onConfirm={handleConfirmDuplicateResolution}
+                onCancel={() => setDuplicatePending(null)}
+                loading={resolvingDuplicate}
             />
 
             <Snackbar open={!!feedback} autoHideDuration={4000} onClose={() => setFeedback(null)}>

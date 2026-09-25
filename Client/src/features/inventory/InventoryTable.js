@@ -271,7 +271,17 @@ export default function InventoryTable(props) {
                 {details && <TablePagination
                     rowsPerPageOptions={false}
                     component="div"
-                    count={pagination.totalResults}
+                    // "Same issue in Live, Changed, Ceased Site Inventory
+                    // list" - pagination.totalResults is one shared Redux
+                    // field holding every site's own total (getSites is
+                    // fetched once, unfiltered, and reused by all three
+                    // tabs - see siteList above), not this tab's own
+                    // statusFilter-matching count, so it always showed the
+                    // Live Site Inventory number even on Changed/Ceased.
+                    // siteList.length is already this tab's own correct,
+                    // filtered count (same fix as DeliveryOrderTable.js's
+                    // own pagination).
+                    count={siteList.length}
                     rowsPerPage={pagination.limit}
                     page={pagination.page}
                     onPageChange={handleChangePage}
