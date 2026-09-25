@@ -267,8 +267,13 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                 onChange={(event) => setSearchInput(event.target.value)}
                 sx={{ mb: 2 }}
             />
+            {/* "Admin Login, reduce row width of Circuit Inventory - Live and
+                Ceased" - same compact cell density (font size + padding)
+                already used by most other tables in the app (Delivery Order
+                table, Open Tickets table, etc.) - this one previously had no
+                override at all, so its rows were noticeably taller/wider. */}
             <TableContainer sx={{ maxHeight: 520 }}>
-                <Table stickyHeader size="small">
+                <Table stickyHeader size="small" sx={{ "& .MuiTableCell-root": { fontSize: "0.75rem", padding: "4px 8px" } }}>
                     <TableHead>
                         <TableRow>
                             <TableCell><Typography variant="subtitle2">Customer Name</Typography></TableCell>

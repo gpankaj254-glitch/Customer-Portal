@@ -4,7 +4,7 @@ const ApiError = require("../utils/ApiError");
 const pick = require("../utils/pick");
 const catchAsync = require("../utils/catchAsync");
 const { deliveryOrderService, vendorService } = require("../services");
-const { activeOnly } = require("../utils/filters");
+const { activeOnly, filterByCustomerId } = require("../utils/filters");
 
 const createDeliveryOrder = catchAsync(async (req, res) => {
   const order = await deliveryOrderService.createDeliveryOrder(req.body, req.user);
@@ -23,7 +23,11 @@ const createDeliveryOrder = catchAsync(async (req, res) => {
 const getDeliveryOrders = catchAsync(async (req, res) => {
   const search = _.trim(_.get(req.body, "search", ""));
   const baseFilter = _.omit(req.body, ["search", "tab"]);
-  const filter = activeOnly(baseFilter);
+  // "Customer Admin Dashboard - New tab" (Open Orders) - Delivery Orders was
+  // SCX-internal only until now; a Customer Admin/User granted
+  // viewDeliveryOrders (see roles.js) is scoped to their own orders only,
+  // same as every other customer-facing list (Tickets, Sites, etc.).
+  const filter = filterByCustomerId(req.user, activeOnly(baseFilter));
 
   if (req.body.tab === "completed") {
     filter.status = "Completed";

@@ -10,7 +10,7 @@ import { selectVendorList } from "../vendors/vendorSlice"
 // better with the tallest/most significant bars up front) - "Not set" covers
 // a blank value (e.g. End User never filled in) rather than dropping it
 // silently from the chart.
-function groupCounts(orders, getLabel) {
+export function groupCounts(orders, getLabel) {
     const counts = new Map()
     orders.forEach((order) => {
         const label = getLabel(order) || "Not set"

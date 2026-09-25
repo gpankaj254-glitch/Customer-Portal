@@ -57,6 +57,14 @@ const getTickets = catchAsync(async (req, res) => {
   const search = _.trim(_.get(req.body, "search", ""));
   const baseFilter = activeOnly(_.omit(req.body, "search"));
   const filter = filterByCustomerId(req.user, baseFilter);
+  // getClosedTickets (ticketSlice.js) sends status as a plain array
+  // (["Closed", "RFO Closed"]) rather than { $in: [...] } - express-mongo-
+  // sanitize (see app.js) strips any $-prefixed key straight out of the
+  // request body, so the $in has to be built here instead, same reasoning
+  // as deliveryOrder.controller.js's own tab -> $ne/$in handling.
+  if (Array.isArray(filter.status)) {
+    filter.status = { $in: filter.status };
+  }
 
   if (search) {
     const orConditions = [
@@ -92,6 +100,14 @@ const updateTicket = catchAsync(async (req, res) => {
 
 const appendDescription = catchAsync(async (req, res) => {
   const ticket = await ticketService.appendTicketDescription(req.body[0], req.user);
+
+  res.send([ticket]);
+});
+
+// "SCX NOC Users/Admin: EDIT Modify Ticket" - RFO Request tab.
+const saveRfo = catchAsync(async (req, res) => {
+  const ticket = await ticketService.saveTicketRfo(req.params.ticketId, req.body, req.user);
+  await alertService.ticketUpdatedEmail(ticket, req.user);
 
   res.send([ticket]);
 });
@@ -163,6 +179,7 @@ module.exports = {
   getTickets,
   getTicket,
   updateTicket,
+  saveRfo,
   appendDescription,
   uploadAttachment,
   downloadAttachment,

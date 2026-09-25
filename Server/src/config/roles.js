@@ -57,8 +57,12 @@ const allRoles = {
     "deleteDeliveryOrders",
     "permanentlyDeleteDeliveryOrders",
   ],
-  customerUser: ["createTickets", "viewTickets", "appendTicketDescription", "viewDashboard"],
-  customerAdmin: ["createUsers", "editUsers", "deleteUsers", "resetUserPassword", "createTickets", "viewTickets", "appendTicketDescription", "viewDashboard"],
+  // viewDeliveryOrders: "Customer Admin Dashboard - New tab" (Open Orders) -
+  // read-only, scoped to the customer's own orders only (see
+  // filterByCustomerId in deliveryOrder.controller.js's getDeliveryOrders).
+  // Customer roles have no create/update/delete rights on Delivery Orders.
+  customerUser: ["createTickets", "viewTickets", "appendTicketDescription", "viewDashboard", "viewDeliveryOrders"],
+  customerAdmin: ["createUsers", "editUsers", "deleteUsers", "resetUserPassword", "createTickets", "viewTickets", "appendTicketDescription", "viewDashboard", "viewDeliveryOrders"],
   vendorUser: [],
   vendorAdmin: ["createUsers", "editUsers", "deleteUsers"],
   // SCX Finance has no rights yet - what it should be able to do is still to

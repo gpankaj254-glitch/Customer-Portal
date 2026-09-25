@@ -2,7 +2,17 @@ const mongoose = require("mongoose");
 // const validator = require("validator");
 // const bcrypt = require("bcryptjs");
 const { toJSON, paginate } = require("./plugins");
-const { problemTypeOptions, priorityOptions, siteAccessHoursOptions, statusOptions, closureCodeOptions, rfoStatusOptions, vendorTicketStatusOptions } = require("../config/ticketOptions");
+const {
+  problemTypeOptions,
+  priorityOptions,
+  siteAccessHoursOptions,
+  statusOptions,
+  closureCodeOptions,
+  rfoStatusOptions,
+  rfoRequestStatusOptions,
+  rfoCodeOptions,
+  vendorTicketStatusOptions,
+} = require("../config/ticketOptions");
 // const { roles } = require("../config/roles");
 
 const attachmentSchema = {
@@ -292,6 +302,31 @@ const ticketSchema = mongoose.Schema(
       downTimeMinutes: { type: Number, default: null },
       uptimePercent: { type: Number, default: null },
       downTimeHours: { type: Number, default: null },
+    },
+    // "SCX NOC Users/Admin: EDIT Modify Ticket" - the new RFO Request tab,
+    // editable even once the ticket is Closed/Completed (see
+    // ticket.service.js's saveTicketRfo). Superseded the old closureDetails
+    // fields above, which stay in the schema untouched (for any already-
+    // saved legacy ticket) but are no longer written or shown by the
+    // current UI - see the redesigned Ticket Closure Details tab, which
+    // reads/writes these same fields when requested is "No" rather than
+    // duplicating them.
+    rfo: {
+      requested: { type: String, enum: ["", "Yes", "No"], default: "No" },
+      requestDate: { type: String, default: "" },
+      problemStartDateTime: { type: String, default: "" },
+      problemStopDateTime: { type: String, default: "" },
+      status: {
+        type: String,
+        enum: ["", ...rfoRequestStatusOptions],
+        default: "Not Received",
+      },
+      code: {
+        type: String,
+        enum: ["", ...rfoCodeOptions],
+        default: "",
+      },
+      description: { type: String, default: "" },
     },
     history: {
       type: Array,

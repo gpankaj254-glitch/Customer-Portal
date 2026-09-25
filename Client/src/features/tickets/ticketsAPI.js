@@ -125,8 +125,34 @@ export async function fetchGetTickets (data, rejectWithValue) {
     try {
         const filter = { search: data.search || "" }
         if (data.closed !== undefined) filter.closed = data.closed
+        // getClosedTickets passes an array (["Closed", "RFO Closed"]) so both
+        // statuses show up in the Closed Tickets list ("RFO Closed" behaves
+        // like Closed) - sent as a plain array (not { $in: [...] }), since
+        // express-mongo-sanitize (see app.js) strips any $-prefixed key out
+        // of the request body; the server builds the actual $in itself (see
+        // ticket.controller.js's getTickets).
         if (data.status !== undefined) filter.status = data.status
-        const response = await axios.post(`${baseURL}/ticket/get?limit=${data.limit}&page=${data.page}`, filter, {headers: headers()})
+        // "View Closed and Completed Tickets - Sort Descending Order by
+        // Ticket Close date" - getTickets (ticket.controller.js) only reads
+        // sortBy from the query string (same as every other list endpoint
+        // in this app), not the body, so it has to be appended here rather
+        // than left in filter.
+        const sortByParam = data.sortBy ? `&sortBy=${encodeURIComponent(data.sortBy)}` : ""
+        const response = await axios.post(`${baseURL}/ticket/get?limit=${data.limit}&page=${data.page}${sortByParam}`, filter, {headers: headers()})
+        return response.data
+    } catch (error) {
+        console.error(error)
+        return rejectWithValue(createResponseErrorMessage(error), {})
+    }
+}
+
+// "SCX NOC Users/Admin: EDIT Modify Ticket" - RFO Request tab's own
+// dedicated endpoint (stays editable even once the ticket is Closed/
+// Completed - see ticket.service.js's saveTicketRfo), separate from the
+// general fetchUpdateTicket above.
+export async function fetchSaveTicketRfo (ticketId, data, rejectWithValue) {
+    try {
+        const response = await axios.patch(`${baseURL}/ticket/${ticketId}/rfo`, data, {headers: headers()})
         return response.data
     } catch (error) {
         console.error(error)

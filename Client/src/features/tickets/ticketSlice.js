@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit"
-import {fetchGetTickets, fetchCreateTicket, fetchUpdateTicket, fetchAppendTicketDescription, fetchUploadTicketAttachments, fetchAppendVendorDescription, fetchUploadVendorAttachments, fetchBulkUploadTickets, fetchDeactivateTicket} from "./ticketsAPI"
+import {fetchGetTickets, fetchCreateTicket, fetchUpdateTicket, fetchSaveTicketRfo, fetchAppendTicketDescription, fetchUploadTicketAttachments, fetchAppendVendorDescription, fetchUploadVendorAttachments, fetchBulkUploadTickets, fetchDeactivateTicket} from "./ticketsAPI"
 import { pageStatusVals} from "./utils"
 import { roles } from "../../consts"
 
@@ -14,6 +14,8 @@ const initialState = {
     createTicketMessage: null,
     updateTicketError: null,
     updateTicketMessage: null,
+    saveRfoError: null,
+    saveRfoMessage: null,
     appendDescriptionError: null,
     appendDescriptionMessage: null,
     uploadAttachmentError: null,
@@ -53,11 +55,17 @@ export const getClosedTickets = createAsyncThunk(
         data.closed = true
         // A ticket SCX has moved on to "Completed" is still closed. Customers
         // have no Completed tab, so their Closed list includes those as well;
-        // SCX keeps Closed and Completed apart.
+        // SCX keeps Closed and Completed apart. "RFO Closed" behaves like
+        // Closed (see ticketOptions.js) so it belongs in this list too.
         const role = getState().auth.user.role
         if (role !== roles.CUSTOMER_ADMIN && role !== roles.CUSTOMER_USER) {
-            data.status = "Closed"
+            data.status = ["Closed", "RFO Closed"]
         }
+        // "View Closed and Completed Tickets - Sort Descending Order by
+        // Ticket Close date -- all Logins" - without this the paginate
+        // plugin falls back to sorting by createdAt ascending (see
+        // paginate.plugin.js), not close date at all.
+        data.sortBy = "closedAt:desc"
         const response = await fetchGetTickets(data, rejectWithValue)
         return response
     }
@@ -67,6 +75,7 @@ export const getCompletedTickets = createAsyncThunk(
     "tickets/fetchGetCompletedTicket",
     async (data, { rejectWithValue }) => {
         data.status = "Completed"
+        data.sortBy = "closedAt:desc"
         const response = await fetchGetTickets(data, rejectWithValue)
         return response
     }
@@ -93,6 +102,17 @@ export const updateTicket = createAsyncThunk(
     "tickets/fetchUpdateTicket",
     async (data, { rejectWithValue }) => {
         const response = await fetchUpdateTicket(data, rejectWithValue)
+        return response
+    }
+)
+
+// "SCX NOC Users/Admin: EDIT Modify Ticket" - RFO Request tab's own
+// dedicated thunk, separate from updateTicket above (see
+// ticket.service.js's saveTicketRfo for why).
+export const saveTicketRfo = createAsyncThunk(
+    "tickets/fetchSaveTicketRfo",
+    async ({ ticketId, ...data }, { rejectWithValue }) => {
+        const response = await fetchSaveTicketRfo(ticketId, data, rejectWithValue)
         return response
     }
 )
@@ -259,6 +279,26 @@ export const ticketSlice = createSlice({
                 const completedIndex = state.completedTicketList.findIndex((t) => t.id === updated.id)
                 if (completedIndex !== -1) state.completedTicketList[completedIndex] = updated
             })
+            .addCase(saveTicketRfo.rejected, (state, {payload}) => {
+                state.saveRfoMessage = null
+                state.saveRfoError = payload
+            })
+            .addCase(saveTicketRfo.pending, (state) => {
+                state.saveRfoMessage = null
+                state.saveRfoError = null
+            })
+            .addCase(saveTicketRfo.fulfilled, (state, { payload }) => {
+                state.saveRfoMessage = "RFO Request saved"
+                state.saveRfoError = null
+                // Same in-place list patch as updateTicket.fulfilled above.
+                const updated = payload[0]
+                const openIndex = state.openTicketList.findIndex((t) => t.id === updated.id)
+                if (openIndex !== -1) state.openTicketList[openIndex] = updated
+                const closedIndex = state.closedTicketList.findIndex((t) => t.id === updated.id)
+                if (closedIndex !== -1) state.closedTicketList[closedIndex] = updated
+                const completedIndex = state.completedTicketList.findIndex((t) => t.id === updated.id)
+                if (completedIndex !== -1) state.completedTicketList[completedIndex] = updated
+            })
             .addCase(appendTicketDescription.rejected, (state, {payload}) => {
                 state.appendDescriptionMessage = null
                 state.appendDescriptionError = payload
@@ -343,6 +383,8 @@ export const selectCreateTicketError = (state) => state.tickets.createTicketErro
 export const selectCreateTicketMessage = (state) => state.tickets.createTicketMessage
 export const selectUpdateTicketError = (state) => state.tickets.updateTicketError
 export const selectUpdateTicketMessage = (state) => state.tickets.updateTicketMessage
+export const selectSaveRfoError = (state) => state.tickets.saveRfoError
+export const selectSaveRfoMessage = (state) => state.tickets.saveRfoMessage
 export const selectAppendDescriptionError = (state) => state.tickets.appendDescriptionError
 export const selectAppendDescriptionMessage = (state) => state.tickets.appendDescriptionMessage
 

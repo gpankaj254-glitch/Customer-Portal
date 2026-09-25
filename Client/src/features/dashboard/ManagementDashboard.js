@@ -9,12 +9,13 @@ import FinanceDashboard from "./FinanceDashboard"
 import ScxDashboard from "./ScxDashboard"
 import DeliveryOrderTable from "../delivery/DeliveryOrderTable"
 import DeliveryOrderCharts from "./DeliveryOrderCharts"
+import DashboardSummary from "./DashboardSummary"
 import { getDeliveryOrders, selectOpenOrderList } from "../delivery/deliveryOrderSlice"
 import { getVendors } from "../vendors/vendorSlice"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
 
-const TAB_LABELS = ["Sales", "Finance", "Delivery", "NOC"]
+const TAB_LABELS = ["Summary", "Sales", "Finance", "Delivery", "NOC"]
 
 // SCX Management's dashboard, also shared by SCX Admin ("SCX Admin
 // Dashboard should be same as SCX Management role" - see Dashboard.js):
@@ -59,9 +60,10 @@ export default function ManagementDashboard() {
             <Grid item xs={12}>
                 {/* "Reduce Font of Sales Dashboard" - matches this tab's own
                     already-compact surrounding chrome (the Tabs row above). */}
-                {activeTab === 0 && <SalesDashboard compact />}
-                {activeTab === 1 && <FinanceDashboard />}
-                {activeTab === 2 && (
+                {activeTab === 0 && <DashboardSummary />}
+                {activeTab === 1 && <SalesDashboard compact />}
+                {activeTab === 2 && <FinanceDashboard />}
+                {activeTab === 3 && (
                     <Grid container spacing={1.5}>
                         <DeliveryOrderCharts orders={openOrderList} />
                         <Grid item xs={12}>
@@ -72,7 +74,7 @@ export default function ManagementDashboard() {
                         </Grid>
                     </Grid>
                 )}
-                {activeTab === 3 && <ScxDashboard embedded />}
+                {activeTab === 4 && <ScxDashboard embedded />}
             </Grid>
         </Grid>
     )

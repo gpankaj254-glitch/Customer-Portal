@@ -81,14 +81,24 @@ const baseColumns = [
 // instead. Only the plain Delivered Orders tab (showDeliveryDate) - View
 // Open Order and every dashboard view keep Status, since it still varies
 // there.
-function buildColumns(dashboardView, showDeliveryDate) {
+// showCustomerPO puts the Customer PO column back for one particular
+// dashboardView consumer - "Customer Admin Dashboard - New tab" (Open
+// Orders) explicitly lists Customer PO Number among its columns, unlike
+// the "Do not display ... Customer Order Number" instruction the other
+// dashboardView call sites (Delivery/SCX Admin/NOC dashboards) follow -
+// defaults false so every other dashboardView usage is unaffected.
+function buildColumns(dashboardView, showDeliveryDate, showCustomerPO) {
     let columns = baseColumns
     if (dashboardView) {
         columns = baseColumns.filter(
-            (column) => column.id !== "orderId" && column.id !== "customerOrderReference"
+            (column) => column.id !== "orderId" && (showCustomerPO || column.id !== "customerOrderReference")
         )
-        const scloudxRefIndex = columns.findIndex((column) => column.id === "scloudxOrderReference")
-        columns.splice(scloudxRefIndex + 1, 0, { id: "endUser", label: "End User Name" })
+        // "Customer Name, SCloudX Order Ref, Customer PO Number, End User
+        // Name, ..." - End User Name goes after Customer PO when it's kept
+        // (showCustomerPO), otherwise right after SCloudX Order Ref as before.
+        const endUserAfterId = showCustomerPO ? "customerOrderReference" : "scloudxOrderReference"
+        const endUserAfterIndex = columns.findIndex((column) => column.id === endUserAfterId)
+        columns.splice(endUserAfterIndex + 1, 0, { id: "endUser", label: "End User Name" })
         const vendorIndex = columns.findIndex((column) => column.id === "vendorName")
         columns.splice(vendorIndex + 1, 0, { id: "lmpName", label: "LMP Name" })
         // Narrow, with word-wrap on the cell below - a milestone name like
@@ -132,8 +142,8 @@ export function currentMilestoneStatus(row) {
 // by DeliveryOrders.js on the Delivered Orders tab only. `liveCircuitOrderRefs`
 // is passed straight through to each row's own OrderDetails, for its Existing
 // Order Number dropdown.
-export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboardView, showDeliveryDate, liveCircuitOrderRefs }) {
-    const columns = buildColumns(dashboardView, showDeliveryDate)
+export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboardView, showDeliveryDate, showCustomerPO, liveCircuitOrderRefs }) {
+    const columns = buildColumns(dashboardView, showDeliveryDate, showCustomerPO)
     const dispatch = useDispatch()
     const errorMessage = useSelector(selectGetOrdersError)
     const pagination = useSelector(selectPagination)
@@ -316,6 +326,7 @@ DeliveryOrderTable.propTypes = {
     canDelete: PropTypes.bool,
     dashboardView: PropTypes.bool,
     showDeliveryDate: PropTypes.bool,
+    showCustomerPO: PropTypes.bool,
     // Map of normalized SCX Order Ref -> original-case ref, one entry per
     // distinct Live circuit - see DeliveryOrders.js.
     liveCircuitOrderRefs: PropTypes.instanceOf(Map),
@@ -326,5 +337,6 @@ DeliveryOrderTable.defaultProps = {
     canDelete: false,
     dashboardView: false,
     showDeliveryDate: false,
+    showCustomerPO: false,
     liveCircuitOrderRefs: new Map(),
 }

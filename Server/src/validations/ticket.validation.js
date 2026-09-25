@@ -1,5 +1,15 @@
 const Joi = require("joi");
-const { problemTypeOptions, priorityOptions, siteAccessHoursOptions, statusOptions, closureCodeOptions, rfoStatusOptions, vendorTicketStatusOptions } = require("../config/ticketOptions");
+const { objectId } = require("./custom.validation");
+const {
+  problemTypeOptions,
+  priorityOptions,
+  siteAccessHoursOptions,
+  statusOptions,
+  closureCodeOptions,
+  rfoRequestStatusOptions,
+  rfoCodeOptions,
+  vendorTicketStatusOptions,
+} = require("../config/ticketOptions");
 
 const createTicket = {
   body: Joi.array().items(
@@ -59,29 +69,40 @@ const updateTicket = {
       vendorTicketCreateDate: Joi.string().allow(""),
       vendorTicketStatus: Joi.string().valid("", ...vendorTicketStatusOptions),
       vendorTicketClosureDate: Joi.string().allow(""),
-      rfoStatus: Joi.string().valid("", ...rfoStatusOptions),
-      ticketStartDateTime: Joi.string().allow(""),
-      actualIssueStartDateTime: Joi.string().allow(""),
-      reportedToSupplier: Joi.string().allow(""),
-      resolvedFromSupplier: Joi.string().allow(""),
-      issueReportedResolvedToAryaka: Joi.string().allow(""),
-      actualDownTimeMinutes: Joi.number().allow(null),
-      issueResolvedDateTime: Joi.string().allow(""),
-      overallDownTime: Joi.number().allow(null),
-      rfo: Joi.string().allow(""),
-      reason: Joi.string().allow(""),
-      reasonCode: Joi.string().allow(""),
-      remarks: Joi.string().allow(""),
-      scloudxBucket: Joi.number().allow(null),
-      supplierBucket: Joi.number().allow(null),
-      customerBucket: Joi.number().allow(null),
-      category: Joi.string().allow(""),
-      totalMinutes: Joi.number().allow(null),
-      downTimeMinutes: Joi.number().allow(null),
-      uptimePercent: Joi.number().allow(null),
-      downTimeHours: Joi.number().allow(null),
+      // Redesigned Ticket Closure Details tab - only meaningful once
+      // requested is "No" (Yes's own fields are entered via the separate
+      // RFO Request tab/endpoint instead - see saveRfo below); mirrors that
+      // same rfo object shape.
+      rfo: Joi.object().keys({
+        problemStartDateTime: Joi.string().allow(""),
+        problemStopDateTime: Joi.string().allow(""),
+        status: Joi.string().valid("", ...rfoRequestStatusOptions),
+        code: Joi.string().valid("", ...rfoCodeOptions),
+      }),
     })
   ),
+};
+
+// "SCX NOC Users/Admin: EDIT Modify Ticket" - RFO Request tab, its own
+// dedicated endpoint (see ticket.route.js/saveTicketRfo) rather than going
+// through the general updateTicket above, since it must stay editable even
+// once the ticket is Closed/Completed.
+const saveRfo = {
+  params: Joi.object().keys({
+    ticketId: Joi.string().custom(objectId),
+  }),
+  body: Joi.object().keys({
+    requested: Joi.string().valid("", "Yes", "No"),
+    requestDate: Joi.string().allow(""),
+    problemStartDateTime: Joi.string().allow(""),
+    problemStopDateTime: Joi.string().allow(""),
+    status: Joi.string().valid("", ...rfoRequestStatusOptions),
+    code: Joi.string().valid("", ...rfoCodeOptions),
+    description: Joi.string().allow(""),
+    // "Give Button at Below - Save and Save and Closed. When Save and
+    // Closed is clicked; Save and Change Ticket Status as RFO Closed"
+    closeNow: Joi.boolean(),
+  }),
 };
 
 const appendDescription = {
@@ -104,6 +125,7 @@ module.exports = {
   getTickets,
   // getTicket,
   updateTicket,
+  saveRfo,
   appendDescription,
   deactivateTicket,
 };

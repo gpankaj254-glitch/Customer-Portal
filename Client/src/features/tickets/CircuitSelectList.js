@@ -16,10 +16,17 @@ import _ from "lodash"
 import { useSelector, useDispatch } from "react-redux"
 import { getSites, selectSiteList } from "../inventory/inventorySlice"
 
+// "Create new Ticket - Show only List of only Circuits with status Live" - a
+// circuit with no stored status yet is still "Live" (the schema default only
+// applies once Mongoose hydrates a document, not to this already-fetched,
+// flattened client-side data - same fallback used throughout Inventory).
 function flattenCircuits(siteList) {
     const rows = []
     siteList.forEach((site) => {
         (site.circuitList || []).forEach((circuit) => {
+            if ((circuit.status || "Live") !== "Live") {
+                return
+            }
             rows.push({
                 ...circuit,
                 site: { id: site.id, name: site.name, code: site.code },

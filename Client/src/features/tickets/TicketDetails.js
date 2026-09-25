@@ -13,29 +13,21 @@ import Tab from "@mui/material/Tab"
 import Snackbar from "@mui/material/Snackbar"
 import Alert from "@mui/material/Alert"
 import Box from "@mui/material/Box"
+import FormLabel from "@mui/material/FormLabel"
+import RadioGroup from "@mui/material/RadioGroup"
+import Radio from "@mui/material/Radio"
+import FormControlLabel from "@mui/material/FormControlLabel"
 import PropTypes from "prop-types"
 import _ from "lodash"
 import { useSelector, useDispatch } from "react-redux"
 import { getFormattedDate } from "../../utils/dates"
-import { updateTicket, appendTicketDescription, uploadTicketAttachments, appendVendorDescription, uploadVendorAttachments } from "./ticketSlice"
+import { updateTicket, saveTicketRfo, appendTicketDescription, uploadTicketAttachments, appendVendorDescription, uploadVendorAttachments } from "./ticketSlice"
 import { downloadTicketAttachment, downloadVendorAttachment } from "./ticketsAPI"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
-import { problemTypeOptions, priorityOptions, statusOptions, openStatusOptions, closureCodeOptions, rfoStatusOptions, vendorTicketStatusOptions } from "../../consts/ticketOptions"
+import { problemTypeOptions, priorityOptions, statusOptions, openStatusOptions, closureCodeOptions, rfoRequestStatusOptions, rfoCodeOptions, vendorTicketStatusOptions } from "../../consts/ticketOptions"
 
 const ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.gif,.bmp,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
-
-// MUI number TextFields hand back "" when empty - convert that (and any
-// other non-numeric input) to null rather than sending NaN/"" to the server.
-function numOrNull(value) {
-    if (value === "" || value === null || value === undefined) return null
-    const parsed = Number(value)
-    return Number.isNaN(parsed) ? null : parsed
-}
-
-function numToInputValue(value) {
-    return value === null || value === undefined ? "" : String(value)
-}
 
 // Problem Start Date and Time is typed into a datetime-local box on Create
 // Ticket and saved as a plain "YYYY-MM-DDTHH:mm" string (no time zone).
@@ -48,6 +40,17 @@ function nowForDateTimeInput() {
     const now = new Date()
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
     return now.toISOString().slice(0, 16)
+}
+
+// Same shape as nowForDateTimeInput above, but for an arbitrary already-saved
+// date (e.g. ticket.closedAt) rather than "now" - used to seed the
+// redesigned Ticket Closure Details tab's editable Ticket Closure Date/Time.
+function dateTimeLocalValue(dateInput) {
+    if (!dateInput) return ""
+    const date = new Date(dateInput)
+    if (Number.isNaN(date.getTime())) return ""
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+    return date.toISOString().slice(0, 16)
 }
 
 function AttachmentList({ attachments, onDownload }) {
@@ -88,6 +91,21 @@ export default function TicketDetails({ ticket, mode }) {
     const descriptionRef = React.useRef(null)
     const vendorDescriptionRef = React.useRef(null)
 
+    // Hoisted above the state block below - a few of the new RFO tab's own
+    // default values (problemStartDateTime/problemStopDateTime when RFO
+    // Request received is "No") are seeded from these.
+    const history = _.get(ticket, "history", [])
+    const createdAt = _.get(history, "[0].updatedAt", "")
+    const problemStartDate = _.get(ticket, "problemStartDate", "") || ""
+    const problemStartUsable = WALL_CLOCK.test(problemStartDate)
+    const ticketStatus = _.get(ticket, "status")
+    // The ticket's saved closing details, shown read-only in the details of a
+    // Closed/Completed ticket (customers and SCX alike). Older imported tickets
+    // may have no closed date recorded.
+    const closedAtText = _.get(ticket, "closedAt") ? getFormattedDate(ticket.closedAt) : "Not recorded"
+    const closureCodeText = _.get(ticket, "closureCode") || "Not recorded"
+    const closedAtInitial = dateTimeLocalValue(_.get(ticket, "closedAt", ""))
+
     const [activeTab, setActiveTab] = React.useState(0)
 
     const [problemType, setProblemType] = React.useState(_.get(ticket, "problemType", ""))
@@ -114,41 +132,31 @@ export default function TicketDetails({ ticket, mode }) {
     const [vendorAttachments, setVendorAttachments] = React.useState(_.get(ticket, "vendorAttachments", []))
     const vendorFileInputRef = React.useRef(null)
 
-    const [rfoStatus, setRfoStatus] = React.useState(_.get(ticket, "closureDetails.rfoStatus", ""))
-    const [ticketStartDateTime, setTicketStartDateTime] = React.useState(_.get(ticket, "closureDetails.ticketStartDateTime", ""))
-    const [actualIssueStartDateTime, setActualIssueStartDateTime] = React.useState(_.get(ticket, "closureDetails.actualIssueStartDateTime", ""))
-    const [reportedToSupplier, setReportedToSupplier] = React.useState(_.get(ticket, "closureDetails.reportedToSupplier", ""))
-    const [resolvedFromSupplier, setResolvedFromSupplier] = React.useState(_.get(ticket, "closureDetails.resolvedFromSupplier", ""))
-    const [issueReportedResolvedToAryaka, setIssueReportedResolvedToAryaka] = React.useState(_.get(ticket, "closureDetails.issueReportedResolvedToAryaka", ""))
-    const [actualDownTimeMinutes, setActualDownTimeMinutes] = React.useState(numToInputValue(_.get(ticket, "closureDetails.actualDownTimeMinutes", null)))
-    const [issueResolvedDateTime, setIssueResolvedDateTime] = React.useState(_.get(ticket, "closureDetails.issueResolvedDateTime", ""))
-    const [overallDownTime, setOverallDownTime] = React.useState(numToInputValue(_.get(ticket, "closureDetails.overallDownTime", null)))
-    const [rfo, setRfo] = React.useState(_.get(ticket, "closureDetails.rfo", ""))
-    const [reason, setReason] = React.useState(_.get(ticket, "closureDetails.reason", ""))
-    const [reasonCode, setReasonCode] = React.useState(_.get(ticket, "closureDetails.reasonCode", ""))
-    const [remarks, setRemarks] = React.useState(_.get(ticket, "closureDetails.remarks", ""))
-    const [scloudxBucket, setScloudxBucket] = React.useState(numToInputValue(_.get(ticket, "closureDetails.scloudxBucket", null)))
-    const [supplierBucket, setSupplierBucket] = React.useState(numToInputValue(_.get(ticket, "closureDetails.supplierBucket", null)))
-    const [customerBucket, setCustomerBucket] = React.useState(numToInputValue(_.get(ticket, "closureDetails.customerBucket", null)))
-    const [category, setCategory] = React.useState(_.get(ticket, "closureDetails.category", ""))
-    const [totalMinutes, setTotalMinutes] = React.useState(numToInputValue(_.get(ticket, "closureDetails.totalMinutes", null)))
-    const [downTimeMinutes, setDownTimeMinutes] = React.useState(numToInputValue(_.get(ticket, "closureDetails.downTimeMinutes", null)))
-    const [uptimePercent, setUptimePercent] = React.useState(numToInputValue(_.get(ticket, "closureDetails.uptimePercent", null)))
-    const [downTimeHours, setDownTimeHours] = React.useState(numToInputValue(_.get(ticket, "closureDetails.downTimeHours", null)))
+    // RFO Request tab - "SCX NOC Users/Admin: EDIT Modify Ticket". Always
+    // editable (never locked by ticket status - see saveTicketRfo), so
+    // unlike every other tab here these have no *Locked companion.
+    const [rfoRequested, setRfoRequested] = React.useState(_.get(ticket, "rfo.requested", "No"))
+    const [rfoRequestDate, setRfoRequestDate] = React.useState(_.get(ticket, "rfo.requestDate", ""))
+    // Defaulted from Problem Start Date/Ticket Closure Date the same way the
+    // redesigned Ticket Closure Details tab's own "requested = No" branch
+    // describes, so the two stay pre-filled consistently whichever tab is
+    // filled in first - still freely editable either way.
+    const [rfoProblemStartDateTime, setRfoProblemStartDateTime] = React.useState(
+        _.get(ticket, "rfo.problemStartDateTime", "") || (problemStartUsable ? problemStartDate.slice(0, 16) : "")
+    )
+    const [rfoProblemStopDateTime, setRfoProblemStopDateTime] = React.useState(
+        _.get(ticket, "rfo.problemStopDateTime", "") || closedAtInitial
+    )
+    const [rfoRequestStatus, setRfoRequestStatus] = React.useState(_.get(ticket, "rfo.status", "Not Received"))
+    const [rfoCode, setRfoCode] = React.useState(_.get(ticket, "rfo.code", ""))
+    const [rfoDescription, setRfoDescription] = React.useState(_.get(ticket, "rfo.description", ""))
+
+    // Redesigned Ticket Closure Details tab's own editable "Ticket Closure
+    // Date/Time" (previously this tab couldn't touch closedAt at all).
+    const [closureDateTime, setClosureDateTime] = React.useState(closedAtInitial)
 
     const [submitting, setSubmitting] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)
-
-    const history = _.get(ticket, "history", [])
-    const createdAt = _.get(history, "[0].updatedAt", "")
-    const problemStartDate = _.get(ticket, "problemStartDate", "") || ""
-    const problemStartUsable = WALL_CLOCK.test(problemStartDate)
-    const ticketStatus = _.get(ticket, "status")
-    // The ticket's saved closing details, shown read-only in the details of a
-    // Closed/Completed ticket (customers and SCX alike). Older imported tickets
-    // may have no closed date recorded.
-    const closedAtText = _.get(ticket, "closedAt") ? getFormattedDate(ticket.closedAt) : "Not recorded"
-    const closureCodeText = _.get(ticket, "closureCode") || "Not recorded"
     // Customer Communication / Vendor Communication's own fields are only
     // editable from the Open Tickets view - once a ticket has moved to the
     // Closed or Completed tab, only the Ticket Closure details tab may
@@ -247,41 +255,65 @@ export default function TicketDetails({ ticket, mode }) {
         }
     }
 
-    // Ticket Closure details - Closed Tickets tab only. Lets the ticket
-    // either stay Closed (just resaving the closure details) or move on to
-    // Completed; nothing else on the ticket changes from here.
-    const handleClosureSubmit = async (event) => {
-        event.preventDefault()
+    // Redesigned Ticket Closure Details tab - Closed Tickets tab only.
+    // "Give Button at Below - Save and Save and Closed. ... Save and Change
+    // Ticket Status as Completed" - forceStatus is only passed by the Save
+    // and Closed button below (event is then null, not a form submission);
+    // the plain Save button (type="submit", forceStatus undefined) just
+    // resaves the ticket's current status as-is.
+    const handleClosureSubmit = async (event, forceStatus) => {
+        if (event && event.preventDefault) event.preventDefault()
+        const nextStatus = forceStatus || status
         setSubmitting(true)
         try {
             await dispatch(updateTicket([{
                 ticketId: ticket.id,
-                status,
-                rfoStatus,
-                ticketStartDateTime,
-                actualIssueStartDateTime,
-                reportedToSupplier,
-                resolvedFromSupplier,
-                issueReportedResolvedToAryaka,
-                actualDownTimeMinutes: numOrNull(actualDownTimeMinutes),
-                issueResolvedDateTime,
-                overallDownTime: numOrNull(overallDownTime),
-                rfo,
-                reason,
-                reasonCode,
-                remarks,
-                scloudxBucket: numOrNull(scloudxBucket),
-                supplierBucket: numOrNull(supplierBucket),
-                customerBucket: numOrNull(customerBucket),
-                category,
-                totalMinutes: numOrNull(totalMinutes),
-                downTimeMinutes: numOrNull(downTimeMinutes),
-                uptimePercent: numOrNull(uptimePercent),
-                downTimeHours: numOrNull(downTimeHours),
+                status: nextStatus,
+                closedAt: closureDateTime ? new Date(closureDateTime).toISOString() : undefined,
+                // Only meaningful (and only sent editable on this tab) when
+                // RFO Request received is "No" - the "Yes" case is a
+                // read-only mirror of the RFO Request tab instead; the
+                // server itself ignores this when requested is "Yes" too
+                // (see ticket.service.js's updateTicket), this just avoids
+                // sending stale edits that wouldn't be applied anyway.
+                rfo: rfoRequested === "No" ? {
+                    problemStartDateTime: rfoProblemStartDateTime,
+                    problemStopDateTime: rfoProblemStopDateTime,
+                    status: rfoRequestStatus,
+                    code: rfoCode,
+                } : undefined,
             }])).unwrap()
+            setStatus(nextStatus)
             setFeedback({ severity: "success", message: "Ticket updated successfully" })
         } catch (err) {
             setFeedback({ severity: "error", message: err || "Failed to update ticket" })
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    // RFO Request tab - its own dedicated endpoint/thunk (saveTicketRfo),
+    // not updateTicket, since it must stay editable even once the ticket is
+    // Closed/Completed (see ticket.service.js's saveTicketRfo for why).
+    // "When Save and Closed is clicked; Save and Change Ticket Status as
+    // RFO Closed" - closeNow is only true for that second button.
+    const handleSaveRfo = async (closeNow) => {
+        setSubmitting(true)
+        try {
+            await dispatch(saveTicketRfo({
+                ticketId: ticket.id,
+                requested: rfoRequested,
+                requestDate: rfoRequestDate,
+                problemStartDateTime: rfoProblemStartDateTime,
+                problemStopDateTime: rfoProblemStopDateTime,
+                status: rfoRequestStatus,
+                code: rfoCode,
+                description: rfoDescription,
+                closeNow,
+            })).unwrap()
+            setFeedback({ severity: "success", message: closeNow ? "RFO Request saved - ticket status set to RFO Closed" : "RFO Request saved" })
+        } catch (err) {
+            setFeedback({ severity: "error", message: err || "Failed to save RFO Request" })
         } finally {
             setSubmitting(false)
         }
@@ -548,6 +580,11 @@ export default function TicketDetails({ ticket, mode }) {
                 >
                     <Tab label="Customer Communication" />
                     <Tab label="Vendor Communication" />
+                    {/* "After Vendor Communication, Tab 'RFO Request' Editable
+                        even in Closed and Completed status" - unlike every
+                        other tab here, always shown/editable regardless of
+                        mode. */}
+                    <Tab label="RFO Request" />
                     {mode !== "open" && <Tab label="Ticket Closure details" />}
                 </Tabs>
 
@@ -913,218 +950,228 @@ export default function TicketDetails({ ticket, mode }) {
                     </Box>
                 )}
 
-                {activeTab === 2 && mode !== "open" && (
-                    <Box component="form" noValidate onSubmit={handleClosureSubmit}>
+                {activeTab === 2 && (
+                    <Box>
                         <Grid container spacing={2}>
-                            {mode === "closed" && (
-                                <Grid item xs={12} sm={4}>
-                                    <FormControl fullWidth required>
-                                        <InputLabel id={`closure-status-${ticket.id}`}>Status</InputLabel>
-                                        <Select
-                                            labelId={`closure-status-${ticket.id}`}
-                                            value={status}
-                                            label="Status"
-                                            onChange={(event) => setStatus(event.target.value)}
-                                        >
-                                            <MenuItem value="Closed">Closed</MenuItem>
-                                            <MenuItem value="Completed">Completed</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                            )}
                             <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth disabled={closureFieldsLocked}>
-                                    <InputLabel id="rfo-status-label">RFO Status</InputLabel>
-                                    <Select
-                                        labelId="rfo-status-label"
-                                        value={rfoStatus}
-                                        label="RFO Status"
-                                        onChange={(event) => setRfoStatus(event.target.value)}
+                                <FormControl>
+                                    <FormLabel id="rfo-requested-label">RFO Request received</FormLabel>
+                                    <RadioGroup
+                                        row
+                                        aria-labelledby="rfo-requested-label"
+                                        value={rfoRequested}
+                                        onChange={(event) => setRfoRequested(event.target.value)}
                                     >
-                                        <MenuItem value=""><em>None</em></MenuItem>
-                                        {rfoStatusOptions.map((option) => (
-                                            <MenuItem key={option} value={option}>{option}</MenuItem>
-                                        ))}
-                                    </Select>
+                                        <FormControlLabel value="No" control={<Radio />} label="No" />
+                                        <FormControlLabel value="Yes" control={<Radio />} label="Yes" />
+                                    </RadioGroup>
                                 </FormControl>
                             </Grid>
+                            {/* "If Changed to Yes, Rest of fields visible to fill" */}
+                            {rfoRequested === "Yes" && (
+                                <>
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField
+                                            fullWidth
+                                            type="datetime-local"
+                                            label="RFO Request Date (IST)"
+                                            InputLabelProps={{ shrink: true }}
+                                            value={rfoRequestDate}
+                                            onChange={(event) => setRfoRequestDate(event.target.value)}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField
+                                            fullWidth
+                                            type="datetime-local"
+                                            label="RFO Problem Start Date/Time (GMT)"
+                                            InputLabelProps={{ shrink: true }}
+                                            value={rfoProblemStartDateTime}
+                                            onChange={(event) => setRfoProblemStartDateTime(event.target.value)}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField
+                                            fullWidth
+                                            type="datetime-local"
+                                            label="RFO Problem Stop Date/Time (GMT)"
+                                            InputLabelProps={{ shrink: true }}
+                                            value={rfoProblemStopDateTime}
+                                            onChange={(event) => setRfoProblemStopDateTime(event.target.value)}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <FormControl fullWidth>
+                                            <InputLabel id="rfo-request-status-label">RFO Status</InputLabel>
+                                            <Select
+                                                labelId="rfo-request-status-label"
+                                                value={rfoRequestStatus}
+                                                label="RFO Status"
+                                                onChange={(event) => setRfoRequestStatus(event.target.value)}
+                                            >
+                                                {rfoRequestStatusOptions.map((option) => (
+                                                    <MenuItem key={option} value={option}>{option}</MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <FormControl fullWidth>
+                                            <InputLabel id="rfo-code-label">RFO Code</InputLabel>
+                                            <Select
+                                                labelId="rfo-code-label"
+                                                value={rfoCode}
+                                                label="RFO Code"
+                                                onChange={(event) => setRfoCode(event.target.value)}
+                                            >
+                                                <MenuItem value=""><em>None</em></MenuItem>
+                                                {rfoCodeOptions.map((option) => (
+                                                    <MenuItem key={option} value={option}>{option}</MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth
+                                            multiline
+                                            minRows={3}
+                                            label="RFO Description"
+                                            value={rfoDescription}
+                                            onChange={(event) => setRfoDescription(event.target.value)}
+                                        />
+                                    </Grid>
+                                </>
+                            )}
+                            <Grid item xs={12}>
+                                <Button variant="contained" disabled={submitting} onClick={() => handleSaveRfo(false)}>
+                                    {submitting ? "Saving..." : "Save"}
+                                </Button>
+                                <Button variant="outlined" sx={{ ml: 1 }} disabled={submitting} onClick={() => handleSaveRfo(true)}>
+                                    Save and Closed
+                                </Button>
+                            </Grid>
+                        </Grid>
+                    </Box>
+                )}
+
+                {activeTab === 3 && mode !== "open" && (
+                    <Box component="form" noValidate onSubmit={handleClosureSubmit}>
+                        <Grid container spacing={2}>
+                            <Grid item xs={12} sm={4}>
+                                <TextField fullWidth label="Ticket Create Date/Time" value={createdAt ? getFormattedDate(createdAt) : ""} disabled />
+                            </Grid>
                             <Grid item xs={12} sm={4}>
                                 <TextField
                                     fullWidth
+                                    label="Problem Start Date/Time"
+                                    value={problemStartUsable ? getFormattedDate(problemStartDate) : (problemStartDate || "Not provided")}
+                                    disabled
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <TextField
+                                    fullWidth
+                                    required
                                     type="datetime-local"
-                                    label="Ticket Start Date & Time (IST)"
+                                    label="Ticket Closure Date/Time"
                                     InputLabelProps={{ shrink: true }}
-                                    value={ticketStartDateTime}
-                                    onChange={(event) => setTicketStartDateTime(event.target.value)}
+                                    value={closureDateTime}
+                                    onChange={(event) => setClosureDateTime(event.target.value)}
                                     disabled={closureFieldsLocked}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="datetime-local"
-                                    label="Actual Issue Start Date & Time"
-                                    InputLabelProps={{ shrink: true }}
-                                    value={actualIssueStartDateTime}
-                                    onChange={(event) => setActualIssueStartDateTime(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="datetime-local"
-                                    label="Reported to Supplier"
-                                    InputLabelProps={{ shrink: true }}
-                                    value={reportedToSupplier}
-                                    onChange={(event) => setReportedToSupplier(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="datetime-local"
-                                    label="Resolved from Supplier"
-                                    InputLabelProps={{ shrink: true }}
-                                    value={resolvedFromSupplier}
-                                    onChange={(event) => setResolvedFromSupplier(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="datetime-local"
-                                    label="Issue reported resolved to Aryaka"
-                                    InputLabelProps={{ shrink: true }}
-                                    value={issueReportedResolvedToAryaka}
-                                    onChange={(event) => setIssueReportedResolvedToAryaka(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Actual Down time (Minutes)"
-                                    value={actualDownTimeMinutes}
-                                    onChange={(event) => setActualDownTimeMinutes(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="datetime-local"
-                                    label="Issue resolved Date & Time (IST)"
-                                    InputLabelProps={{ shrink: true }}
-                                    value={issueResolvedDateTime}
-                                    onChange={(event) => setIssueResolvedDateTime(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Overall Down Time"
-                                    value={overallDownTime}
-                                    onChange={(event) => setOverallDownTime(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="RFO" value={rfo} onChange={(event) => setRfo(event.target.value)} disabled={closureFieldsLocked} />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} disabled={closureFieldsLocked} />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Reason Code" value={reasonCode} onChange={(event) => setReasonCode(event.target.value)} disabled={closureFieldsLocked} />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Remarks" value={remarks} onChange={(event) => setRemarks(event.target.value)} disabled={closureFieldsLocked} />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Scloudx Bucket"
-                                    value={scloudxBucket}
-                                    onChange={(event) => setScloudxBucket(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Supplier Bucket"
-                                    value={supplierBucket}
-                                    onChange={(event) => setSupplierBucket(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Customer Bucket"
-                                    value={customerBucket}
-                                    onChange={(event) => setCustomerBucket(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Category" value={category} onChange={(event) => setCategory(event.target.value)} disabled={closureFieldsLocked} />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Total Minutes"
-                                    value={totalMinutes}
-                                    onChange={(event) => setTotalMinutes(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Down Time Minutes"
-                                    value={downTimeMinutes}
-                                    onChange={(event) => setDownTimeMinutes(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Uptime %"
-                                    value={uptimePercent}
-                                    onChange={(event) => setUptimePercent(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Down Time Hours"
-                                    value={downTimeHours}
-                                    onChange={(event) => setDownTimeHours(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
+
+                            {rfoRequested === "Yes" ? (
+                                <>
+                                    <Grid item xs={12}>
+                                        <Typography variant="subtitle2" sx={{ mt: 1 }}>
+                                            RFO Request received = Yes - shown below as entered on the RFO Request tab (read-only here)
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField fullWidth label="RFO Problem Start Date/Time" value={rfoProblemStartDateTime} disabled />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField fullWidth label="RFO Problem Stop Date/Time" value={rfoProblemStopDateTime} disabled />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField fullWidth label="RFO Status" value={rfoRequestStatus} disabled />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField fullWidth label="RFO Code" value={rfoCode} disabled />
+                                    </Grid>
+                                </>
+                            ) : (
+                                <>
+                                    {/* "RFO Request received = No; Display Below In Edit
+                                        Mode" - defaulted to Problem Start Date/Time and
+                                        Ticket Closure Date/Time respectively (see this
+                                        component's own rfoProblemStartDateTime/
+                                        rfoProblemStopDateTime state), still freely editable. */}
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField
+                                            fullWidth
+                                            type="datetime-local"
+                                            label="RFO Problem Start Date/Time"
+                                            InputLabelProps={{ shrink: true }}
+                                            value={rfoProblemStartDateTime}
+                                            onChange={(event) => setRfoProblemStartDateTime(event.target.value)}
+                                            disabled={closureFieldsLocked}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField
+                                            fullWidth
+                                            type="datetime-local"
+                                            label="RFO Problem Stop Date/Time"
+                                            InputLabelProps={{ shrink: true }}
+                                            value={rfoProblemStopDateTime}
+                                            onChange={(event) => setRfoProblemStopDateTime(event.target.value)}
+                                            disabled={closureFieldsLocked}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <FormControl fullWidth disabled={closureFieldsLocked}>
+                                            <InputLabel id="closure-rfo-code-label">RFO Code</InputLabel>
+                                            <Select
+                                                labelId="closure-rfo-code-label"
+                                                value={rfoCode}
+                                                label="RFO Code"
+                                                onChange={(event) => setRfoCode(event.target.value)}
+                                            >
+                                                <MenuItem value=""><em>None</em></MenuItem>
+                                                {rfoCodeOptions.map((option) => (
+                                                    <MenuItem key={option} value={option}>{option}</MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+                                </>
+                            )}
 
                             {!closureFieldsLocked && (
                                 <Grid item xs={12}>
                                     <Button type="submit" variant="contained" disabled={submitting}>
                                         {submitting ? "Saving..." : "Save"}
                                     </Button>
+                                    {/* "Give Button at Below - Save and Save and Closed.
+                                        When Save and Closed is clicked; Save and Change
+                                        Ticket Status as Completed" - only offered from
+                                        Closed (mode "completed" has no further status to
+                                        move to; Admin can still use plain Save there to
+                                        amend the RFO/closure record). */}
+                                    {mode === "closed" && (
+                                        <Button
+                                            type="button"
+                                            variant="outlined"
+                                            sx={{ ml: 1 }}
+                                            disabled={submitting}
+                                            onClick={(event) => handleClosureSubmit(event, "Completed")}
+                                        >
+                                            Save and Closed
+                                        </Button>
+                                    )}
                                 </Grid>
                             )}
                         </Grid>

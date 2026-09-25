@@ -103,15 +103,11 @@ function InventoryContent() {
     // deliveryOrder.service.js's createCircuitFromOrder).
     const isAdmin = currentUser.role === roles.SCLOUDX_ADMIN
     const canCreate = isAdmin
-    // "Remove Live Site Inventory, Changed Site Inventory and Ceased Site
-    // Inventory for Management, and Sales roles" - these three site-centric
-    // tabs stay for everyone else; the two circuit-centric tabs above them
-    // are unaffected.
-    const hideSiteInventoryTabs = [
-        roles.SCLOUDX_MANAGEMENT,
-        roles.SCLOUDX_SALES_ADMIN,
-        roles.SCLOUDX_SALES_USER,
-    ].includes(currentUser.role)
+    // "Inventory management - remove Live/Changed/Ceased Site Inventory for
+    // everyone except SCX Admin" - supersedes the earlier, narrower "remove
+    // for Management and Sales roles only" rule below; the two circuit-
+    // centric tabs above them are unaffected either way.
+    const hideSiteInventoryTabs = !isAdmin
 
     // Local, uncommitted text box value - kept separate from the Redux search
     // term so we can debounce before actually dispatching a fetch.

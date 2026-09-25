@@ -237,30 +237,6 @@ const getAuthorizedTicket = async (ticketId, user) => {
  * @param {Object} user
  * @returns {Promise<Ticket>}
  */
-const CLOSURE_DETAIL_FIELDS = [
-  "rfoStatus",
-  "ticketStartDateTime",
-  "actualIssueStartDateTime",
-  "reportedToSupplier",
-  "resolvedFromSupplier",
-  "issueReportedResolvedToAryaka",
-  "actualDownTimeMinutes",
-  "issueResolvedDateTime",
-  "overallDownTime",
-  "rfo",
-  "reason",
-  "reasonCode",
-  "remarks",
-  "scloudxBucket",
-  "supplierBucket",
-  "customerBucket",
-  "category",
-  "totalMinutes",
-  "downTimeMinutes",
-  "uptimePercent",
-  "downTimeHours",
-];
-
 const updateTicket = async (ticketBody, user) => {
   const {
     ticketId,
@@ -287,7 +263,11 @@ const updateTicket = async (ticketBody, user) => {
     throw new ApiError(httpStatus.BAD_REQUEST, "This ticket is completed and can no longer be modified");
   }
 
-  if (ticket.status === "Closed" || (ticket.status === "Completed" && isScxAdmin)) {
+  // "RFO Closed" (set via the RFO Request tab's own "Save and Closed" - see
+  // saveTicketRfo below) behaves like "Closed" here too, so a ticket closed
+  // that way can still have its Ticket Closure Details edited/completed
+  // the same as one closed the ordinary way.
+  if (ticket.status === "Closed" || ticket.status === "RFO Closed" || (ticket.status === "Completed" && isScxAdmin)) {
     // Once Closed (or Completed, for SCX Admin), the rest of the ticket is
     // frozen for every other role - only Ticket Closure details may still
     // be edited, via the Closed Tickets tab, and status can only stay put
@@ -298,11 +278,26 @@ const updateTicket = async (ticketBody, user) => {
     if (!isScxAdmin && status !== ticket.status && status !== "Completed") {
       throw new ApiError(httpStatus.BAD_REQUEST, "This ticket's status can only stay the same or move to Completed");
     }
-    CLOSURE_DETAIL_FIELDS.forEach((field) => {
-      if (ticketBody[field] !== undefined) {
-        ticket.closureDetails[field] = ticketBody[field];
-      }
-    });
+    // Redesigned Ticket Closure Details tab - "Ticket Closure Date/Time:
+    // Display Existing - Editable" - previously this tab couldn't touch
+    // closedAt at all (only the initial close, in the still-open branch
+    // below, ever set it). Available to NOC too, not just Admin (same
+    // closureFieldsLocked reasoning the client uses - Closed stays editable
+    // for everyone, only Completed is Admin-only).
+    if (closedAt) {
+      ticket.closedAt = new Date(closedAt);
+    }
+    // Problem Start/Stop Date-Time, RFO Status and RFO Code are only
+    // editable here when RFO Request received is "No" (the "Yes" case is a
+    // read-only mirror of what was entered on the RFO Request tab instead -
+    // see saveTicketRfo below).
+    if (ticketBody.rfo && ticket.rfo.requested !== "Yes") {
+      const { problemStartDateTime, problemStopDateTime, status: rfoStatus, code: rfoCode } = ticketBody.rfo;
+      if (problemStartDateTime !== undefined) ticket.rfo.problemStartDateTime = problemStartDateTime;
+      if (problemStopDateTime !== undefined) ticket.rfo.problemStopDateTime = problemStopDateTime;
+      if (rfoStatus !== undefined) ticket.rfo.status = rfoStatus;
+      if (rfoCode !== undefined) ticket.rfo.code = rfoCode;
+    }
     if (isScxAdmin) {
       // Same fields a still-open ticket allows below - SCX Admin can still
       // fix these after the ticket is Closed/Completed.
@@ -317,10 +312,11 @@ const updateTicket = async (ticketBody, user) => {
       if (vendorTicketCreateDate !== undefined) ticket.vendorTicketCreateDate = vendorTicketCreateDate;
       if (vendorTicketStatus !== undefined) ticket.vendorTicketStatus = vendorTicketStatus;
       if (vendorTicketClosureDate !== undefined) ticket.vendorTicketClosureDate = vendorTicketClosureDate;
-      // Reopening (any status other than Closed/Completed) has to clear
-      // .closed too, or appendTicketDescription/addTicketAttachments (etc.)
-      // would keep rejecting the now-reopened ticket as still closed.
-      ticket.closed = status === "Closed" || status === "Completed";
+      // Reopening (any status other than Closed/Completed/RFO Closed) has
+      // to clear .closed too, or appendTicketDescription/
+      // addTicketAttachments (etc.) would keep rejecting the now-reopened
+      // ticket as still closed.
+      ticket.closed = status === "Closed" || status === "Completed" || status === "RFO Closed";
     }
     ticket.status = status;
     return updateAndSave(ticket, status, "", user);
@@ -386,6 +382,51 @@ const updateTicket = async (ticketBody, user) => {
   }
 
   return updateAndSave(ticket, status, "", user);
+};
+
+/**
+ * "SCX NOC Users/Admin: EDIT Modify Ticket" - RFO Request tab. Stays
+ * editable for SCX NOC/Admin even once the ticket is Closed or Completed
+ * (unlike updateTicket above, which freezes everything but Ticket Closure
+ * Details once Closed, and freezes everything for non-Admin once
+ * Completed) - a deliberately separate, narrower endpoint rather than
+ * another bypass bolted onto updateTicket. Route-level auth("updateTickets")
+ * already limits this to SCX NOC/Admin, the only two roles holding that
+ * right (see roles.js).
+ * @param {ObjectId} ticketId
+ * @param {Object} rfoBody
+ * @param {Object} user
+ * @returns {Promise<Ticket>}
+ */
+const saveTicketRfo = async (ticketId, rfoBody, user) => {
+  const ticket = await getAuthorizedTicket(ticketId, user);
+  const { requested, requestDate, problemStartDateTime, problemStopDateTime, status, code, description, closeNow } = rfoBody;
+
+  if (requested !== undefined) _.set(ticket, "rfo.requested", requested);
+  if (requestDate !== undefined) _.set(ticket, "rfo.requestDate", requestDate);
+  if (problemStartDateTime !== undefined) _.set(ticket, "rfo.problemStartDateTime", problemStartDateTime);
+  if (problemStopDateTime !== undefined) _.set(ticket, "rfo.problemStopDateTime", problemStopDateTime);
+  if (status !== undefined) _.set(ticket, "rfo.status", status);
+  if (code !== undefined) _.set(ticket, "rfo.code", code);
+  if (description !== undefined) _.set(ticket, "rfo.description", description);
+
+  // "Give Button at Below - Save and Save and Closed. When Save and Closed
+  // is clicked; Save and Change Ticket Status as RFO Closed" - behaves like
+  // "Closed" (closed=true, shows in the Closed Tickets list - see
+  // ticket.controller.js's getTickets), but doesn't regress an already-
+  // Completed ticket, which is the one genuinely terminal status - the RFO
+  // record can still be amended/saved on one (that's the point of staying
+  // editable "even in Closed and Completed status"), it just no longer
+  // moves status backwards once truly done.
+  if (closeNow && ticket.status !== "Completed") {
+    ticket.status = "RFO Closed";
+    ticket.closed = true;
+    if (!ticket.closedAt) {
+      ticket.closedAt = new Date();
+    }
+  }
+
+  return updateAndSave(ticket, ticket.status, "RFO Request updated", user);
 };
 
 /**
@@ -811,6 +852,7 @@ module.exports = {
   queryTickets,
   getTicketById,
   updateTicket,
+  saveTicketRfo,
   appendTicketDescription,
   addTicketAttachments,
   getTicketAttachment,

@@ -36,6 +36,19 @@ router
     ticketController.updateTicket
   );
 
+// "SCX NOC Users/Admin: EDIT Modify Ticket" - RFO Request tab. Same right
+// as the main /update endpoint (only SCX NOC/Admin hold updateTickets - see
+// roles.js), but its own dedicated route since it must stay editable even
+// once the ticket is Closed/Completed (see ticket.service.js's
+// saveTicketRfo for why this isn't just folded into /update).
+router
+  .route("/:ticketId/rfo")
+  .patch(
+    auth("updateTickets"),
+    validate(ticketValidation.saveRfo),
+    ticketController.saveRfo
+  );
+
 router
   .route("/append-description")
   .post(

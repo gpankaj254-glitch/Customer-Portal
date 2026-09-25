@@ -16,7 +16,7 @@ import { Alert } from "@mui/material"
 import PropTypes from "prop-types"
 import _ from "lodash"
 
-import { StatTile } from "./DashboardWidgets"
+import { StatTile, CountChart } from "./DashboardWidgets"
 import {getSites, selectGetSiteError, selectPageStatus as selectGetSiteStatus, selectSiteList} from "../inventory/inventorySlice"
 import { getCustomers, selectGetCustomersError, selectPageStatus as selectGetCustomerStatus } from "../customers/customerSlice"
 import {
@@ -41,8 +41,8 @@ import FinanceDashboard from "./FinanceDashboard"
 import ManagementDashboard from "./ManagementDashboard"
 import { getDeliveryOrders, selectOpenOrderList } from "../delivery/deliveryOrderSlice"
 import { getVendors } from "../vendors/vendorSlice"
-import DeliveryOrderTable from "../delivery/DeliveryOrderTable"
-import DeliveryOrderCharts from "./DeliveryOrderCharts"
+import DeliveryOrderTable, { currentMilestoneStatus } from "../delivery/DeliveryOrderTable"
+import DeliveryOrderCharts, { groupCounts } from "./DeliveryOrderCharts"
 
 const openTicketColumns = [
     "Ticket ID",
@@ -161,15 +161,46 @@ function DashboardContent() {
     // "Show View Open Orders in Dashboard for Delivery role" - same
     // openOrderList/vendor data the Service Delivery Management module
     // itself uses (see DeliveryOrders.js), fetched here too since a Service
-    // Delivery user may land on the Dashboard first.
+    // Delivery user may land on the Dashboard first. "Customer Admin
+    // Dashboard - New tab" (Open Orders) reuses the same openOrderList,
+    // server-scoped to the customer's own orders only (see
+    // filterByCustomerId in deliveryOrder.controller.js) - it has no need
+    // for the vendor list (Customer's Open Orders tab shows Vendor by name
+    // already returned on the order itself, unlike the Delivery role's own
+    // vendor-wise breakdown chart).
     React.useEffect(() => {
-        if (!isDeliveryRole) {
+        if (!isDeliveryRole && !isCustomerRole) {
             return
         }
         dispatch(getDeliveryOrders({ limit: 1000, page: 1, search: "", tab: "open" }))
-        dispatch(getVendors({ limit: 1000, page: 1 }))
+        if (isDeliveryRole) {
+            dispatch(getVendors({ limit: 1000, page: 1 }))
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isDeliveryRole])
+    }, [isDeliveryRole, isCustomerRole])
+
+    // "Customer Admin: Main Dashboard - Active Circuits - Total Live
+    // Circuits: Total Number, Number by Product, Number by Bandwidth" -
+    // computed client-side from the customer's own already-fetched
+    // siteList (each site's embedded circuitList), same effective-Live
+    // fallback used throughout Inventory (a circuit with no stored status
+    // yet is still "Live" - the schema default only applies once Mongoose
+    // hydrates a document, not to this flattened client-side data).
+    const liveCircuits = React.useMemo(() => {
+        const rows = []
+        siteList.forEach((site) => {
+            (site.circuitList || []).forEach((circuit) => {
+                if ((circuit.status || "Live") === "Live") {
+                    rows.push(circuit)
+                }
+            })
+        })
+        return rows
+    }, [siteList])
+    const circuitsByProduct = React.useMemo(() => groupCounts(liveCircuits, (circuit) => circuit.product), [liveCircuits])
+    const circuitsByBandwidth = React.useMemo(() => groupCounts(liveCircuits, (circuit) => circuit.bandwidth), [liveCircuits])
+    const ticketsByStatus = _.get(openAnalysis, "statusWise", [])
+    const ordersByMilestone = React.useMemo(() => groupCounts(openOrderList, currentMilestoneStatus), [openOrderList])
 
     // Sends the user to Tickets > View Open Ticket with this ticket's details
     // expanded (see ticketSlice's focusTicket and TicketsTable) - same as the
@@ -240,37 +271,74 @@ function DashboardContent() {
                                 sx={{ minHeight: 34, "& .MuiTab-root": { minHeight: 34, py: 0.5, fontSize: "0.72rem" } }}
                             >
                                 <Tab label="Main Dashboard" />
+                                <Tab label="Open Tickets" />
+                                <Tab label="Open Orders" />
                                 <Tab label="Closed Tickets" />
                             </Tabs>
                         </Grid>
-                        {customerTab === 1 ? (
+                        {customerTab === 3 ? (
                             <Grid item xs={12}>
                                 <CustomerClosedTickets />
                             </Grid>
+                        ) : customerTab === 1 ? (
+                            <>
+                                <Grid item xs={12} sm={6} md={3}>
+                                    <StatTile compact title="Total Open Tickets" value={_.get(summary, "openTickets", 0)} />
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={9}>
+                                    <CountChart compact title="Open Tickets - Status wise" data={ticketsByStatus} />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Typography component="h2" variant="h5" sx={{ mt: 0.5, fontSize: "0.85rem", fontWeight: 600 }}>List Open Tickets</Typography>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    {openAnalysisError ? (
+                                        <Alert severity="error">Unable to load open tickets</Alert>
+                                    ) : !openTicketsLoaded || !openAnalysis ? (
+                                        <Typography variant="body2" sx={{ fontSize: "0.72rem" }}>Loading...</Typography>
+                                    ) : (
+                                        <OpenTicketsTable rows={_.get(openAnalysis, "tickets", [])} onOpenTicket={handleOpenTicket} />
+                                    )}
+                                </Grid>
+                            </>
+                        ) : customerTab === 2 ? (
+                            <>
+                                <Grid item xs={12} sm={6} md={3}>
+                                    <StatTile compact title="Total Open Orders" value={openOrderList.length} />
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={9}>
+                                    <CountChart compact title="Open Orders - Milestone wise" data={ordersByMilestone} />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Typography component="h2" variant="h5" sx={{ mt: 0.5, fontSize: "0.85rem", fontWeight: 600 }}>List Open Orders</Typography>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <DeliveryOrderTable rows={openOrderList} dashboardView showCustomerPO />
+                                </Grid>
+                            </>
                         ) : (
                             <>
-                        <Grid item xs={12} sm={6} md={4}>
-                            <StatTile compact title="Active Sites" value={_.get(summary, "activeSites", 0)} />
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={4}>
-                            <StatTile compact title="Active Circuits" value={_.get(summary, "activeCircuits", 0)} />
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={4}>
-                            <StatTile compact title="Open Tickets" value={_.get(summary, "openTickets", 0)} />
-                        </Grid>
-
-                        <Grid item xs={12}>
-                            <Typography component="h2" variant="h5" sx={{ mt: 0.5, fontSize: "0.85rem", fontWeight: 600 }}>Open Tickets</Typography>
-                        </Grid>
-                        <Grid item xs={12}>
-                            {openAnalysisError ? (
-                                <Alert severity="error">Unable to load open tickets</Alert>
-                            ) : !openTicketsLoaded || !openAnalysis ? (
-                                <Typography variant="body2" sx={{ fontSize: "0.72rem" }}>Loading...</Typography>
-                            ) : (
-                                <OpenTicketsTable rows={_.get(openAnalysis, "tickets", [])} onOpenTicket={handleOpenTicket} />
-                            )}
-                        </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <StatTile compact title="Total Live Circuits" value={liveCircuits.length} />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <StatTile compact title="Total Open Tickets" value={_.get(summary, "openTickets", 0)} />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <StatTile compact title="Total Open Orders" value={openOrderList.length} />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <CountChart compact title="Live Circuits - Product wise" data={circuitsByProduct} />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <CountChart compact title="Live Circuits - Bandwidth wise" data={circuitsByBandwidth} />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <CountChart compact title="Open Tickets - Status wise" data={ticketsByStatus} />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <CountChart compact title="Open Orders - Milestone wise" data={ordersByMilestone} />
+                                </Grid>
                             </>
                         )}
                     </>
