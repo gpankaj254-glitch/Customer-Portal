@@ -15,15 +15,15 @@ import { customerName } from "../delivery/DeliveryOrderTable"
 import { groupCounts } from "./DeliveryOrderCharts"
 
 // "Main Dashboard - Add Summary Tab; Show - Total Customers, Total Live
-// Circuits, Sales - total Open Opportunities, Delivery, Total Open Orders
-// Customer Wise and Total, NOC Open Tickets and Open Tickets with Status -
-// InProgress" (SCX Admin/Management's Main Dashboard - see
-// ManagementDashboard.js, this tab's new first tab). Every number reuses
-// data each area's own tab already fetches/computes elsewhere in this app -
-// this component only adds the handful of fetches not already dispatched by
-// ManagementDashboard (getDashboardSummary/getSalesDashboardSummary/
-// getOpenTicketsAnalysis); Delivery's openOrderList is already fetched by
-// ManagementDashboard itself, so it isn't re-fetched here.
+// Circuits, Sales - total Open Opportunities in Bar Chart, Delivery - Total
+// Open Orders and Customer Wise in Bar Chart, NOC - Total Open Tickets and
+// Open Tickets with Status - InProgress in Bar Chart" (SCX Admin/Management's
+// Main Dashboard - see ManagementDashboard.js, this tab's own first tab).
+// Every number reuses data each area's own tab already fetches/computes
+// elsewhere in this app - this component only adds the handful of fetches
+// not already dispatched by ManagementDashboard
+// (getDashboardSummary/getSalesDashboardSummary/getOpenTicketsAnalysis);
+// Delivery's openOrderList is already fetched by ManagementDashboard itself.
 export default function DashboardSummary() {
     const dispatch = useDispatch()
     const summary = useSelector(selectDashboardSummary)
@@ -40,30 +40,43 @@ export default function DashboardSummary() {
     const statusWise = _.get(openTicketsAnalysis, "statusWise", [])
     const inProgressCount = _.get(_.find(statusWise, { name: "InProgress" }), "count", 0)
     const totalOpenTickets = _.get(openTicketsAnalysis, "tickets.length", 0)
-    const customerWiseOrders = React.useMemo(() => groupCounts(openOrderList, customerName), [openOrderList])
+    const totalOpenOpportunities = _.get(salesSummary, "totalOpenOpportunities", 0)
+
+    // "Sales - total Open Opportunities in Bar Chart" - a single-bar chart,
+    // for visual consistency with Delivery/NOC's own bar charts below rather
+    // than a plain number tile.
+    const salesChartData = React.useMemo(() => (
+        [{ name: "Total Open Opportunities", count: totalOpenOpportunities }]
+    ), [totalOpenOpportunities])
+
+    // "Delivery - Total Open Orders and Customer Wise in Bar Chart" - one
+    // chart, Total as its own bar alongside the customer-wise breakdown.
+    const deliveryChartData = React.useMemo(() => (
+        [{ name: "Total Open Orders", count: openOrderList.length }, ...groupCounts(openOrderList, customerName)]
+    ), [openOrderList])
+
+    // "NOC - Total Open Tickets and Open Tickets with Status - InProgress in
+    // Bar Chart" - one chart, both numbers as their own bars.
+    const nocChartData = React.useMemo(() => (
+        [{ name: "Total Open Tickets", count: totalOpenTickets }, { name: "InProgress", count: inProgressCount }]
+    ), [totalOpenTickets, inProgressCount])
 
     return (
         <Grid container spacing={1.5}>
-            <Grid item xs={6} sm={4} md={2}>
+            <Grid item xs={6} sm={3}>
                 <StatTile compact title="Total Customers" value={_.get(summary, "activeCustomers", 0)} />
             </Grid>
-            <Grid item xs={6} sm={4} md={2}>
+            <Grid item xs={6} sm={3}>
                 <StatTile compact title="Total Live Circuits" value={_.get(summary, "activeCircuits", 0)} />
             </Grid>
-            <Grid item xs={6} sm={4} md={2}>
-                <StatTile compact title="Sales - Total Open Opportunities" value={_.get(salesSummary, "totalOpenOpportunities", 0)} />
-            </Grid>
-            <Grid item xs={6} sm={4} md={2}>
-                <StatTile compact title="Delivery - Total Open Orders" value={openOrderList.length} />
-            </Grid>
-            <Grid item xs={6} sm={4} md={2}>
-                <StatTile compact title="NOC - Total Open Tickets" value={totalOpenTickets} />
-            </Grid>
-            <Grid item xs={6} sm={4} md={2}>
-                <StatTile compact title="NOC - Open Tickets (InProgress)" value={inProgressCount} />
+            <Grid item xs={12} sm={6} md={4}>
+                <CountChart compact title="Sales - Open Opportunities" data={salesChartData} />
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
-                <CountChart compact title="Open Orders - Customer wise" data={customerWiseOrders} />
+                <CountChart compact title="Delivery - Open Orders" data={deliveryChartData} />
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+                <CountChart compact title="NOC - Open Tickets" data={nocChartData} />
             </Grid>
         </Grid>
     )

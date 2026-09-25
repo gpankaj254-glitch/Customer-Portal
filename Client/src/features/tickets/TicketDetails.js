@@ -53,6 +53,35 @@ function dateTimeLocalValue(dateInput) {
     return date.toISOString().slice(0, 16)
 }
 
+// "HH:MM" (hours can exceed 24 - a multi-day outage isn't unusual) -> total
+// minutes, or null if unparseable/blank. Used for the Customer Delay/Hold
+// Time input and the calculated downtime fields below it.
+function parseHHMM(value) {
+    const match = /^(\d+):([0-5]\d)$/.exec(_.trim(value))
+    if (!match) return null
+    return Number(match[1]) * 60 + Number(match[2])
+}
+
+// Total minutes -> "HH:MM" (hours not padded/capped at 24, same reasoning as
+// parseHHMM above) - null/negative minutes render as "-" (not applicable/
+// not yet computable, e.g. Ticket Closure Date/Time not filled in yet).
+function formatMinutesToHHMM(minutes) {
+    if (minutes === null || minutes === undefined || Number.isNaN(minutes) || minutes < 0) return "-"
+    const hours = Math.floor(minutes / 60)
+    const mins = Math.round(minutes % 60)
+    return `${hours}:${String(mins).padStart(2, "0")}`
+}
+
+// Minutes between two datetime-local ("YYYY-MM-DDTHH:mm") strings, or null
+// if either is missing/unusable.
+function minutesBetween(startValue, endValue) {
+    if (!startValue || !endValue) return null
+    const start = new Date(startValue)
+    const end = new Date(endValue)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
+    return (end.getTime() - start.getTime()) / 60000
+}
+
 function AttachmentList({ attachments, onDownload }) {
     if (attachments.length === 0) {
         return <Typography variant="body2" color="text.secondary">No attachments</Typography>
@@ -154,6 +183,9 @@ export default function TicketDetails({ ticket, mode }) {
     // Redesigned Ticket Closure Details tab's own editable "Ticket Closure
     // Date/Time" (previously this tab couldn't touch closedAt at all).
     const [closureDateTime, setClosureDateTime] = React.useState(closedAtInitial)
+    // "Add Field - Customer Delay/Hold Time - HH:MM" - free-text "H:MM"
+    // entry (see parseHHMM above), used below to derive Net/Network Down Time.
+    const [customerDelayTime, setCustomerDelayTime] = React.useState(_.get(ticket, "customerDelayTime", ""))
 
     const [submitting, setSubmitting] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)
@@ -193,6 +225,27 @@ export default function TicketDetails({ ticket, mode }) {
     // value as a MenuItem (even disabled) or MUI renders it blank - Open
     // mode is the only place "Completed" is deliberately left off the list.
     const tab0StatusOptions = mode === "open" ? openStatusOptions : statusOptions
+
+    // "Add Fields - Total Down Time (HH:MM) = (Ticket Closure Time - Problem
+    // Start Time), Net Down Time (HH:MM) = Downtime minus Customer Delay/
+    // Hold Time (HH:MM), Network Downtime (HH:MM) = Net Down Time If RFO
+    // Code contains Network Issue" - purely derived from already-tracked
+    // state, recomputed on every render rather than stored, so they always
+    // reflect the current (possibly not-yet-saved) Ticket Closure Date/Time/
+    // Customer Delay edits rather than going stale.
+    const totalDownTimeMinutes = minutesBetween(problemStartUsable ? problemStartDate.slice(0, 16) : "", closureDateTime)
+    const customerDelayMinutes = parseHHMM(customerDelayTime)
+    const netDownTimeMinutes = totalDownTimeMinutes === null ? null : totalDownTimeMinutes - (customerDelayMinutes || 0)
+    const isNetworkIssue = rfoCode.startsWith("Network Issue")
+    const networkDownTimeMinutes = isNetworkIssue ? netDownTimeMinutes : null
+    // "In Ticket Closure Details, Save and Close Button should be active
+    // when all fields are filled and RFO Code is not Blank/None"
+    const closureAllFieldsFilled = Boolean(
+        closureDateTime && rfoProblemStartDateTime && rfoProblemStopDateTime && rfoRequestStatus && rfoCode && customerDelayTime
+    )
+    // "RFO Request -- ... Save and Close Tab should only be there once RFO
+    // Status is 'Closed' and RFO Code is not Blank/NONE"
+    const rfoCanClose = rfoRequestStatus === "Closed" && Boolean(rfoCode)
 
     // Description grows with every appended comment - keep the box a fixed
     // size and default the scroll position to the bottom so the latest
@@ -270,6 +323,7 @@ export default function TicketDetails({ ticket, mode }) {
                 ticketId: ticket.id,
                 status: nextStatus,
                 closedAt: closureDateTime ? new Date(closureDateTime).toISOString() : undefined,
+                customerDelayTime,
                 // Only meaningful (and only sent editable on this tab) when
                 // RFO Request received is "No" - the "Yes" case is a
                 // read-only mirror of the RFO Request tab instead; the
@@ -953,7 +1007,11 @@ export default function TicketDetails({ ticket, mode }) {
                 {activeTab === 2 && (
                     <Box>
                         <Grid container spacing={2}>
-                            <Grid item xs={12} sm={4}>
+                            {/* "Realign various fields, Display Below RFO
+                                Received (yes/No)" - full width on its own
+                                row so the rest of the fields always wrap
+                                onto new rows below it, not beside it. */}
+                            <Grid item xs={12}>
                                 <FormControl>
                                     <FormLabel id="rfo-requested-label">RFO Request received</FormLabel>
                                     <RadioGroup
@@ -1047,9 +1105,14 @@ export default function TicketDetails({ ticket, mode }) {
                                 <Button variant="contained" disabled={submitting} onClick={() => handleSaveRfo(false)}>
                                     {submitting ? "Saving..." : "Save"}
                                 </Button>
-                                <Button variant="outlined" sx={{ ml: 1 }} disabled={submitting} onClick={() => handleSaveRfo(true)}>
-                                    Save and Closed
-                                </Button>
+                                {/* "Save and Close Tab should only be there
+                                    once RFO Status is 'Closed' and RFO Code
+                                    is not Blank/NONE" */}
+                                {rfoCanClose && (
+                                    <Button variant="outlined" sx={{ ml: 1 }} disabled={submitting} onClick={() => handleSaveRfo(true)}>
+                                        Save and Closed
+                                    </Button>
+                                )}
                             </Grid>
                         </Grid>
                     </Box>
@@ -1080,6 +1143,36 @@ export default function TicketDetails({ ticket, mode }) {
                                     onChange={(event) => setClosureDateTime(event.target.value)}
                                     disabled={closureFieldsLocked}
                                 />
+                            </Grid>
+                            {/* "Add Field - Customer Delay/Hold Time - HH:MM" */}
+                            <Grid item xs={12} sm={4}>
+                                <TextField
+                                    fullWidth
+                                    required
+                                    label="Customer Delay/Hold Time"
+                                    placeholder="HH:MM"
+                                    value={customerDelayTime}
+                                    onChange={(event) => setCustomerDelayTime(event.target.value)}
+                                    disabled={closureFieldsLocked}
+                                />
+                            </Grid>
+                            {/* "Add Fields - Total Down Time (HH:MM) = (Ticket
+                                Closure Time - Problem Start Time), Net Down
+                                Time (HH:MM) = Downtime minus Customer Delay/
+                                Hold Time (HH:MM), Network Downtime (HH:MM) =
+                                Net Down Time If RFO Code contains Network
+                                Issue" - all three calculated (see this
+                                component's own totalDownTimeMinutes/
+                                netDownTimeMinutes/networkDownTimeMinutes), so
+                                always read-only and never saved on their own. */}
+                            <Grid item xs={12} sm={4}>
+                                <TextField fullWidth label="Total Down Time (HH:MM)" value={formatMinutesToHHMM(totalDownTimeMinutes)} disabled />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <TextField fullWidth label="Net Down Time (HH:MM)" value={formatMinutesToHHMM(netDownTimeMinutes)} disabled />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <TextField fullWidth label="Network Downtime (HH:MM)" value={formatMinutesToHHMM(networkDownTimeMinutes)} disabled />
                             </Grid>
 
                             {rfoRequested === "Yes" ? (
@@ -1161,12 +1254,15 @@ export default function TicketDetails({ ticket, mode }) {
                                         Closed (mode "completed" has no further status to
                                         move to; Admin can still use plain Save there to
                                         amend the RFO/closure record). */}
+                                    {/* "Save and Close Button should be active
+                                        when all fields are filled and RFO Code
+                                        is not Blank/None" */}
                                     {mode === "closed" && (
                                         <Button
                                             type="button"
                                             variant="outlined"
                                             sx={{ ml: 1 }}
-                                            disabled={submitting}
+                                            disabled={submitting || !closureAllFieldsFilled}
                                             onClick={(event) => handleClosureSubmit(event, "Completed")}
                                         >
                                             Save and Closed

@@ -36,7 +36,6 @@ import { pageStatusVals } from "../tickets/utils"
 import { getFormattedDateTimeGMT } from "../../utils/dates"
 import SalesDashboard from "../opportunities/SalesDashboard"
 import ScxDashboard from "./ScxDashboard"
-import CustomerClosedTickets from "./CustomerClosedTickets"
 import FinanceDashboard from "./FinanceDashboard"
 import ManagementDashboard from "./ManagementDashboard"
 import { getDeliveryOrders, selectOpenOrderList } from "../delivery/deliveryOrderSlice"
@@ -141,7 +140,10 @@ function DashboardContent() {
     // tickets could still be in the store - only show the list once this
     // visit's own request has come back.
     const [openTicketsLoaded, setOpenTicketsLoaded] = React.useState(false)
-    // Customer Admin/User dashboard tabs: 0 = Main Dashboard, 1 = Closed Tickets.
+    // Customer Admin/User dashboard tabs: 0 = Main Dashboard, 1 = Open
+    // Tickets, 2 = Open Orders. "Customer Admin, Dashboard Remove Closed
+    // Ticket Tab" - the fourth tab (Closed Tickets/CustomerClosedTickets)
+    // is gone.
     const [customerTab, setCustomerTab] = React.useState(0)
 
     React.useEffect(() => {
@@ -273,14 +275,9 @@ function DashboardContent() {
                                 <Tab label="Main Dashboard" />
                                 <Tab label="Open Tickets" />
                                 <Tab label="Open Orders" />
-                                <Tab label="Closed Tickets" />
                             </Tabs>
                         </Grid>
-                        {customerTab === 3 ? (
-                            <Grid item xs={12}>
-                                <CustomerClosedTickets />
-                            </Grid>
-                        ) : customerTab === 1 ? (
+                        {customerTab === 1 ? (
                             <>
                                 <Grid item xs={12} sm={6} md={3}>
                                     <StatTile compact title="Total Open Tickets" value={_.get(summary, "openTickets", 0)} />

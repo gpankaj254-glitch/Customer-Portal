@@ -253,6 +253,7 @@ const updateTicket = async (ticketBody, user) => {
     vendorTicketCreateDate,
     vendorTicketStatus,
     vendorTicketClosureDate,
+    customerDelayTime,
   } = ticketBody;
   const ticket = await getAuthorizedTicket(ticketId, user);
   const isScxAdmin = user.role === roleTypes.scloudxAdmin;
@@ -286,6 +287,10 @@ const updateTicket = async (ticketBody, user) => {
     // for everyone, only Completed is Admin-only).
     if (closedAt) {
       ticket.closedAt = new Date(closedAt);
+    }
+    // "Add Field - Customer Delay/Hold Time - HH:MM"
+    if (customerDelayTime !== undefined) {
+      ticket.customerDelayTime = customerDelayTime;
     }
     // Problem Start/Stop Date-Time, RFO Status and RFO Code are only
     // editable here when RFO Request received is "No" (the "Yes" case is a

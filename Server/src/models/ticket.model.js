@@ -274,6 +274,14 @@ const ticketSchema = mongoose.Schema(
       type: Number,
       default: null,
     },
+    // "Add Field - Customer Delay/Hold Time - HH:MM" (Ticket Closure
+    // Details tab) - free-text "H:MM", used client-side to derive Total/Net/
+    // Network Down Time (all three computed on the fly from this, closedAt
+    // and problemStartDate rather than stored - see TicketDetails.js).
+    customerDelayTime: {
+      type: String,
+      default: "",
+    },
     // Ticket Closure details tab - SCX-only, only shown once status is
     // "Closed". Purely manual entry for now (no auto-calculation).
     closureDetails: {

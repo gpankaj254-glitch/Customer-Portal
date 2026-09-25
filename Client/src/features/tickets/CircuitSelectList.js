@@ -69,6 +69,13 @@ export default function CircuitSelectList({ onSelectCircuit }) {
     return (
         <Box>
             <Typography variant="h5" gutterBottom>Create Ticket</Typography>
+            {/* "Show Total Circuits at top while Showing only List of only
+                Circuits with status Live" - counts whatever's currently
+                loaded/matched (same as this list itself), so it narrows
+                along with the search below. */}
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                Total Circuits: {rows.length}
+            </Typography>
             <TextField
                 fullWidth
                 label="Search Inventory"

@@ -69,6 +69,8 @@ const updateTicket = {
       vendorTicketCreateDate: Joi.string().allow(""),
       vendorTicketStatus: Joi.string().valid("", ...vendorTicketStatusOptions),
       vendorTicketClosureDate: Joi.string().allow(""),
+      // "Add Field - Customer Delay/Hold Time - HH:MM"
+      customerDelayTime: Joi.string().allow(""),
       // Redesigned Ticket Closure Details tab - only meaningful once
       // requested is "No" (Yes's own fields are entered via the separate
       // RFO Request tab/endpoint instead - see saveRfo below); mirrors that
