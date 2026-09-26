@@ -262,7 +262,10 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
         return <Alert severity="error">{error}</Alert>
     }
 
-    const columnCount = showChangeType ? 11 : 10
+    // "In Customer login: Inventory Management - Remove Action Column" - one
+    // less than before whenever the Actions column itself is hidden (see
+    // the header/cell below).
+    const columnCount = (showChangeType ? 11 : 10) - (isCustomer ? 1 : 0)
 
     return (
         <Paper sx={{ width: "100%", overflow: "hidden", p: 2 }}>
@@ -316,7 +319,13 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                                 <TableCell><Typography variant="subtitle2">Change Type</Typography></TableCell>
                             )}
                             <TableCell><Typography variant="subtitle2">Circuit Status Date</Typography></TableCell>
-                            <TableCell align="right"><Typography variant="subtitle2">Actions</Typography></TableCell>
+                            {/* "In Customer login: Inventory Management - Remove Action
+                                Column" - every icon in it is already isAdmin/canMove-gated
+                                (never rendered for a Customer anyway), so this only ever
+                                removed an empty column for them, not any actual capability. */}
+                            {!isCustomer && (
+                                <TableCell align="right"><Typography variant="subtitle2">Actions</Typography></TableCell>
+                            )}
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -382,54 +391,56 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                                     </TableCell>
                                 )}
                                 <TableCell>{row.statusDateDisplay}</TableCell>
-                                <TableCell align="right" sx={{ whiteSpace: "nowrap", p: "0 4px" }}>
-                                    {/* "SCX Admin Live Circuit Inventory reduce
-                                        inter row width, realign Action
-                                        placeholders" - size="small" (matches
-                                        DeliveryOrderTable.js's own compact
-                                        action icons) instead of the default
-                                        40px hit area, which was forcing every
-                                        row taller/wider than the rest of this
-                                        already-compact table. */}
-                                    {isAdmin && (
-                                        <IconButton
-                                            size="small"
-                                            aria-label={`edit ${row.vendorCircuitId || row.code}`}
-                                            onClick={() => setCircuitToEdit(row)}
-                                        >
-                                            <EditIcon fontSize="small" />
-                                        </IconButton>
-                                    )}
-                                    {canEditStatusForRow(row) && (
-                                        <IconButton
-                                            size="small"
-                                            aria-label={`edit status ${row.vendorCircuitId || row.code}`}
-                                            title="Change Circuit Status"
-                                            onClick={() => setCircuitToEditStatus(row)}
-                                        >
-                                            <SwapHorizIcon fontSize="small" />
-                                        </IconButton>
-                                    )}
-                                    {canMove && (
-                                        <IconButton
-                                            size="small"
-                                            aria-label={`move ${row.vendorCircuitId || row.code}`}
-                                            title="Move to another site"
-                                            onClick={() => setCircuitToMove(row)}
-                                        >
-                                            <DriveFileMoveIcon fontSize="small" />
-                                        </IconButton>
-                                    )}
-                                    {isAdmin && (
-                                        <IconButton
-                                            size="small"
-                                            aria-label={`delete ${row.vendorCircuitId || row.code}`}
-                                            onClick={() => setCircuitToDelete(row)}
-                                        >
-                                            <DeleteIcon fontSize="small" />
-                                        </IconButton>
-                                    )}
-                                </TableCell>
+                                {!isCustomer && (
+                                    <TableCell align="right" sx={{ whiteSpace: "nowrap", p: "0 4px" }}>
+                                        {/* "SCX Admin Live Circuit Inventory reduce
+                                            inter row width, realign Action
+                                            placeholders" - size="small" (matches
+                                            DeliveryOrderTable.js's own compact
+                                            action icons) instead of the default
+                                            40px hit area, which was forcing every
+                                            row taller/wider than the rest of this
+                                            already-compact table. */}
+                                        {isAdmin && (
+                                            <IconButton
+                                                size="small"
+                                                aria-label={`edit ${row.vendorCircuitId || row.code}`}
+                                                onClick={() => setCircuitToEdit(row)}
+                                            >
+                                                <EditIcon fontSize="small" />
+                                            </IconButton>
+                                        )}
+                                        {canEditStatusForRow(row) && (
+                                            <IconButton
+                                                size="small"
+                                                aria-label={`edit status ${row.vendorCircuitId || row.code}`}
+                                                title="Change Circuit Status"
+                                                onClick={() => setCircuitToEditStatus(row)}
+                                            >
+                                                <SwapHorizIcon fontSize="small" />
+                                            </IconButton>
+                                        )}
+                                        {canMove && (
+                                            <IconButton
+                                                size="small"
+                                                aria-label={`move ${row.vendorCircuitId || row.code}`}
+                                                title="Move to another site"
+                                                onClick={() => setCircuitToMove(row)}
+                                            >
+                                                <DriveFileMoveIcon fontSize="small" />
+                                            </IconButton>
+                                        )}
+                                        {isAdmin && (
+                                            <IconButton
+                                                size="small"
+                                                aria-label={`delete ${row.vendorCircuitId || row.code}`}
+                                                onClick={() => setCircuitToDelete(row)}
+                                            >
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        )}
+                                    </TableCell>
+                                )}
                             </TableRow>
                         ))}
                     </TableBody>

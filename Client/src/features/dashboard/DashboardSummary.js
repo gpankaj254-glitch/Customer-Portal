@@ -13,6 +13,8 @@ import { getSalesDashboardSummary, selectSalesDashboardSummary } from "../opport
 import { selectOpenOrderList } from "../delivery/deliveryOrderSlice"
 import { customerName } from "../delivery/DeliveryOrderTable"
 import { groupCounts } from "./DeliveryOrderCharts"
+import { getCircuitsList, selectCircuitsList } from "../inventory/circuitSlice"
+import { selectVendorList } from "../vendors/vendorSlice"
 
 // "Main Dashboard - Add Summary Tab; Show - Total Customers, Total Live
 // Circuits, Sales - total Open Opportunities in Bar Chart, Delivery - Total
@@ -30,11 +32,19 @@ export default function DashboardSummary() {
     const salesSummary = useSelector(selectSalesDashboardSummary)
     const openTicketsAnalysis = useSelector(selectOpenTicketsAnalysis)
     const openOrderList = useSelector(selectOpenOrderList)
+    // "Add 5 Bar Charts; Live Circuit by Customer, Product, Bandwidth,
+    // Vendor, Country" - vendorList is already fetched by
+    // ManagementDashboard.js itself (same as openOrderList above); the Live
+    // circuit list is fetched here, same call FinanceDashboard.js's own
+    // table already makes.
+    const circuitsList = useSelector(selectCircuitsList)
+    const vendorList = useSelector(selectVendorList)
 
     React.useEffect(() => {
         dispatch(getDashboardSummary())
         dispatch(getSalesDashboardSummary())
         dispatch(getOpenTicketsAnalysis())
+        dispatch(getCircuitsList({ search: "", statuses: ["Live"] }))
     }, [dispatch])
 
     const statusWise = _.get(openTicketsAnalysis, "statusWise", [])
@@ -61,6 +71,35 @@ export default function DashboardSummary() {
         [{ name: "Total Open Tickets", count: totalOpenTickets }, { name: "InProgress", count: inProgressCount }]
     ), [totalOpenTickets, inProgressCount])
 
+    const vendorNameById = React.useMemo(
+        () => new Map(vendorList.map((vendor) => [vendor.id, vendor.name])),
+        [vendorList]
+    )
+
+    // "Add 5 Bar Charts; Live Circuit by Customer, Product, Bandwidth,
+    // Vendor, Country" - each just a breakdown of the same Live circuit
+    // list fetched above, one dimension per chart.
+    const circuitsByCustomer = React.useMemo(
+        () => groupCounts(circuitsList, (circuit) => _.get(circuit, "customer.name")),
+        [circuitsList]
+    )
+    const circuitsByProduct = React.useMemo(
+        () => groupCounts(circuitsList, (circuit) => circuit.product),
+        [circuitsList]
+    )
+    const circuitsByBandwidth = React.useMemo(
+        () => groupCounts(circuitsList, (circuit) => circuit.bandwidth),
+        [circuitsList]
+    )
+    const circuitsByVendor = React.useMemo(
+        () => groupCounts(circuitsList, (circuit) => vendorNameById.get(circuit.vendorId) || ""),
+        [circuitsList, vendorNameById]
+    )
+    const circuitsByCountry = React.useMemo(
+        () => groupCounts(circuitsList, (circuit) => _.get(circuit, "location.country")),
+        [circuitsList]
+    )
+
     return (
         <Grid container spacing={1.5}>
             {/* Own row (xs=6 each sum to 12) so the bar charts below always
@@ -82,6 +121,31 @@ export default function DashboardSummary() {
             </Grid>
             <Grid item xs={12} sm={4}>
                 <CountChart compact title="NOC - Open Tickets" data={nocChartData} />
+            </Grid>
+            {/* "Add 5 Bar Charts; Live Circuit by Customer, Product,
+                Bandwidth, Vendor, Country" - own set of rows below the
+                three above (xs=12 sm=4 wraps 3-then-2, same idea as the row
+                above it). */}
+            <Grid item xs={12} sm={4}>
+                <CountChart compact title="Live Circuits - Customer wise" data={circuitsByCustomer} />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+                <CountChart compact title="Live Circuits - Product wise" data={circuitsByProduct} />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+                <CountChart compact title="Live Circuits - Bandwidth wise" data={circuitsByBandwidth} />
+            </Grid>
+            {/* "Change Live Circuits Vendor wise and Live Circuits Country
+                wise in Horizontal Bars" - sm=6 each (rather than sm=4 like
+                the row above) since a horizontal chart needs more width for
+                its own category labels + numeric axis, and these two grow
+                tall (one row per vendor/country) rather than wide, so
+                pairing them side by side reads better than a 3-up row. */}
+            <Grid item xs={12} sm={6}>
+                <CountChart compact horizontal title="Live Circuits - Vendor wise" data={circuitsByVendor} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+                <CountChart compact horizontal title="Live Circuits - Country wise" data={circuitsByCountry} />
             </Grid>
         </Grid>
     )

@@ -67,7 +67,7 @@ const stickyActionsSx = {
 // are open-tickets-only now - not meaningful once a ticket is closed/
 // completed, same reasoning as Days Pending. View Closed/Completed instead
 // get Problem Start Date and Ticket Close Date after Created Date.
-function buildColumns (mode) {
+function buildColumns (mode, isCustomer) {
     // "View Open RFO ... show all Tickets with fields as shown in 'View
     // Open Ticket'" - same column set, whichever of the two modes this is.
     const isOpen = mode === "open" || mode === "openRfo"
@@ -75,27 +75,36 @@ function buildColumns (mode) {
         { id: "ticketId", label: "Ticket ID" },
         { id: "customerReference", label: "Customer Reference" },
     ]
-    if (isOpen) {
+    // "In Customer login: View Open Tickets: Modify Columns" - Vendor
+    // Reference/Vendor Circuit ID/Vendor Name/Vendor Status/Days Pending
+    // all removed for Customer (vendor-side operational detail that isn't
+    // meaningful to them); only ever reached via mode "open", the only
+    // ticket list a Customer sees at all.
+    if (isOpen && !isCustomer) {
         columns.push({ id: "vendorTicketId", label: "Vendor Reference" })
     }
-    columns.push(
-        // Narrow, with word-wrap on the cell below - a long unbroken ID
-        // would otherwise stretch the column (same fix as CircuitTable.js's
-        // own Vendor Circuit ID column).
-        { id: "vendorCircuitId", label: "Vendor Circuit ID", width: "8%" },
-        { id: "vendorName", label: "Vendor Name" },
-        { id: "problemType", label: "Problem Type" }
-    )
+    if (!isCustomer) {
+        columns.push(
+            // Narrow, with word-wrap on the cell below - a long unbroken ID
+            // would otherwise stretch the column (same fix as CircuitTable.js's
+            // own Vendor Circuit ID column).
+            { id: "vendorCircuitId", label: "Vendor Circuit ID", width: "8%" },
+            { id: "vendorName", label: "Vendor Name" }
+        )
+    }
+    columns.push({ id: "problemType", label: "Problem Type" })
     if (isOpen) {
         columns.push({ id: "priority", label: "Priority" })
     }
     columns.push(isOpen ? { id: "status", label: "Status" } : { id: "closureCode", label: "Closure Code" })
-    if (isOpen) {
+    if (isOpen && !isCustomer) {
         columns.push({ id: "vendorTicketStatus", label: "Vendor Status" })
     }
     columns.push({ id: "createdDate", label: "Created Date (GMT)" })
     if (isOpen) {
-        columns.push({ id: "daysPending", label: "Days Pending" })
+        if (!isCustomer) {
+            columns.push({ id: "daysPending", label: "Days Pending" })
+        }
     } else {
         columns.push(
             { id: "problemStartDateText", label: "Problem Start Date/Time (GMT)" },
@@ -178,10 +187,11 @@ export default function TicketsTable(props) {
     // above already being scoped narrower than "anyone who can see this
     // table").
     const canActOnOpenRfo = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_USER
+    const isCustomer = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
 
     const pagination = props.pagination
     const mode = props.mode
-    const columns = React.useMemo(() => buildColumns(mode), [mode])
+    const columns = React.useMemo(() => buildColumns(mode, isCustomer), [mode, isCustomer])
 
     const [open, setOpen] = React.useState(false)
     const [searchInput, setSearchInput] = React.useState(search)

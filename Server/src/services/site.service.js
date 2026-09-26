@@ -6,7 +6,7 @@ const httpStatus = require("http-status");
 const _ = require("lodash");
 const { parse } = require("csv-parse/sync");
 const logger = require("../config/logger");
-const { Site, Circuit, Region } = require("../models");
+const { Site, Circuit, Region, Ticket } = require("../models");
 const ApiError = require("../utils/ApiError");
 const {
   getActiveRegionById,
@@ -207,9 +207,32 @@ const getAuthorizedSite = async (siteId, user) => {
  * @returns {Promise<Site>}
  */
 const updateSite = async (site, updateBody, actingUser) => {
+  // Captured before Object.assign below overwrites it - "If I edit Site
+  // Name in Site Management, how will it impact existing orders?" answered
+  // that Circuit/Ticket each keep their own frozen site.name/site.code
+  // snapshot from whenever they were created, unlike DeliveryOrder (which
+  // only ever stores siteId, a live reference, so it was never affected).
+  // Cascading the rename here - the one place every Site update already
+  // goes through - keeps those snapshots in sync going forward without a
+  // separate job to remember to run; see scripts/backfill-site-snapshots.js
+  // for the one-time repair of whatever's already stale from before this
+  // existed.
+  const nameChanged = updateBody.name !== undefined && updateBody.name !== site.name;
+  const codeChanged = updateBody.code !== undefined && updateBody.code !== site.code;
+
   Object.assign(site, updateBody);
   site.updatedBy = extractUserDetails(actingUser);
   await site.save();
+
+  if (nameChanged || codeChanged) {
+    const siteIdStr = String(site._id);
+    const snapshot = { "site.name": site.name, "site.code": site.code };
+    await Promise.all([
+      Circuit.updateMany({ "site.id": siteIdStr }, { $set: snapshot }),
+      Ticket.updateMany({ "site.id": siteIdStr }, { $set: snapshot }),
+    ]);
+  }
+
   return site;
 };
 

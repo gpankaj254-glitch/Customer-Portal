@@ -43,8 +43,8 @@ export const getManagedCircuitOptions = createAsyncThunk(
 
 export const createCircuitOption = createAsyncThunk(
     "circuitOptions/fetchCreate",
-    async ({ type, name }, { rejectWithValue }) => {
-        const option = await fetchCreateCircuitOption({ type, name }, rejectWithValue)
+    async ({ type, name, afterId }, { rejectWithValue }) => {
+        const option = await fetchCreateCircuitOption({ type, name, afterId }, rejectWithValue)
         return { type, option }
     }
 )

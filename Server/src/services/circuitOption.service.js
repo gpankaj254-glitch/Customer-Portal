@@ -55,7 +55,35 @@ const isNameTaken = async (type, name, excludeId) => {
 };
 
 /**
- * @param {Object} body - { type, name }
+ * Where a newly-added option's sortOrder should land - "we need option to
+ * place this at what position or after which existing BW option to
+ * maintain its Sorting order". Defaults to the end (no afterId, or an
+ * afterId that no longer exists/isn't found); otherwise splits the gap
+ * between the chosen option and whatever already sorts right after it, so
+ * the rest of the list never needs renumbering. Repeatedly inserting
+ * between the same two neighbors halves the remaining gap each time - fine
+ * for how few inserts this admin UI sees in practice.
+ * @param {"product"|"bandwidth"} type
+ * @param {ObjectId} [afterId]
+ * @returns {Promise<number>}
+ */
+const computeInsertSortOrder = async (type, afterId) => {
+  if (afterId) {
+    const afterOption = await CircuitOption.findOne({ _id: afterId, type }).select("sortOrder").lean();
+    if (afterOption) {
+      const nextOption = await CircuitOption.findOne({ type, sortOrder: { $gt: afterOption.sortOrder } })
+        .sort({ sortOrder: 1 })
+        .select("sortOrder")
+        .lean();
+      return nextOption ? (afterOption.sortOrder + nextOption.sortOrder) / 2 : afterOption.sortOrder + 10;
+    }
+  }
+  const last = await CircuitOption.findOne({ type }).sort({ sortOrder: -1 }).select("sortOrder").lean();
+  return (last ? last.sortOrder : 0) + 10;
+};
+
+/**
+ * @param {Object} body - { type, name, afterId? }
  * @param {Object} user
  * @returns {Promise<CircuitOption>}
  */
@@ -63,11 +91,11 @@ const createCircuitOption = async (body, user) => {
   if (await isNameTaken(body.type, body.name)) {
     throw new ApiError(httpStatus.BAD_REQUEST, `This ${body.type} name already exists`);
   }
-  const last = await CircuitOption.findOne({ type: body.type }).sort({ sortOrder: -1 }).select("sortOrder").lean();
+  const sortOrder = await computeInsertSortOrder(body.type, body.afterId);
   return CircuitOption.create({
     type: body.type,
     name: body.name.trim(),
-    sortOrder: (last ? last.sortOrder : 0) + 10,
+    sortOrder,
     createdBy: extractUserDetails(user),
     updatedBy: extractUserDetails(user),
   });

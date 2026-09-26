@@ -70,8 +70,8 @@ const rfoRequestStatusOptions = ["Not Received", "Received", "Awaiting from LEC"
 const rfoCodeOptions = [
   "Network Issue - Fibre Cut",
   "Network Issue - Hardware Issue",
-  "Latency/ Packet Loss",
   "Network Issue - Site Equipment",
+  "Latency/ Packet Loss",
   "Customer Site Issue",
   "Force Majeure",
 ];

@@ -4,7 +4,7 @@ const _ = require("lodash");
 const { parse } = require("csv-parse/sync");
 const { isScloudxUser } = require("../config/roles");
 const logger = require("../config/logger");
-const { Vendor, Circuit } = require("../models");
+const { Vendor, Circuit, DeliveryOrder } = require("../models");
 const ApiError = require("../utils/ApiError");
 const { extractUserDetails } = require("../utils/extractors");
 const { createCodeFromName } = require("../utils/creators");
@@ -164,6 +164,24 @@ const deactivateVendorById = async (vendorId, actingUser) => {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       `Cannot delete vendor: ${activeCircuitCount} active circuit(s) still reference it. Delete them first.`
+    );
+  }
+
+  // "What will happen if Vendor is deleted, impact on existing ...
+  // Delivery Orders" - a still-open order (anything short of Completed)
+  // hasn't produced a Circuit yet, so the check above alone let a vendor
+  // still tied to one be deleted; its Vendor Name would then silently go
+  // blank once getVendors' own active-only filter stopped returning it.
+  // Same guard, same message shape, just against DeliveryOrder instead.
+  const openOrderCount = await DeliveryOrder.countDocuments({
+    vendorId,
+    active: true,
+    status: { $ne: "Completed" },
+  });
+  if (openOrderCount > 0) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `Cannot delete vendor: ${openOrderCount} open delivery order(s) still reference it. Complete or reassign them first.`
     );
   }
 

@@ -1043,7 +1043,15 @@ export default function TicketDetails({ ticket, mode }) {
                                         row
                                         aria-labelledby="rfo-requested-label"
                                         value={rfoRequested}
-                                        onChange={(event) => setRfoRequested(event.target.value)}
+                                        onChange={(event) => {
+                                            setRfoRequested(event.target.value)
+                                            // "RFO Request - Once RFO Request is changed Yes,
+                                            // change its default status as 'Received' ... and
+                                            // again default to 'Not received' if toggled to
+                                            // 'No'" - still freely editable afterward via its
+                                            // own dropdown either way.
+                                            setRfoRequestStatus(event.target.value === "Yes" ? "Received" : "Not Received")
+                                        }}
                                     >
                                         <FormControlLabel value="No" control={<Radio />} label="No" />
                                         <FormControlLabel value="Yes" control={<Radio />} label="Yes" />

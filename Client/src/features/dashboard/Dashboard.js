@@ -166,18 +166,20 @@ function DashboardContent() {
     // Delivery user may land on the Dashboard first. "Customer Admin
     // Dashboard - New tab" (Open Orders) reuses the same openOrderList,
     // server-scoped to the customer's own orders only (see
-    // filterByCustomerId in deliveryOrder.controller.js) - it has no need
-    // for the vendor list (Customer's Open Orders tab shows Vendor by name
-    // already returned on the order itself, unlike the Delivery role's own
-    // vendor-wise breakdown chart).
+    // filterByCustomerId in deliveryOrder.controller.js) - it does still
+    // need the vendor list, same as the Delivery role: DeliveryOrderTable.js
+    // always resolves Vendor by looking up vendorId against this list (an
+    // order itself only stores the id, not a name) - Customer's own Open
+    // Orders tab was skipping this fetch entirely, so its Vendor column
+    // silently rendered blank (confirmed live: "Remove LMP Name Column and
+    // show Vendor as vendor Name + '/' + LMP Name" surfaced it as "/
+    // LmpName" instead of a plain empty cell).
     React.useEffect(() => {
         if (!isDeliveryRole && !isCustomerRole) {
             return
         }
         dispatch(getDeliveryOrders({ limit: 1000, page: 1, search: "", tab: "open" }))
-        if (isDeliveryRole) {
-            dispatch(getVendors({ limit: 1000, page: 1 }))
-        }
+        dispatch(getVendors({ limit: 1000, page: 1 }))
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isDeliveryRole, isCustomerRole])
 
@@ -312,7 +314,10 @@ function DashboardContent() {
                                     <Typography component="h2" variant="h5" sx={{ mt: 0.5, fontSize: "0.85rem", fontWeight: 600 }}>List Open Orders</Typography>
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <DeliveryOrderTable rows={openOrderList} dashboardView showCustomerPO />
+                                    {/* "In Customer Admin, Dashboard, Open Orders, Remove
+                                        LMP Name Column and show Vendor as vendor Name + '/'
+                                        + LMP Name" */}
+                                    <DeliveryOrderTable rows={openOrderList} dashboardView showCustomerPO combineVendorLmp />
                                 </Grid>
                             </>
                         ) : (

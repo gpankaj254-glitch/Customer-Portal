@@ -88,7 +88,7 @@ const baseColumns = [
 // the "Do not display ... Customer Order Number" instruction the other
 // dashboardView call sites (Delivery/SCX Admin/NOC dashboards) follow -
 // defaults false so every other dashboardView usage is unaffected.
-function buildColumns(dashboardView, showDeliveryDate, showCustomerPO) {
+function buildColumns(dashboardView, showDeliveryDate, showCustomerPO, combineVendorLmp) {
     let columns = baseColumns
     if (dashboardView) {
         columns = baseColumns.filter(
@@ -100,8 +100,14 @@ function buildColumns(dashboardView, showDeliveryDate, showCustomerPO) {
         const endUserAfterId = showCustomerPO ? "customerOrderReference" : "scloudxOrderReference"
         const endUserAfterIndex = columns.findIndex((column) => column.id === endUserAfterId)
         columns.splice(endUserAfterIndex + 1, 0, { id: "endUser", label: "End User Name" })
-        const vendorIndex = columns.findIndex((column) => column.id === "vendorDisplay")
-        columns.splice(vendorIndex + 1, 0, { id: "lmpName", label: "LMP Name" })
+        // "In Customer Admin, Dashboard, Open Orders, Remove LMP Name Column
+        // and show Vendor as vendor Name + '/' + LMP Name" - this one
+        // dashboardView consumer (see combineVendorLmp) folds it into Vendor
+        // instead of the separate column every other dashboardView keeps.
+        if (!combineVendorLmp) {
+            const vendorIndex = columns.findIndex((column) => column.id === "vendorDisplay")
+            columns.splice(vendorIndex + 1, 0, { id: "lmpName", label: "LMP Name" })
+        }
         // Narrow, with word-wrap on the cell below - a milestone name like
         // "Configuration provisioning and testing" would otherwise stretch
         // the column (same fix already used for Vendor/Customer Circuit ID
@@ -143,8 +149,8 @@ export function currentMilestoneStatus(row) {
 // by DeliveryOrders.js on the Delivered Orders tab only. `liveCircuitOrderRefs`
 // is passed straight through to each row's own OrderDetails, for its Existing
 // Order Number dropdown.
-export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboardView, showDeliveryDate, showCustomerPO, liveCircuitOrderRefs }) {
-    const columns = buildColumns(dashboardView, showDeliveryDate, showCustomerPO)
+export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboardView, showDeliveryDate, showCustomerPO, combineVendorLmp, liveCircuitOrderRefs }) {
+    const columns = buildColumns(dashboardView, showDeliveryDate, showCustomerPO, combineVendorLmp)
     const dispatch = useDispatch()
     const errorMessage = useSelector(selectGetOrdersError)
     const pagination = useSelector(selectPagination)
@@ -176,8 +182,10 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboard
             // createCircuitFromOrder, which carries this same value over
             // onto the Circuit's own vendorLECName once the order
             // completes). Not for dashboardView, which already shows LMP
-            // Name as its own separate column right after Vendor.
-            vendorDisplay: dashboardView ? vendorName : formatVendorDisplay(vendorName, row.lmpName),
+            // Name as its own separate column right after Vendor - except
+            // combineVendorLmp, which wants that combined instead (see
+            // buildColumns above).
+            vendorDisplay: dashboardView && !combineVendorLmp ? vendorName : formatVendorDisplay(vendorName, row.lmpName),
             orderDateText: formatDate(row.orderDate),
             deliveryDateText: formatDate(row.deliveryDate),
             milestoneStatus: dashboardView ? currentMilestoneStatus(row) : "",
@@ -340,6 +348,7 @@ DeliveryOrderTable.propTypes = {
     dashboardView: PropTypes.bool,
     showDeliveryDate: PropTypes.bool,
     showCustomerPO: PropTypes.bool,
+    combineVendorLmp: PropTypes.bool,
     // Map of normalized SCX Order Ref -> original-case ref, one entry per
     // distinct Live circuit - see DeliveryOrders.js.
     liveCircuitOrderRefs: PropTypes.instanceOf(Map),
@@ -351,5 +360,6 @@ DeliveryOrderTable.defaultProps = {
     dashboardView: false,
     showDeliveryDate: false,
     showCustomerPO: false,
+    combineVendorLmp: false,
     liveCircuitOrderRefs: new Map(),
 }

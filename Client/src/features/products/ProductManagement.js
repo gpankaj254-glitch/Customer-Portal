@@ -32,7 +32,23 @@ function CircuitOptionPanel({ type, label }) {
     const options = useSelector(selectManagedCircuitOptions(type))
     const status = useSelector(selectManagedCircuitOptionsStatus(type))
 
+    const isBandwidth = type === "bandwidth"
     const [newName, setNewName] = React.useState("")
+    // "Product Management, Bandwidths - New Bandwidth split in 2 fields -
+    // First Field as Number and Second with Dropdown (Mbps or Gbps) and
+    // then Create bandwidth = First Field + second field" - bandwidth-only;
+    // Product keeps its own plain free-text newName above.
+    const [newBandwidthNumber, setNewBandwidthNumber] = React.useState("")
+    const [newBandwidthUnit, setNewBandwidthUnit] = React.useState("Mbps")
+    const composedName = isBandwidth
+        ? (newBandwidthNumber.trim() ? `${newBandwidthNumber.trim()} ${newBandwidthUnit}` : "")
+        : newName
+    // "In Add New bandwidth Option, we need option to place this at what
+    // position or after which existing BW option to maintain its Sorting
+    // order" - "" (the default) means "at the end", same as before this was
+    // added; otherwise the id of the existing option the new one should be
+    // inserted right after.
+    const [afterId, setAfterId] = React.useState("")
     const [adding, setAdding] = React.useState(false)
     // "To Edit/Delete Product or Bandwidth, Through Action Tab, ... Show
     // existing from Dropdown and ask for delete or ask new value to
@@ -73,12 +89,20 @@ function CircuitOptionPanel({ type, label }) {
     const refreshNames = () => dispatch(getCircuitOptionNames(type))
 
     const handleAdd = async () => {
-        if (!newName.trim()) return
+        if (!composedName.trim()) return
         setAdding(true)
         try {
-            await dispatch(createCircuitOption({ type, name: newName.trim() })).unwrap()
+            await dispatch(createCircuitOption({ type, name: composedName.trim(), afterId: afterId || undefined })).unwrap()
             setNewName("")
+            setNewBandwidthNumber("")
+            setNewBandwidthUnit("Mbps")
+            setAfterId("")
             refreshNames()
+            // Re-fetch this panel's own list too (not just refreshNames'
+            // dropdown-facing one) - the reducer just appends the new option
+            // to the end locally, which would show the wrong position here
+            // until this is done whenever afterId placed it somewhere else.
+            dispatch(getManagedCircuitOptions(type))
             setFeedback({ severity: "success", message: `${label} added` })
         } catch (err) {
             setFeedback({ severity: "error", message: err || `Failed to add ${label.toLowerCase()}` })
@@ -143,17 +167,64 @@ function CircuitOptionPanel({ type, label }) {
                     Circuit, Delivery Order or Opportunity.
                 </Typography>
             </Grid>
-            <Grid item xs={12} sm={8} md={6}>
-                <TextField
-                    fullWidth
-                    label={`New ${label} Name`}
-                    value={newName}
-                    onChange={(event) => setNewName(event.target.value)}
-                    onKeyDown={(event) => { if (event.key === "Enter") handleAdd() }}
-                />
+            {isBandwidth ? (
+                <>
+                    <Grid item xs={6} sm={3} md={2}>
+                        <TextField
+                            fullWidth
+                            type="number"
+                            label="Number"
+                            value={newBandwidthNumber}
+                            onChange={(event) => setNewBandwidthNumber(event.target.value)}
+                            onKeyDown={(event) => { if (event.key === "Enter") handleAdd() }}
+                        />
+                    </Grid>
+                    <Grid item xs={6} sm={3} md={2}>
+                        <FormControl fullWidth>
+                            <InputLabel id={`${type}-new-unit-label`}>Unit</InputLabel>
+                            <Select
+                                labelId={`${type}-new-unit-label`}
+                                label="Unit"
+                                value={newBandwidthUnit}
+                                onChange={(event) => setNewBandwidthUnit(event.target.value)}
+                            >
+                                <MenuItem value="Mbps">Mbps</MenuItem>
+                                <MenuItem value="Gbps">Gbps</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                </>
+            ) : (
+                <Grid item xs={12} sm={8} md={5}>
+                    <TextField
+                        fullWidth
+                        label={`New ${label} Name`}
+                        value={newName}
+                        onChange={(event) => setNewName(event.target.value)}
+                        onKeyDown={(event) => { if (event.key === "Enter") handleAdd() }}
+                    />
+                </Grid>
+            )}
+            <Grid item xs={12} sm={isBandwidth ? 6 : 8} md={isBandwidth ? 6 : 5}>
+                <FormControl fullWidth>
+                    <InputLabel id={`${type}-after-select-label`}>Insert Position</InputLabel>
+                    <Select
+                        labelId={`${type}-after-select-label`}
+                        label="Insert Position"
+                        value={afterId}
+                        onChange={(event) => setAfterId(event.target.value)}
+                    >
+                        <MenuItem value="">At the end</MenuItem>
+                        {options.map((option) => (
+                            <MenuItem key={option.id} value={option.id}>
+                                After &quot;{option.name}&quot;
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
             </Grid>
             <Grid item xs={12} sm={4} md={2}>
-                <Button variant="contained" fullWidth disabled={adding || !newName.trim()} onClick={handleAdd} sx={{ height: "100%" }}>
+                <Button variant="contained" fullWidth disabled={adding || !composedName.trim()} onClick={handleAdd} sx={{ height: "100%" }}>
                     {adding ? "Adding..." : "Add"}
                 </Button>
             </Grid>
