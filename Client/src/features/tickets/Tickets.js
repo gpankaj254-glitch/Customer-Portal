@@ -112,8 +112,9 @@ function TicketsContent() {
     if (!isManagement) {
         tabs.push({ label: "Create New Ticket", content: <CreateTicket /> })
     }
-    tabs.push({ label: "View Closed Tickets", content: <TicketsTable pagination={pagination} mode="closed" /> })
+    // "Customer Login - Remove View Closed Tickets"
     if (!isCustomer) {
+        tabs.push({ label: "View Closed Tickets", content: <TicketsTable pagination={pagination} mode="closed" /> })
         tabs.push({ label: "Completed Tickets", content: <TicketsTable pagination={pagination} mode="completed" /> })
     }
     if (isAdmin) {

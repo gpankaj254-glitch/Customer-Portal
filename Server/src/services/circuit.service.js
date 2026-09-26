@@ -44,6 +44,7 @@ const createCircuitBySite = async (site, circuitBody) => {
     "product",
     "vendorUptime",
     "vendorMTTR",
+    "endUser",
   ]);
 
   const code = createCodeFromName(circuitBody.vendorCircuitId, site.code);
@@ -55,9 +56,18 @@ const createCircuitBySite = async (site, circuitBody) => {
   circuitToCreate.region = site.region;
   circuitToCreate.site = extractNameAndCode(site);
   const createdCircuit = await Circuit.create(circuitToCreate);
-  // const siteCircuits = _.concat(site.circuits, createdCircuit._id);
-  // _.set(site, "circuits", siteCircuits);
-  // await site.save();
+  // This was previously commented out, which meant every circuit created
+  // through this path (a completed Delivery Order auto-creating its
+  // circuit - see deliveryOrder.service.js's createCircuitFromOrder) never
+  // made it into its site's own `circuits` id list. Site Inventory and the
+  // Create Ticket circuit picker both build their list from that array (see
+  // site.controller.js's getSites -> circuitService.getActiveCircuitsById),
+  // not from the Circuit collection directly (unlike Circuit Inventory,
+  // which queries Circuits directly and so showed these circuits all
+  // along) - the circuit was fully live and counted there, just invisible
+  // everywhere that goes through the site. Same $addToSet pattern already
+  // used by moveCircuitToSite above.
+  await Site.updateOne({ _id: site._id }, { $addToSet: { circuits: String(createdCircuit._id) } });
   return createdCircuit;
 };
 
@@ -150,7 +160,12 @@ const updateCircuitById = async (circuitId, updateBody, actingUser) => {
   return circuit;
 };
 
-const CIRCUIT_STATUS_FIELDS = ["status", "billStopDate", "changeType", "changeOrderNumber", "changeDate"];
+// product/bandwidth: "Give Option to SCX Admin - Add change Product and
+// bandwidth" - unlike billStopDate/changeType/changeOrderNumber/changeDate
+// below, these describe the circuit itself (not the Changed-transition
+// metadata), so they're never cleared when the status later moves on to
+// something else.
+const CIRCUIT_STATUS_FIELDS = ["status", "billStopDate", "changeType", "changeOrderNumber", "changeDate", "product", "bandwidth"];
 
 /**
  * Update just a circuit's Status (and whichever of Bill Stop Date/Change

@@ -33,6 +33,8 @@ import {
     deactivateCircuit,
 } from "./circuitSlice"
 import { getVendors, selectVendorList } from "../vendors/vendorSlice"
+import { selectUser } from "../auth/authSlice"
+import { roles } from "../../consts"
 import { pageStatusVals } from "./utils"
 import { formatTownCountry } from "../../utils/address"
 import { getFormattedStoredDate, getFormattedDateTime } from "../../utils/dates"
@@ -60,6 +62,7 @@ function matchesMultiTermSearch(row, rawSearch) {
         row.product,
         row.bandwidth,
         row.vendorName,
+        row.endUser,
         row.siteName,
         row.townCountry,
         row.status,
@@ -97,6 +100,11 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
     const status = useSelector(selectCircuitsListStatus)
     const error = useSelector(selectCircuitsListError)
     const vendorList = useSelector(selectVendorList)
+    const currentUser = useSelector(selectUser)
+    // "Customer Login - Live inventory list, replace Vendor Name with End
+    // User name" - Circuit Inventory is the only Inventory list a Customer
+    // still sees at all (Site Inventory is SCX Admin only - see Inventory.js).
+    const isCustomer = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
     const { isAdmin, canMove, canEditStatusForRow } = useCircuitRowPermissions()
     const [searchInput, setSearchInput] = React.useState(initialSearch)
 
@@ -150,6 +158,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
         product: circuit.product || "",
         bandwidth: circuit.bandwidth || "",
         vendorName: vendorNameById.get(circuit.vendorId) || "",
+        endUser: circuit.endUser || "",
         siteName: _.get(circuit, "site.name", ""),
         townCountry: formatTownCountry(circuit.location || {}),
         location: circuit.location,
@@ -158,11 +167,23 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
         changeOrderNumber: circuit.changeOrderNumber || "",
         changeTypeDisplay: getCircuitChangeTypeDisplay(circuit),
         statusDateDisplay: getFormattedStoredDate(getCircuitStatusDate(circuit)),
+        // "Live Circuit Inventory, Sort by Circuit status date decending
+        // order" - Circuit Status Date is stored "DD-MM-YYYY" (see
+        // circuit.service.js's BILL_START_DATE_FORMAT), so it has to be
+        // parsed before sorting - sorting the raw strings would order
+        // "05-12-2023" before "20-01-2024" (day-first, not year-first).
+        // Invalid/blank dates sort last either way.
+        statusDateValue: (() => {
+            const parsed = moment(getCircuitStatusDate(circuit), "DD-MM-YYYY", true)
+            return parsed.isValid() ? parsed.valueOf() : -1
+        })(),
     })), [circuits, vendorNameById])
 
     const searchTerm = searchInput.trim().toLowerCase()
     const filteredRows = React.useMemo(
-        () => rows.filter((row) => matchesMultiTermSearch(row, searchTerm)),
+        () => rows
+            .filter((row) => matchesMultiTermSearch(row, searchTerm))
+            .sort((a, b) => b.statusDateValue - a.statusDateValue),
         [rows, searchTerm]
     )
 
@@ -281,7 +302,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                             <TableCell><Typography variant="subtitle2">Customer PO Number</Typography></TableCell>
                             <TableCell><Typography variant="subtitle2">Product</Typography></TableCell>
                             <TableCell><Typography variant="subtitle2">Bandwidth</Typography></TableCell>
-                            <TableCell><Typography variant="subtitle2">Vendor Name</Typography></TableCell>
+                            <TableCell><Typography variant="subtitle2">{isCustomer ? "End User Name" : "Vendor Name"}</Typography></TableCell>
                             <TableCell><Typography variant="subtitle2">Town/City + Country</Typography></TableCell>
                             <TableCell><Typography variant="subtitle2">Circuit Status</Typography></TableCell>
                             {showChangeType && (
@@ -313,7 +334,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                                 <TableCell>{row.customerOrderReference}</TableCell>
                                 <TableCell>{row.product}</TableCell>
                                 <TableCell>{row.bandwidth}</TableCell>
-                                <TableCell>{row.vendorName}</TableCell>
+                                <TableCell>{isCustomer ? row.endUser : row.vendorName}</TableCell>
                                 <TableCell sx={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>{row.townCountry}</TableCell>
                                 <TableCell>{row.status}</TableCell>
                                 {showChangeType && (
@@ -434,7 +455,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                 open={!!circuitToEditStatus}
                 title="Change Circuit Status"
                 dense
-                fields={buildStatusEditableFields}
+                fields={(values) => buildStatusEditableFields(values, isAdmin)}
                 initialValues={
                     circuitToEditStatus
                         ? {
@@ -443,6 +464,8 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                             changeType: circuitToEditStatus.changeType || "",
                             changeOrderNumber: circuitToEditStatus.changeOrderNumber || "",
                             changeDate: circuitToEditStatus.changeDate || "",
+                            product: circuitToEditStatus.product || "",
+                            bandwidth: circuitToEditStatus.bandwidth || "",
                         }
                         : {}
                 }

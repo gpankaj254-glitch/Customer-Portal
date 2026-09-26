@@ -334,6 +334,7 @@ const createCircuitFromOrder = async (order, actingUser, options = {}) => {
       vendorLECName: order.lmpName,
       bandwidth: order.bandwidth,
       product: order.product,
+      endUser: order.endUser,
     });
 
     order.circuitId = String(circuit._id);

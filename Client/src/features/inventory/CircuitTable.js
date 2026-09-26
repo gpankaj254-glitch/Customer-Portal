@@ -251,7 +251,7 @@ export default function CircuitTable(props) {
                 open={!!circuitToEditStatus}
                 title="Change Circuit Status"
                 dense
-                fields={buildStatusEditableFields}
+                fields={(values) => buildStatusEditableFields(values, isAdmin)}
                 initialValues={
                     circuitToEditStatus
                         ? {
@@ -260,6 +260,8 @@ export default function CircuitTable(props) {
                             changeType: circuitToEditStatus.changeType || "",
                             changeOrderNumber: circuitToEditStatus.changeOrderNumber || "",
                             changeDate: circuitToEditStatus.changeDate || "",
+                            product: circuitToEditStatus.product || "",
+                            bandwidth: circuitToEditStatus.bandwidth || "",
                         }
                         : {}
                 }

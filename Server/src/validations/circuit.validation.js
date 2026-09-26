@@ -67,6 +67,12 @@ const updateCircuitStatus = {
     changeType: Joi.string().valid("", ...circuitChangeTypeOptions),
     changeOrderNumber: Joi.string().allow(""),
     changeDate: Joi.string().allow(""),
+    // "Give Option to SCX Admin - Add change Product and bandwidth" - only
+    // meaningful (and only sent by the client) alongside a "Changed" status,
+    // but accepted here regardless of status value, same as the other
+    // Changed-only fields above.
+    product: Joi.string().valid("", ...productOptions),
+    bandwidth: Joi.string().valid("", ...bandwidthOptions),
   }),
 };
 

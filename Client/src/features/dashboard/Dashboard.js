@@ -251,7 +251,9 @@ function DashboardContent() {
                     </Grid>
                 ) : isDeliveryRole ? (
                     <>
-                        <DeliveryOrderCharts orders={openOrderList} />
+                        {/* "SCX Delivery Dashboard Delivery, remove Open
+                            Order Status wise" */}
+                        <DeliveryOrderCharts orders={openOrderList} hideStatusWise />
                         <Grid item xs={12}>
                             <Typography component="h2" variant="h5" sx={{ mt: 0.5, fontSize: "0.85rem", fontWeight: 600 }}>View Open Orders</Typography>
                         </Grid>

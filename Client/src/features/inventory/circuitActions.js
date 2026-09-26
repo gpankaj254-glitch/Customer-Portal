@@ -79,7 +79,12 @@ export function buildEditableFields(circuit) {
 // "Live" needs nothing beyond the Status field itself; plain text dates
 // here, not HTML5 date inputs, to match the dd-mm-yyyy string convention
 // already used by customerCircuitBillStartDate/vendorCircuitBillStartDate.
-export function buildStatusEditableFields(values) {
+// isAdmin defaults false so any other caller that still invokes this with
+// just `values` keeps today's behavior - "Give Option to SCX Admin - Add
+// change Product and bandwidth" only applies to SCX Admin (not SCX Service
+// Delivery, who shares this same Edit Status dialog for a Ceased/Changed
+// transition but not the full Edit dialog's other fields).
+export function buildStatusEditableFields(values, isAdmin = false) {
     const status = _.get(values, "status", "Live")
     const fields = [
         {
@@ -103,8 +108,27 @@ export function buildStatusEditableFields(values) {
             { name: "changeOrderNumber", label: "Change Order Number" },
             { name: "changeDate", label: "Change Date (dd-mm-yyyy)" }
         )
+        // A "Changed" circuit is very often an Upgrade/Downgrade - letting
+        // SCX Admin record the new Product/Bandwidth right here (instead of
+        // a separate Edit afterward) keeps the whole change in one save.
+        if (isAdmin) {
+            fields.push(
+                {
+                    name: "product",
+                    label: "Product",
+                    type: "select",
+                    options: selectFieldOptions(productOptions, _.get(values, "product")),
+                },
+                {
+                    name: "bandwidth",
+                    label: "Bandwidth",
+                    type: "select",
+                    options: selectFieldOptions(bandwidthOptions, _.get(values, "bandwidth")),
+                }
+            )
+        }
     }
     return fields
 }
 
-export const STATUS_FIELD_NAMES = ["status", "billStopDate", "changeType", "changeOrderNumber", "changeDate"]
+export const STATUS_FIELD_NAMES = ["status", "billStopDate", "changeType", "changeOrderNumber", "changeDate", "product", "bandwidth"]

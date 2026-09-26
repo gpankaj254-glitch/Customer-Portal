@@ -46,12 +46,15 @@ export function CountChart({ title, data, compact }) {
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: compact ? "0.8rem" : "1.3rem" }}>No data</Typography>
             ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 32 }}>
+                    {/* "In all bar Charts, Display Number on top of each bar" -
+                        extra top margin makes room for the label above the
+                        tallest bar so it doesn't get clipped by the chart edge. */}
+                    <BarChart data={data} margin={{ top: 16, right: 8, left: 0, bottom: 32 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" angle={-30} textAnchor="end" interval={0} height={40} tick={{ fontSize: compact ? 8 : 9 }} />
                         <YAxis allowDecimals={false} tick={{ fontSize: compact ? 8 : 9 }} />
                         <Tooltip contentStyle={compact ? { fontSize: "0.75rem" } : undefined} />
-                        <Bar dataKey="count" fill="#1976d2" />
+                        <Bar dataKey="count" fill="#1976d2" isAnimationActive={false} label={{ position: "top", fontSize: compact ? 8 : 9, fill: "#333" }} />
                     </BarChart>
                 </ResponsiveContainer>
             )}

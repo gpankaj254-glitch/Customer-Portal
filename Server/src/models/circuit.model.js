@@ -121,6 +121,15 @@ const circuitSchema = mongoose.Schema(
       type: String,
       // required: true,
     },
+    // "Customer Login - Live inventory list, replace Vendor Name with End
+    // User name" - copied from the originating Delivery Order (see
+    // deliveryOrder.service.js's createCircuitFromOrder) when the circuit is
+    // auto-created; optional since older circuits (manual/bulk-uploaded,
+    // before this field existed) may have none.
+    endUser: {
+      type: String,
+      default: "",
+    },
     vendorUptime: {
       type: String,
       // required: true,
