@@ -87,20 +87,46 @@ const getLocationsBySiteIds = async (siteIds) => {
 /**
  * Count every active Circuit belonging to any Site matching the given
  * filter (the same Site-level filter querySites/getSites uses, search
- * conditions included) - not just the circuits on the current page's sites.
- * "need Total Count of Circuits in Total and based on search option" - the
- * Inventory page's own "Total Circuits" figure, which narrows the same way
- * the site list itself does as the user searches.
+ * conditions included) - not just the circuits on the current page's sites -
+ * broken down by Circuit Status. "SCX Admin - Inventory - Live Circuit
+ * Inventory says Number of Circuits 217; Live Site Inventory says Total
+ * Circuits 221. Why this difference?" - because the old, single combined
+ * count here included every active Circuit regardless of status (217 Live +
+ * 2 Changed + 2 Ceased = 221), even though "Total Circuits" is shown
+ * specifically on the Live/Changed/Ceased Site Inventory tab it matches.
+ * Returning per-status counts instead lets each tab show only its own
+ * status's total, same as Live Circuit Inventory already does.
  * @param {Object} filter - the same Mongo filter passed to querySites
- * @returns {Promise<number>}
+ * @returns {Promise<{Live: number, Changed: number, Ceased: number}>}
  */
-const countCircuitsForFilter = async (filter) => {
+const countCircuitsForFilterByStatus = async (filter) => {
+  const counts = { Live: 0, Changed: 0, Ceased: 0 };
   const matchingSites = await Site.find(filter).select("_id").lean();
   if (matchingSites.length === 0) {
-    return 0;
+    return counts;
   }
   const siteIds = matchingSites.map((site) => String(site._id));
-  return Circuit.countDocuments({ active: true, "site.id": { $in: siteIds } });
+  const grouped = await Circuit.aggregate([
+    { $match: { active: true, "site.id": { $in: siteIds } } },
+    { $group: { _id: "$status", count: { $sum: 1 } } },
+  ]);
+  grouped.forEach(({ _id, count }) => {
+    // A circuit with no stored status yet is "Live" (the schema default -
+    // aggregate() reads raw documents, bypassing that default, same as
+    // everywhere else this is handled - see circuit.model.js). That means
+    // $group can produce TWO separate buckets that both belong under
+    // "Live" - _id: null (no status stored) and _id: "Live" (stored
+    // explicitly) - in an order Mongo doesn't guarantee. Summing with += is
+    // what makes that safe; a plain "=" here (the original bug - confirmed
+    // live: "Live Circuit Inventory says 217, Live Site Inventory says 7")
+    // let whichever bucket happened to sort last silently overwrite the
+    // other instead of the two adding up to the correct total.
+    const status = _id || "Live";
+    if (counts[status] !== undefined) {
+      counts[status] += count;
+    }
+  });
+  return counts;
 };
 
 /**
@@ -443,7 +469,7 @@ const bulkUploadSites = async (fileBuffer) => {
 module.exports = {
   createSite,
   querySites,
-  countCircuitsForFilter,
+  countCircuitsForFilterByStatus,
   getLocationsBySiteIds,
   getSiteById,
   updateSiteById,

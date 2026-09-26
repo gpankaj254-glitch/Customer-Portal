@@ -14,6 +14,7 @@ import circuitsReducer from "../features/inventory/circuitSlice"
 import dashboardReducer from "../features/dashboard/dashboardSlice"
 import opportunitiesReducer from "../features/opportunities/opportunitySlice"
 import deliveryOrdersReducer from "../features/delivery/deliveryOrderSlice"
+import circuitOptionsReducer from "../features/products/circuitOptionSlice"
 
 const appReducer = combineReducers({
     counter: counterReducer,
@@ -29,6 +30,7 @@ const appReducer = combineReducers({
     dashboard: dashboardReducer,
     opportunities: opportunitiesReducer,
     deliveryOrders: deliveryOrdersReducer,
+    circuitOptions: circuitOptionsReducer,
 })
 
 // Nothing in this store is saved in the browser - it lives in memory for as

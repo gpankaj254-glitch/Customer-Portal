@@ -11,6 +11,7 @@ const siteRoute = require("./site.route");
 const dashboardRoute = require("./dashboard.route");
 const opportunityRoute = require("./opportunity.route");
 const deliveryOrderRoute = require("./deliveryOrder.route");
+const circuitOptionRoute = require("./circuitOption.route");
 
 const docsRoute = require("./docs.route");
 const config = require("../../config/config");
@@ -65,6 +66,10 @@ const defaultRoutes = [
   {
     path: "/delivery-order",
     route: deliveryOrderRoute,
+  },
+  {
+    path: "/circuit-option",
+    route: circuitOptionRoute,
   },
 ];
 

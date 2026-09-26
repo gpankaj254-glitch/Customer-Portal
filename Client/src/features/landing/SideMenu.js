@@ -67,6 +67,11 @@ const adminSecondaryListItems = [
     sideMenuItems.TICKETS,
     sideMenuItems.DELIVERY_ORDERS,
     sideMenuItems.SALES_OPPORTUNITIES,
+    // "Create Product Management Function for SCX Admin ... independent
+    // like NOC/ Delivery management, visible at Left side of Admin Login" -
+    // only SCX Admin holds this permission (see permissions.js), so this
+    // only ever shows in this list.
+    sideMenuItems.PRODUCT_MANAGEMENT,
 ]
 
 // SCX Sales Admin/Sales User's own explicit order - "Put Sales management

@@ -1,5 +1,12 @@
 const Joi = require("joi");
-const { bandwidthOptions, productOptions, circuitStatusOptions, circuitChangeTypeOptions } = require("../config/circuitOptions");
+const { circuitStatusOptions, circuitChangeTypeOptions } = require("../config/circuitOptions");
+
+// "Create Product Management Function for SCX Admin" - Product/Bandwidth
+// are no longer restricted to the original static list here (that list
+// isn't known at server startup anymore - SCX Admin can add to it any
+// time via CircuitOption/circuitOption.service.js). The client's own
+// dropdowns already only ever offer a name from that combined list, so
+// this is unrestricted free text at the API layer rather than an enum.
 
 const createCircuit = {
   body: Joi.array().items(
@@ -16,8 +23,8 @@ const createCircuit = {
       customerCircuitContractTerm: Joi.string().allow(""),
       vendorCircuitBillStartDate: Joi.string().allow(""),
       vendorCircuitContractTerm: Joi.string().allow(""),
-      bandwidth: Joi.string().valid("", ...bandwidthOptions),
-      product: Joi.string().valid("", ...productOptions),
+      bandwidth: Joi.string().allow(""),
+      product: Joi.string().allow(""),
       vendorUptime: Joi.string().allow(""),
       vendorMTTR: Joi.string().allow(""),
     })
@@ -49,8 +56,8 @@ const updateCircuit = {
       customerCircuitContractTerm: Joi.string().allow(""),
       vendorCircuitBillStartDate: Joi.string().allow(""),
       vendorCircuitContractTerm: Joi.string().allow(""),
-      bandwidth: Joi.string().valid("", ...bandwidthOptions),
-      product: Joi.string().valid("", ...productOptions),
+      bandwidth: Joi.string().allow(""),
+      product: Joi.string().allow(""),
       vendorUptime: Joi.string().allow(""),
       vendorMTTR: Joi.string().allow(""),
     })
@@ -71,8 +78,8 @@ const updateCircuitStatus = {
     // meaningful (and only sent by the client) alongside a "Changed" status,
     // but accepted here regardless of status value, same as the other
     // Changed-only fields above.
-    product: Joi.string().valid("", ...productOptions),
-    bandwidth: Joi.string().valid("", ...bandwidthOptions),
+    product: Joi.string().allow(""),
+    bandwidth: Joi.string().allow(""),
   }),
 };
 

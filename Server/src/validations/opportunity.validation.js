@@ -7,8 +7,11 @@ const {
   ipRequirementOptions,
   interfaceOptions,
 } = require("../config/opportunityOptions");
-const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
 const { currencyOptions } = require("../config/currencyOptions");
+// "Create Product Management Function for SCX Admin" - Product/Bandwidth
+// are no longer restricted to the original static list here (see
+// circuit.validation.js's own note - same reasoning applies everywhere
+// these two fields appear).
 
 const currencyCodes = currencyOptions.map((option) => option.code);
 
@@ -21,11 +24,11 @@ const customerRequestSchema = Joi.object().keys({
   state: Joi.string().allow(""),
   zipCode: Joi.string().allow(""),
   country: Joi.string().allow(""),
-  product: Joi.string().valid("", ...productOptions),
+  product: Joi.string().allow(""),
   ipRequirement: Joi.string().valid("", ...ipRequirementOptions),
   interface: Joi.string().valid("", ...interfaceOptions),
-  downBandwidth: Joi.string().valid("", ...bandwidthOptions),
-  upBandwidth: Joi.string().valid("", ...bandwidthOptions),
+  downBandwidth: Joi.string().allow(""),
+  upBandwidth: Joi.string().allow(""),
   contractTerm: Joi.string().allow(""),
   quoteSubmitDate: Joi.string().allow(""),
   quoteStatus: Joi.string().valid(...quoteStatusOptions),
@@ -45,7 +48,7 @@ const supplierCommunicationItem = Joi.object().keys({
   quoteSubmitDate: Joi.string().allow(""),
   quoteStatus: Joi.string().valid(...supplierQuoteStatusOptions),
   // "Edit Supplier Communication: Add Field - bandwith, Remarks".
-  bandwidth: Joi.string().valid("", ...bandwidthOptions),
+  bandwidth: Joi.string().allow(""),
   remarks: Joi.string().allow(""),
 });
 

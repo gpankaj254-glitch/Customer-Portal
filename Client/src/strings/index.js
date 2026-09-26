@@ -22,6 +22,8 @@ export function sideMenuItemNames (sideMenuItem) {
         return "Sales Opportunities"
     case sideMenuItems.DELIVERY_ORDERS:
         return "Service Delivery Management"
+    case sideMenuItems.PRODUCT_MANAGEMENT:
+        return "Product Management"
     default:
         return sideMenuItem
     }

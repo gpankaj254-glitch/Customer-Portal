@@ -22,7 +22,7 @@ import { getFormattedDateTime as formatDateTime } from "../../utils/dates"
 import { changeLimit, changePage, getOpportunities, selectGetOpportunitiesError, selectOpportunityList, deactivateOpportunity, updateOpportunity } from "./opportunitySlice"
 import { quoteStatusOptions, linkTypeOptions, ipRequirementOptions, interfaceOptions } from "../../consts/opportunityCommOptions"
 import { currencyOptions } from "../../consts/currencyOptions"
-import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
+import { useCircuitFieldOptions } from "../inventory/circuitActions"
 import { countryOptions } from "../../consts/countryOptions"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
@@ -96,6 +96,11 @@ export default function OpportunityTable(props) {
     // log") - Management still gets the row's Activity Log and Attachments
     // view icons, just not anything that writes.
     const canEdit = currentUser.role !== roles.SCLOUDX_MANAGEMENT
+    // "Create Product Management Function for SCX Admin ... these values
+    // should be visible in various dropdown menus" - Product/Bandwidth
+    // dropdowns in the Edit Opportunity dialog below now read the merged
+    // (static + admin-added) list.
+    const { productOptions, bandwidthOptions } = useCircuitFieldOptions()
 
     const pagination = props.pagination
     const { autoExpandOpportunityId, onAutoExpanded } = props

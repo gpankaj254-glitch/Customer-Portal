@@ -30,7 +30,7 @@ import { createSite, updateSite } from "../sites/siteSlice"
 import { fetchSitesOfCustomer } from "../inventory/circuitAPI"
 import { selectVendorList } from "../vendors/vendorSlice"
 import { selectUser } from "../auth/authSlice"
-import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
+import { useCircuitFieldOptions } from "../inventory/circuitActions"
 import { ipRequirementOptions, interfaceOptions } from "../../consts/opportunityCommOptions"
 import { countryOptions } from "../../consts/countryOptions"
 import { orderStatusOptions, milestoneStatusOptions, milestoneNames, siteTypeOptions, orderTypeOptions } from "../../consts/deliveryOrderOptions"
@@ -44,6 +44,31 @@ function toDateInputValue(value) {
 
 function customerName(order) {
     return _.get(order, "customer.name") || _.get(order, "newCustomerName", "")
+}
+
+// "Service Delivery Management - View Open Orders - Complete Order Details -
+// Pre populate Site Name (for both New and Existing Sites) with Logic 'End
+// User + Town + Country'" - the same suggested combination whichever site
+// type ends up chosen: it seeds the New Site's own Site Name field (see
+// buildInitialValues below) and the Existing Site search box (see the
+// existingSiteSearch state), both still freely editable/re-typable
+// afterward. End User/City/Country all come from Order Info, already
+// captured before Complete Order Details is ever opened.
+function buildSuggestedSiteName(order) {
+    return [_.get(order, "endUser", ""), _.get(order, "city", ""), _.get(order, "country", "")]
+        .filter(Boolean)
+        .join("-")
+}
+
+// Site's own "ID" - its name (see SiteTable.js, which has no separate ID
+// column either) - plus its full address, so sites that share a name are
+// still distinguishable. Named (not inline) so both the Existing Site
+// Autocomplete's getOptionLabel and its onChange (see existingSiteSearch)
+// can share it.
+function getExistingSiteOptionLabel(option) {
+    const name = _.get(option, "name", "")
+    const address = combineAddress(_.get(option, "location", {}))
+    return address ? `${name} - ${address}` : name
 }
 
 function buildInitialValues(order) {
@@ -95,7 +120,7 @@ function buildInitialValues(order) {
         remarks: _.get(order, "remarks", ""),
         siteType: _.get(order, "siteType", ""),
         siteId: _.get(order, "siteId", ""),
-        newSiteName: _.get(order, "newSiteName", ""),
+        newSiteName: _.get(order, "newSiteName", "") || buildSuggestedSiteName(order),
         // Pre-filled from Order Info's own Site Address/City/Zip/Country -
         // "Display already captured Address, City ... with Edit Option"
         // rather than asking for the same details again.
@@ -174,12 +199,21 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
     )
     const openOrderList = useSelector(selectOpenOrderList)
     const deliveredOrderList = useSelector(selectDeliveredOrderList)
+    // "Create Product Management Function for SCX Admin ... these values
+    // should be visible in various dropdown menus" - Product/Bandwidth
+    // dropdowns below now read the merged (static + admin-added) list.
+    const { productOptions, bandwidthOptions } = useCircuitFieldOptions()
     const [values, setValues] = React.useState(() => buildInitialValues(order))
     const [saving, setSaving] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)
     const [activeTab, setActiveTab] = React.useState(0)
     const [existingSites, setExistingSites] = React.useState([])
     const [sitesLoading, setSitesLoading] = React.useState(false)
+    // "Pre populate Site Name (for both New and Existing Sites) with Logic
+    // 'End User + Town + Country'" - Existing Site's own half: the
+    // Autocomplete's search text, pre-seeded so a matching site is easier
+    // to spot without retyping it - see buildSuggestedSiteName.
+    const [existingSiteSearch, setExistingSiteSearch] = React.useState(() => buildSuggestedSiteName(order))
     const [siteConfirmOpen, setSiteConfirmOpen] = React.useState(false)
     const [creatingSite, setCreatingSite] = React.useState(false)
     // Once a New site is already linked, its fields start disabled (a saved
@@ -201,6 +235,7 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
     React.useEffect(() => {
         setValues(buildInitialValues(order))
         setEditingNewSite(false)
+        setExistingSiteSearch(buildSuggestedSiteName(order))
     }, [order])
 
     const linkedCustomerId = _.get(order, "customer.id", "")
@@ -858,16 +893,29 @@ export default function OrderDetails({ order, readOnly, vendorName, liveCircuitO
                                 size="small"
                                 loading={sitesLoading}
                                 options={existingSites}
-                                getOptionLabel={(option) => {
-                                    // Site's own "ID" - its name (see SiteTable.js, which has
-                                    // no separate ID column either) - plus its full address, so
-                                    // sites that share a name are still distinguishable.
-                                    const name = _.get(option, "name", "")
-                                    const address = combineAddress(_.get(option, "location", {}))
-                                    return address ? `${name} - ${address}` : name
-                                }}
+                                getOptionLabel={getExistingSiteOptionLabel}
                                 value={existingSites.find((site) => site.id === values.siteId) || null}
-                                onChange={(event, newValue) => setValues((prev) => ({ ...prev, siteId: newValue ? newValue.id : "" }))}
+                                onChange={(event, newValue) => {
+                                    setValues((prev) => ({ ...prev, siteId: newValue ? newValue.id : "" }))
+                                    // Reflect the pick (or a cleared selection) in the search
+                                    // box text itself - see the onInputChange comment below for
+                                    // why that isn't just left to MUI's own reset sync.
+                                    setExistingSiteSearch(newValue ? getExistingSiteOptionLabel(newValue) : "")
+                                }}
+                                // "Pre populate Site Name ... with Logic 'End User + Town +
+                                // Country'" - starts pre-seeded with that suggestion (see
+                                // existingSiteSearch), freely re-typable afterward. MUI fires
+                                // its own onInputChange(..., "", "reset") the moment `value` is
+                                // null (e.g. right after switching to "Existing", before
+                                // anything is picked) to sync the text to a blank selection -
+                                // left unfiltered, that immediately wipes the pre-seeded
+                                // suggestion. Only real typing ("input") should update this.
+                                inputValue={existingSiteSearch}
+                                onInputChange={(event, newInputValue, reason) => {
+                                    if (reason === "input") {
+                                        setExistingSiteSearch(newInputValue)
+                                    }
+                                }}
                                 renderInput={(params) => <TextField {...params} label="Existing Site" placeholder="Search sites" />}
                             />
                         </Grid>

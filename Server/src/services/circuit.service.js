@@ -6,7 +6,6 @@ const _ = require("lodash");
 const moment = require("moment");
 const { parse } = require("csv-parse/sync");
 const { roleTypes } = require("../config/roles");
-const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
 const logger = require("../config/logger");
 const { Circuit, Site, Customer, Vendor, Ticket } = require("../models");
 const ApiError = require("../utils/ApiError");
@@ -14,6 +13,7 @@ const { createCodeFromName } = require("../utils/creators");
 const { extractNameAndCode, extractUserDetails } = require("../utils/extractors");
 const { getSiteById } = require("./site.service");
 const { getVendorById } = require("./vendor.service");
+const { getCircuitOptionNames } = require("./circuitOption.service");
 
 const BILL_START_DATE_FORMAT = "DD-MM-YYYY";
 
@@ -583,9 +583,15 @@ const validateBulkUploadCircuits = async (fileBuffer) => {
     if (customerName) customerCodes.add(createCodeFromName(customerName));
     if (vendorName) vendorCodes.add(createCodeFromName(vendorName));
   });
-  const [customers, vendors] = await Promise.all([
+  const [customers, vendors, validBandwidths, validProducts] = await Promise.all([
     Customer.find({ code: { $in: [...customerCodes] } }),
     Vendor.find({ code: { $in: [...vendorCodes] } }),
+    // "Create Product Management Function for SCX Admin ... these values
+    // should be visible in various dropdown menus" - the CSV's own "is a
+    // valid option" check now includes whatever Admin has added, not just
+    // the original static list.
+    getCircuitOptionNames("bandwidth"),
+    getCircuitOptionNames("product"),
   ]);
   const customersByCode = new Map(customers.map((customer) => [customer.code, customer]));
   const vendorsByCode = new Map(vendors.map((vendor) => [vendor.code, vendor]));
@@ -653,8 +659,8 @@ const validateBulkUploadCircuits = async (fileBuffer) => {
     if (!vendorName) errors.push("Vendor Name is required");
     if (!scloudxOrderReference) errors.push("SCloudX Order Reference is required");
     if (!vendorLECName) errors.push("Vendor LEC Name is required");
-    if (bandwidth && !bandwidthOptions.includes(bandwidth)) errors.push(`Bandwidth "${bandwidth}" is not a valid option`);
-    if (product && !productOptions.includes(product)) errors.push(`Product "${product}" is not a valid option`);
+    if (bandwidth && !validBandwidths.includes(bandwidth)) errors.push(`Bandwidth "${bandwidth}" is not a valid option`);
+    if (product && !validProducts.includes(product)) errors.push(`Product "${product}" is not a valid option`);
     if (!isValidBillStartDate(customerCircuitBillStartDate)) errors.push("Customer Circuit Bill Start Date must be dd-mm-yyyy");
     if (!isValidBillStartDate(vendorCircuitBillStartDate)) errors.push("Vendor Circuit Bill Start Date must be dd-mm-yyyy");
 

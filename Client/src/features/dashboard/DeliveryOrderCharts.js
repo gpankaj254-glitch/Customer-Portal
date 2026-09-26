@@ -41,7 +41,14 @@ export default function DeliveryOrderCharts({ orders, hideStatusWise }) {
         [vendorList]
     )
 
-    const customerWise = React.useMemo(() => groupCounts(orders, customerName), [orders])
+    // "SCX Delivery Dashboard Delivery, Open Order Customer Wise - Add
+    // Total Orders bar along with customerwise bars" - same "Total" bar
+    // ahead of the per-label breakdown already used by DashboardSummary.js's
+    // own Delivery chart.
+    const customerWise = React.useMemo(
+        () => [{ name: "Total Orders", count: orders.length }, ...groupCounts(orders, customerName)],
+        [orders]
+    )
     const endUserWise = React.useMemo(() => groupCounts(orders, (order) => order.endUser), [orders])
     const vendorWise = React.useMemo(
         () => groupCounts(orders, (order) => vendorNameById.get(order.vendorId) || ""),

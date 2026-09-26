@@ -39,11 +39,11 @@ import { pageStatusVals } from "./utils"
 import { formatTownCountry } from "../../utils/address"
 import { getFormattedStoredDate, getFormattedDateTime } from "../../utils/dates"
 import { downloadCsv } from "../../utils/csv"
-import { getCircuitStatusDate, getCircuitChangeTypeDisplay, circuitCsvColumns } from "../../utils/circuitDisplay"
+import { getCircuitStatusDate, getCircuitChangeTypeDisplay, circuitCsvColumns, formatVendorDisplay } from "../../utils/circuitDisplay"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
 import MoveCircuitDialog from "./MoveCircuitDialog"
-import { useCircuitRowPermissions, buildEditableFields, buildStatusEditableFields, STATUS_FIELD_NAMES } from "./circuitActions"
+import { useCircuitRowPermissions, useCircuitFieldOptions, buildEditableFields, buildStatusEditableFields, STATUS_FIELD_NAMES } from "./circuitActions"
 
 // "if I put 100 Mbps+USA+Verizon) it should filter all circuits with 100
 // Mbps BW in USA country and Verizon Vendor" - each "+"-separated term must
@@ -62,6 +62,7 @@ function matchesMultiTermSearch(row, rawSearch) {
         row.product,
         row.bandwidth,
         row.vendorName,
+        row.vendorLECName,
         row.endUser,
         row.siteName,
         row.townCountry,
@@ -106,6 +107,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
     // still sees at all (Site Inventory is SCX Admin only - see Inventory.js).
     const isCustomer = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
     const { isAdmin, canMove, canEditStatusForRow } = useCircuitRowPermissions()
+    const { productOptions, bandwidthOptions } = useCircuitFieldOptions()
     const [searchInput, setSearchInput] = React.useState(initialSearch)
 
     const [circuitToDelete, setCircuitToDelete] = React.useState(null)
@@ -158,6 +160,11 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
         product: circuit.product || "",
         bandwidth: circuit.bandwidth || "",
         vendorName: vendorNameById.get(circuit.vendorId) || "",
+        // "In Vendor Name - Show Vendor Name + Vendor LEC Name" - what the
+        // Vendor Name column/CSV field actually displays; row.vendorName
+        // itself is left as just the plain name for anything else that
+        // still needs it.
+        vendorDisplay: formatVendorDisplay(vendorNameById.get(circuit.vendorId) || "", circuit.vendorLECName || ""),
         endUser: circuit.endUser || "",
         siteName: _.get(circuit, "site.name", ""),
         townCountry: formatTownCountry(circuit.location || {}),
@@ -194,7 +201,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
     // labelled "Address" here since circuitCsvColumns is shared with Site
     // Inventory's own full-address CSV - now pulls from this row's
     // townCountry, matching "Remove Address, Just add Town/City+Country").
-    const csvFieldByColumnId = { changeType: "changeTypeDisplay", statusDate: "statusDateDisplay", address: "townCountry" }
+    const csvFieldByColumnId = { changeType: "changeTypeDisplay", statusDate: "statusDateDisplay", address: "townCountry", vendorName: "vendorDisplay" }
     const handleDownloadCsv = () => {
         const csvColumns = circuitCsvColumns(showChangeType)
         const headers = csvColumns.map((column) => column.label)
@@ -334,7 +341,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                                 <TableCell>{row.customerOrderReference}</TableCell>
                                 <TableCell>{row.product}</TableCell>
                                 <TableCell>{row.bandwidth}</TableCell>
-                                <TableCell>{isCustomer ? row.endUser : row.vendorName}</TableCell>
+                                <TableCell>{isCustomer ? row.endUser : row.vendorDisplay}</TableCell>
                                 <TableCell sx={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>{row.townCountry}</TableCell>
                                 <TableCell>{row.status}</TableCell>
                                 {showChangeType && (
@@ -440,8 +447,8 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
             <EditDialog
                 open={!!circuitToEdit}
                 title="Edit circuit"
-                fields={buildEditableFields(circuitToEdit)}
-                initialValues={circuitToEdit ? _.pick(circuitToEdit, buildEditableFields(circuitToEdit).map((field) => field.name)) : {}}
+                fields={buildEditableFields(circuitToEdit, productOptions, bandwidthOptions)}
+                initialValues={circuitToEdit ? _.pick(circuitToEdit, buildEditableFields(circuitToEdit, productOptions, bandwidthOptions).map((field) => field.name)) : {}}
                 lastEditedNote={
                     circuitToEdit && circuitToEdit.updatedBy && circuitToEdit.updatedBy.name
                         ? `Last edited by ${circuitToEdit.updatedBy.name} on ${getFormattedDateTime(circuitToEdit.updatedAt)}`
@@ -455,7 +462,7 @@ export default function CircuitInventoryTable({ statuses, showChangeType, initia
                 open={!!circuitToEditStatus}
                 title="Change Circuit Status"
                 dense
-                fields={(values) => buildStatusEditableFields(values, isAdmin)}
+                fields={(values) => buildStatusEditableFields(values, isAdmin, productOptions, bandwidthOptions)}
                 initialValues={
                     circuitToEditStatus
                         ? {

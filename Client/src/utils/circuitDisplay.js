@@ -5,6 +5,20 @@ import { getFormattedStoredDate } from "./dates"
 // tabs) so both build the exact same "Circuit Inventory" CSV shape
 // regardless of which tab it's downloaded from.
 
+// "In Vendor Name - Show Vendor Name + Vendor LEC Name" - combines the
+// Vendor's own master name with this circuit's own vendorLECName (a
+// per-circuit field, defaulted from the vendor's name at creation but
+// independently editable - see CreateCircuit.js) into the one column/value
+// most "Vendor Name" displays show. Falls back to just the plain name when
+// there's no LEC name captured yet (legacy circuits) or the two match, so
+// nothing shows a redundant "Name (Name)".
+export function formatVendorDisplay(vendorName, vendorLECName) {
+    if (vendorLECName && vendorLECName !== vendorName) {
+        return `${vendorName} / ${vendorLECName}`
+    }
+    return vendorName || ""
+}
+
 // "Circuit Status Date" - the single date that matters for a circuit's
 // current status: Live reuses its Customer Bill Start Date (there's no
 // separate "went Live" date captured), Ceased uses Bill Stop Date, Changed

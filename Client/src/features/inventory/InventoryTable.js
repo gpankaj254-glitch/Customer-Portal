@@ -22,6 +22,7 @@ import { combineAddress } from "../../utils/address"
 import { downloadCsv } from "../../utils/csv"
 import { circuitCsvColumns, buildCircuitCsvRow } from "../../utils/circuitDisplay"
 import { getVendors, selectVendorList } from "../vendors/vendorSlice"
+import { useCircuitFieldOptions } from "./circuitActions"
 
 const columns = [
     { id: "icon", label: ""},
@@ -72,6 +73,12 @@ export default function InventoryTable(props) {
     // "Give CSV Download options for Inventory ... only to SCX Admin User" -
     // set by Inventory.js from the viewer's own role.
     const canDownloadCsv = props.canDownloadCsv
+    // Dispatched here (mounted at most 3x - once per Live/Changed/Ceased
+    // Site Inventory tab), not inside CircuitTable.js itself, which mounts
+    // once per SITE ROW (200+ at once, always-mounted under Collapse) - see
+    // useCircuitFieldOptions' own comment for why that would otherwise
+    // fire hundreds of duplicate dispatches at once.
+    useCircuitFieldOptions()
 
     // "Live Inventory"/"Changed Inventory"/"Ceased Inventory" - reuses the
     // same already-fetched siteList for all three (no separate fetch per

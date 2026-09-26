@@ -132,6 +132,11 @@ export async function fetchGetTickets (data, rejectWithValue) {
         // of the request body; the server builds the actual $in itself (see
         // ticket.controller.js's getTickets).
         if (data.status !== undefined) filter.status = data.status
+        // "View Open RFO ... Logic where 'RFO Request Received = Yes' 'RFO
+        // Status is not Closed'" - getOpenRfoTickets (ticketSlice.js) sets
+        // this plain flag; the server builds the actual rfo.* filter from
+        // it (see ticket.controller.js's getTickets).
+        if (data.rfoOpen !== undefined) filter.rfoOpen = data.rfoOpen
         // "View Closed and Completed Tickets - Sort Descending Order by
         // Ticket Close date" - getTickets (ticket.controller.js) only reads
         // sortBy from the query string (same as every other list endpoint

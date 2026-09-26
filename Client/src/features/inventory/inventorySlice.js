@@ -12,9 +12,11 @@ const initialState = {
     focusSiteId: "",
     // "need Total Count of Circuits in Total and based on search option" -
     // count of active circuits across every site matching the current
-    // search (not just the current page's sites) - see getSites' own
-    // totalCircuits.
-    totalCircuits: 0,
+    // search (not just the current page's sites), broken down by Circuit
+    // Status - see getSites' own totalCircuitsByStatus and the "why does
+    // Live Circuit Inventory (217) differ from Live Site Inventory (221)"
+    // fix note on countCircuitsForFilterByStatus.
+    totalCircuitsByStatus: { Live: 0, Changed: 0, Ceased: 0 },
     pagination: {
         page: 0,
         limit: 200,
@@ -70,7 +72,7 @@ export const inventorySlice = createSlice({
                 state.siteList = payload.results
                 state.pagination.totalResults = payload.totalResults
                 state.pagination.totalPages = payload.totalPages
-                state.totalCircuits = payload.totalCircuits ?? 0
+                state.totalCircuitsByStatus = payload.totalCircuitsByStatus ?? { Live: 0, Changed: 0, Ceased: 0 }
                 // state.pagination.totalResults = payload.totalResults
             })
             .addCase(getSites.rejected, (state, {payload}) => {
@@ -88,6 +90,6 @@ export const selectPageStatus = (state) => state.inventory.pageStatus
 export const selectPagination = (state) => state.inventory.pagination
 export const selectSearch = (state) => state.inventory.search
 export const selectFocusSiteId = (state) => state.inventory.focusSiteId
-export const selectTotalCircuits = (state) => state.inventory.totalCircuits
+export const selectTotalCircuitsByStatus = (state) => state.inventory.totalCircuitsByStatus
 
 export default inventorySlice.reducer

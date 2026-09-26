@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const { toJSON, paginate } = require("./plugins");
-const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
 const { ipRequirementOptions, interfaceOptions } = require("../config/opportunityOptions");
 const { orderStatusOptions, milestoneStatusOptions, siteTypeOptions, orderTypeOptions } = require("../config/deliveryOrderOptions");
 
@@ -87,14 +86,16 @@ const deliveryOrderSchema = mongoose.Schema(
       type: String,
       default: "",
     },
+    // "Create Product Management Function for SCX Admin" - no longer a
+    // fixed enum (SCX Admin can add new Product/Bandwidth names at any
+    // time via CircuitOption, well after server startup - see
+    // circuitOption.service.js).
     product: {
       type: String,
-      enum: ["", ...productOptions],
       default: "",
     },
     bandwidth: {
       type: String,
-      enum: ["", ...bandwidthOptions],
       default: "",
     },
     // The customer-side contract term - maps to Circuit's own

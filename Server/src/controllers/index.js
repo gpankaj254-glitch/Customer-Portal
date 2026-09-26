@@ -10,3 +10,4 @@ module.exports.siteController = require("./site.controller");
 module.exports.dashboardController = require("./dashboard.controller");
 module.exports.opportunityController = require("./opportunity.controller");
 module.exports.deliveryOrderController = require("./deliveryOrder.controller");
+module.exports.circuitOptionController = require("./circuitOption.controller");

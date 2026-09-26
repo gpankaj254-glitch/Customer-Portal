@@ -21,6 +21,16 @@ function sortBySerialNumber(list) {
     )
 }
 
+// "Service Delivery Management - Delivered Order, Sort By Delivery Date,
+// latest first" - a blank/missing Delivery Date sorts last either way.
+function sortByDeliveryDateDesc(list) {
+    return [...list].sort((a, b) => {
+        const aTime = a.deliveryDate ? new Date(a.deliveryDate).getTime() : -Infinity
+        const bTime = b.deliveryDate ? new Date(b.deliveryDate).getTime() : -Infinity
+        return bTime - aTime
+    })
+}
+
 const initialState = {
     // Two lists, one per tab - mirrors ticketSlice's
     // openTicketList/closedTicketList. "View Open Order" is every status
@@ -124,7 +134,7 @@ export const deliveryOrderSlice = createSlice({
             .addCase(getDeliveryOrders.fulfilled, (state, { payload }) => {
                 state.pageStatus = pageStatusVals.fetched
                 if (payload.tab === "completed") {
-                    state.deliveredOrderList = payload.results
+                    state.deliveredOrderList = sortByDeliveryDateDesc(payload.results)
                 } else {
                     state.openOrderList = sortBySerialNumber(payload.results)
                 }
@@ -149,7 +159,7 @@ export const deliveryOrderSlice = createSlice({
                 state.openOrderList = state.openOrderList.filter((order) => order.id !== payload.id)
                 state.deliveredOrderList = state.deliveredOrderList.filter((order) => order.id !== payload.id)
                 if (payload.status === "Completed") {
-                    state.deliveredOrderList = [payload, ...state.deliveredOrderList]
+                    state.deliveredOrderList = sortByDeliveryDateDesc([payload, ...state.deliveredOrderList])
                 } else {
                     state.openOrderList = sortBySerialNumber([payload, ...state.openOrderList])
                 }
@@ -165,7 +175,7 @@ export const deliveryOrderSlice = createSlice({
                 state.openOrderList = state.openOrderList.filter((order) => order.id !== payload.id)
                 state.deliveredOrderList = state.deliveredOrderList.filter((order) => order.id !== payload.id)
                 if (payload.status === "Completed") {
-                    state.deliveredOrderList = [payload, ...state.deliveredOrderList]
+                    state.deliveredOrderList = sortByDeliveryDateDesc([payload, ...state.deliveredOrderList])
                 } else {
                     state.openOrderList = sortBySerialNumber([payload, ...state.openOrderList])
                 }

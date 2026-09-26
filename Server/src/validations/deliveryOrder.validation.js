@@ -1,6 +1,5 @@
 const Joi = require("joi");
 const { objectId } = require("./custom.validation");
-const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
 const { ipRequirementOptions, interfaceOptions } = require("../config/opportunityOptions");
 const {
   orderStatusOptions,
@@ -31,8 +30,8 @@ const createDeliveryOrder = {
         state: Joi.string().allow(""),
         country: Joi.string().allow(""),
         zipCode: Joi.string().allow(""),
-        product: Joi.string().valid("", ...productOptions),
-        bandwidth: Joi.string().valid("", ...bandwidthOptions),
+        product: Joi.string().allow(""),
+        bandwidth: Joi.string().allow(""),
         contractTerm: Joi.string().allow(""),
         ipRequirement: Joi.string().valid("", ...ipRequirementOptions),
         interface: Joi.string().valid("", ...interfaceOptions),
@@ -92,8 +91,8 @@ const updateDeliveryOrder = {
       state: Joi.string().allow(""),
       country: Joi.string().allow(""),
       zipCode: Joi.string().allow(""),
-      product: Joi.string().valid("", ...productOptions),
-      bandwidth: Joi.string().valid("", ...bandwidthOptions),
+      product: Joi.string().allow(""),
+      bandwidth: Joi.string().allow(""),
       contractTerm: Joi.string().allow(""),
       vendorContractTerm: Joi.string().allow(""),
       ipRequirement: Joi.string().valid("", ...ipRequirementOptions),

@@ -56,6 +56,11 @@ const allRoles = {
     "updateDeliveryOrders",
     "deleteDeliveryOrders",
     "permanentlyDeleteDeliveryOrders",
+    // "Create Product Management Function for SCX Admin" - manage the
+    // Product/Bandwidth name lists themselves (list/read is open to any
+    // authenticated role - see circuitOption.route.js - since every
+    // Product/Bandwidth dropdown across the app needs to read it).
+    "manageCircuitOptions",
   ],
   // viewDeliveryOrders: "Customer Admin Dashboard - New tab" (Open Orders) -
   // read-only, scoped to the customer's own orders only (see

@@ -19,13 +19,14 @@ import Radio from "@mui/material/Radio"
 import FormControlLabel from "@mui/material/FormControlLabel"
 import PropTypes from "prop-types"
 import _ from "lodash"
+import moment from "moment"
 import { useSelector, useDispatch } from "react-redux"
 import { getFormattedDate } from "../../utils/dates"
 import { updateTicket, saveTicketRfo, appendTicketDescription, uploadTicketAttachments, appendVendorDescription, uploadVendorAttachments } from "./ticketSlice"
 import { downloadTicketAttachment, downloadVendorAttachment } from "./ticketsAPI"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
-import { problemTypeOptions, priorityOptions, statusOptions, openStatusOptions, closureCodeOptions, rfoRequestStatusOptions, rfoCodeOptions, vendorTicketStatusOptions } from "../../consts/ticketOptions"
+import { problemTypeOptions, priorityOptions, statusOptions, openStatusOptions, closureCodeOptions, rfoRequestStatusOptions, rfoCodeOptions, networkIssueRfoCodes, vendorTicketStatusOptions } from "../../consts/ticketOptions"
 
 const ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.gif,.bmp,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
 
@@ -34,6 +35,19 @@ const ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.gif,.bmp,.webp,.pdf,.doc,.docx,.xls,
 // Bulk-imported tickets can hold other text, so only this shape is usable
 // for comparing against the Closed Date and Time.
 const WALL_CLOCK = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
+
+// "RFO Problem Start/Stop Date/Time ... IST (Converted from GMT if
+// captured in GMT in RFO Tab)" - the RFO Request tab captures these as a
+// plain GMT wall-clock string (see its own "(GMT)" field labels), same
+// convention as Problem Start Date; the Ticket Closure Details tab instead
+// shows them converted to IST (+05:30, no DST) for whoever reads this tab.
+// RFO Request Date is captured directly in IST on the RFO tab already (see
+// its own "(IST)" label there), so it needs no conversion - just plain
+// formatting, same as today.
+function formatGmtWallClockAsIst(value) {
+    if (!value || !WALL_CLOCK.test(value)) return value || ""
+    return moment.utc(value, "YYYY-MM-DDTHH:mm").utcOffset(330).format("DD-MMM-YY HH:mm").toUpperCase()
+}
 
 // Current local time formatted for a datetime-local input ("YYYY-MM-DDTHH:mm").
 function nowForDateTimeInput() {
@@ -226,17 +240,28 @@ export default function TicketDetails({ ticket, mode }) {
     // mode is the only place "Completed" is deliberately left off the list.
     const tab0StatusOptions = mode === "open" ? openStatusOptions : statusOptions
 
-    // "Add Fields - Total Down Time (HH:MM) = (Ticket Closure Time - Problem
-    // Start Time), Net Down Time (HH:MM) = Downtime minus Customer Delay/
-    // Hold Time (HH:MM), Network Downtime (HH:MM) = Net Down Time If RFO
-    // Code contains Network Issue" - purely derived from already-tracked
-    // state, recomputed on every render rather than stored, so they always
-    // reflect the current (possibly not-yet-saved) Ticket Closure Date/Time/
-    // Customer Delay edits rather than going stale.
-    const totalDownTimeMinutes = minutesBetween(problemStartUsable ? problemStartDate.slice(0, 16) : "", closureDateTime)
+    // "Total downtime calculation is wrong" - Total Down Time is the actual
+    // reported outage window, RFO Problem Start -> RFO Problem Stop, not
+    // the ticket-level Problem Start Date/Ticket Closure Date/Time (which
+    // can differ a lot - Ticket Closure Date/Time is just when the ticket
+    // was administratively closed, and Problem Start Date is often only a
+    // rough initial guess later refined on the RFO side). rfoProblemStart/
+    // StopDateTime already default FROM Problem Start Date/Ticket Closure
+    // Date/Time when nothing's been entered yet (see their own useState
+    // initializers), so this still reduces to the old formula until either
+    // is edited - it just also picks up a more accurate RFO-side correction
+    // once one exists, in either the "Yes" or "No" branch. Purely derived
+    // from already-tracked state, recomputed on every render rather than
+    // stored, so it always reflects the current (possibly not-yet-saved)
+    // edits rather than going stale.
+    const totalDownTimeMinutes = minutesBetween(rfoProblemStartDateTime, rfoProblemStopDateTime)
     const customerDelayMinutes = parseHHMM(customerDelayTime)
     const netDownTimeMinutes = totalDownTimeMinutes === null ? null : totalDownTimeMinutes - (customerDelayMinutes || 0)
-    const isNetworkIssue = rfoCode.startsWith("Network Issue")
+    // Membership in the "Network Issue" category, not a string prefix check -
+    // "Network Issue - Latency Packet Loss" was renamed to "Latency/ Packet
+    // Loss" (no longer literally starting with "Network Issue"), which had
+    // silently broken this.
+    const isNetworkIssue = networkIssueRfoCodes.includes(rfoCode)
     const networkDownTimeMinutes = isNetworkIssue ? netDownTimeMinutes : null
     // "In Ticket Closure Details, Save and Close Button should be active
     // when all fields are filled and RFO Code is not Blank/None"
@@ -1144,42 +1169,16 @@ export default function TicketDetails({ ticket, mode }) {
                                     disabled={closureFieldsLocked}
                                 />
                             </Grid>
-                            {/* "Add Field - Customer Delay/Hold Time - HH:MM" */}
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    required
-                                    label="Customer Delay/Hold Time"
-                                    placeholder="HH:MM"
-                                    value={customerDelayTime}
-                                    onChange={(event) => setCustomerDelayTime(event.target.value)}
-                                    disabled={closureFieldsLocked}
-                                />
-                            </Grid>
-                            {/* "Add Fields - Total Down Time (HH:MM) = (Ticket
-                                Closure Time - Problem Start Time), Net Down
-                                Time (HH:MM) = Downtime minus Customer Delay/
-                                Hold Time (HH:MM), Network Downtime (HH:MM) =
-                                Net Down Time If RFO Code contains Network
-                                Issue" - all three calculated (see this
-                                component's own totalDownTimeMinutes/
-                                netDownTimeMinutes/networkDownTimeMinutes), so
-                                always read-only and never saved on their own. */}
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Total Down Time (HH:MM)" value={formatMinutesToHHMM(totalDownTimeMinutes)} disabled />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Net Down Time (HH:MM)" value={formatMinutesToHHMM(netDownTimeMinutes)} disabled />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField fullWidth label="Network Downtime (HH:MM)" value={formatMinutesToHHMM(networkDownTimeMinutes)} disabled />
-                            </Grid>
 
-                            {/* "Display all fields of Ticket closure Details" -
-                                the full RFO record is always visible here now
-                                (not just the subset that varies by Yes/No),
-                                so nothing entered on the RFO Request tab is
-                                hidden from this tab's own view. */}
+                            {/* "Ticket Closure Details, Display fields in
+                                following order ... RFO Request received =
+                                Yes/No indicator at top, RFO Request Date,
+                                RFO Problem Start/Stop Date/Time, RFO Status,
+                                RFO Code, RFO Description" - the full RFO
+                                record, ahead of Customer Delay/downtime below
+                                (see "Display all fields of Ticket closure
+                                Details" - always visible here regardless of
+                                Yes/No, not just the subset that varies). */}
                             <Grid item xs={12}>
                                 <Typography variant="subtitle2" sx={{ mt: 1 }}>
                                     RFO Request received = {rfoRequested}
@@ -1191,17 +1190,40 @@ export default function TicketDetails({ ticket, mode }) {
                             </Grid>
                             {rfoRequested === "Yes" ? (
                                 <>
+                                    {/* "RFO Problem Start/Stop Date/Time IST
+                                        (Converted from GMT if captured in GMT
+                                        in RFO Tab)" - the RFO Request tab
+                                        captures these as GMT (see its own
+                                        "(GMT)" labels); converted here since
+                                        this read-only mirror is what most
+                                        other readers of this tab actually
+                                        need. */}
                                     <Grid item xs={12} sm={4}>
-                                        <TextField fullWidth label="RFO Problem Start Date/Time" value={rfoProblemStartDateTime} disabled />
+                                        <TextField fullWidth label="RFO Problem Start Date/Time (IST)" value={formatGmtWallClockAsIst(rfoProblemStartDateTime)} disabled />
                                     </Grid>
                                     <Grid item xs={12} sm={4}>
-                                        <TextField fullWidth label="RFO Problem Stop Date/Time" value={rfoProblemStopDateTime} disabled />
+                                        <TextField fullWidth label="RFO Problem Stop Date/Time (IST)" value={formatGmtWallClockAsIst(rfoProblemStopDateTime)} disabled />
+                                    </Grid>
+                                    {/* "Align all fields as were aligned when RFO Request
+                                        received = No" - same RFO Code/RFO Status/Customer
+                                        Delay/Hold Time order as the "No" branch below, just
+                                        read-only here instead of editable. */}
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField fullWidth label="RFO Code" value={rfoCode} disabled />
                                     </Grid>
                                     <Grid item xs={12} sm={4}>
                                         <TextField fullWidth label="RFO Status" value={rfoRequestStatus} disabled />
                                     </Grid>
                                     <Grid item xs={12} sm={4}>
-                                        <TextField fullWidth label="RFO Code" value={rfoCode} disabled />
+                                        <TextField
+                                            fullWidth
+                                            required
+                                            label="Customer Delay/Hold Time"
+                                            placeholder="HH:MM"
+                                            value={customerDelayTime}
+                                            onChange={(event) => setCustomerDelayTime(event.target.value)}
+                                            disabled={closureFieldsLocked}
+                                        />
                                     </Grid>
                                     <Grid item xs={12} sm={8}>
                                         <TextField fullWidth multiline minRows={2} label="RFO Description" value={rfoDescription} disabled />
@@ -1214,6 +1236,9 @@ export default function TicketDetails({ ticket, mode }) {
                                         Ticket Closure Date/Time respectively (see this
                                         component's own rfoProblemStartDateTime/
                                         rfoProblemStopDateTime state), still freely editable.
+                                        Captured directly here (not on the RFO Request tab),
+                                        same GMT convention as Problem Start Date - no IST
+                                        conversion, unlike the read-only "Yes" branch above.
                                         RFO Status/Description aren't part of the "No"
                                         edit fields (there's no RFO to report a status or
                                         description on), but still shown read-only so every
@@ -1259,11 +1284,60 @@ export default function TicketDetails({ ticket, mode }) {
                                     <Grid item xs={12} sm={4}>
                                         <TextField fullWidth label="RFO Status" value={rfoRequestStatus} disabled />
                                     </Grid>
+                                    {/* "Align Customer Delay Hold Time next to RFO Status
+                                        field" / "if RFO Request received = Yes, Align all
+                                        fields as were aligned when RFO Request received =
+                                        No" - RFO Code, RFO Status, Customer Delay/Hold Time
+                                        in that same order in both branches (see the "Yes"
+                                        branch above, which mirrors this one field-for-field
+                                        now, just read-only instead of editable). */}
+                                    <Grid item xs={12} sm={4}>
+                                        <TextField
+                                            fullWidth
+                                            required
+                                            label="Customer Delay/Hold Time"
+                                            placeholder="HH:MM"
+                                            value={customerDelayTime}
+                                            onChange={(event) => setCustomerDelayTime(event.target.value)}
+                                            disabled={closureFieldsLocked}
+                                        />
+                                    </Grid>
                                     <Grid item xs={12} sm={8}>
                                         <TextField fullWidth multiline minRows={2} label="RFO Description" value={rfoDescription} disabled />
                                     </Grid>
                                 </>
                             )}
+
+                            {/* "Align Total Downtime; Effective Down Time;
+                                Network Downtime in one line ... Below RFO
+                                Details" - a full-width spacer forces these
+                                three onto their own fresh row regardless of
+                                how much of the RFO block's own last row (RFO
+                                Description, sm=8) the grid packing above
+                                happened to leave open - otherwise the first
+                                of the three could end up sharing that row
+                                instead of starting a new one below it. */}
+                            <Grid item xs={12} />
+
+                            {/* "Add Fields - Total Down Time (HH:MM) = (Ticket
+                                Closure Time - Problem Start Time), Effective
+                                Down Time (HH:MM) [renamed from Net Down Time]
+                                = Downtime minus Customer Delay/Hold Time
+                                (HH:MM), Network Downtime (HH:MM) = Effective
+                                Down Time If RFO Code contains Network Issue" -
+                                all three calculated (see this component's own
+                                totalDownTimeMinutes/netDownTimeMinutes/
+                                networkDownTimeMinutes), so always read-only
+                                and never saved on their own. */}
+                            <Grid item xs={12} sm={4}>
+                                <TextField fullWidth label="Total Down Time (HH:MM)" value={formatMinutesToHHMM(totalDownTimeMinutes)} disabled />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <TextField fullWidth label="Effective Down Time (HH:MM)" value={formatMinutesToHHMM(netDownTimeMinutes)} disabled />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <TextField fullWidth label="Network Downtime (HH:MM)" value={formatMinutesToHHMM(networkDownTimeMinutes)} disabled />
+                            </Grid>
 
                             {!closureFieldsLocked && (
                                 <Grid item xs={12}>

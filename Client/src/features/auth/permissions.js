@@ -8,7 +8,9 @@ function roleBasedPermissions(role) {
     case roles.CUSTOMER_ADMIN:
         return [permisiions.USER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.TICKETS]
     case roles.SCLOUDX_ADMIN:
-        return [permisiions.USER_MANAGEMENT, permisiions.CUSTOMER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.VENDOR_MANAGEMENT, permisiions.TICKETS, permisiions.SALES_OPPORTUNITIES, permisiions.DELIVERY_ORDERS]
+        // "Create Product Management Function for SCX Admin ... independent
+        // like NOC/ Delivery management, visible at Left side of Admin Login"
+        return [permisiions.USER_MANAGEMENT, permisiions.CUSTOMER_MANAGEMENT, permisiions.SITE_MANAGEMENT, permisiions.VENDOR_MANAGEMENT, permisiions.TICKETS, permisiions.SALES_OPPORTUNITIES, permisiions.DELIVERY_ORDERS, permisiions.PRODUCT_MANAGEMENT]
     case roles.CUSTOMER_USER:
         return [permisiions.SITE_MANAGEMENT, permisiions.TICKETS]
     case roles.SCLOUDX_USER:

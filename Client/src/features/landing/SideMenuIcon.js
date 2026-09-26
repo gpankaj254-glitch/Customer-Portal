@@ -11,6 +11,7 @@ import LocationOnIcon from "@mui/icons-material/LocationOn"
 import LocalShippingIcon from "@mui/icons-material/LocalShipping"
 import TrendingUpIcon from "@mui/icons-material/TrendingUp"
 import AssignmentIcon from "@mui/icons-material/Assignment"
+import CategoryIcon from "@mui/icons-material/Category"
 
 import {sideMenuItems} from "../../consts"
 
@@ -36,6 +37,8 @@ export default function getMenuItemIcon(itemType) {
         return <TrendingUpIcon />
     case sideMenuItems.DELIVERY_ORDERS:
         return <AssignmentIcon />
+    case sideMenuItems.PRODUCT_MANAGEMENT:
+        return <CategoryIcon />
     default:
         return <LayersIcon />
     }

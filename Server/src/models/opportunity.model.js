@@ -8,8 +8,10 @@ const {
   ipRequirementOptions,
   interfaceOptions,
 } = require("../config/opportunityOptions");
-const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
 const { currencyOptions } = require("../config/currencyOptions");
+// "Create Product Management Function for SCX Admin" - product/bandwidth
+// below are no longer enum-restricted here (see deliveryOrder.model.js's
+// own note - same reasoning: SCX Admin can add new names post-deploy).
 const currencyCodes = currencyOptions.map((option) => option.code);
 
 // Same shape as Ticket's attachmentSchema (Server/src/models/ticket.model.js)
@@ -109,11 +111,11 @@ const opportunitySchema = mongoose.Schema(
       state: { type: String, default: "" },
       zipCode: { type: String, default: "" },
       country: { type: String, default: "" },
-      product: { type: String, enum: ["", ...productOptions], default: "" },
+      product: { type: String, default: "" },
       ipRequirement: { type: String, enum: ["", ...ipRequirementOptions], default: "" },
       interface: { type: String, enum: ["", ...interfaceOptions], default: "" },
-      downBandwidth: { type: String, enum: ["", ...bandwidthOptions], default: "" },
-      upBandwidth: { type: String, enum: ["", ...bandwidthOptions], default: "" },
+      downBandwidth: { type: String, default: "" },
+      upBandwidth: { type: String, default: "" },
       contractTerm: { type: String, default: "" },
       quoteSubmitDate: { type: String, default: "" },
       quoteStatus: { type: String, enum: quoteStatusOptions, default: "Pending" },
@@ -159,7 +161,7 @@ const opportunitySchema = mongoose.Schema(
           quoteSubmitDate: { type: String, default: "" },
           quoteStatus: { type: String, enum: supplierQuoteStatusOptions, default: "Pending" },
           // "Edit Supplier Communication: Add Field - bandwith, Remarks".
-          bandwidth: { type: String, enum: ["", ...bandwidthOptions], default: "" },
+          bandwidth: { type: String, default: "" },
           remarks: { type: String, default: "" },
           // Every quoteStatus this entry has been set to, in order, including
           // the initial value at creation. currency/nrc/mrc are a snapshot

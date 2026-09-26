@@ -1,8 +1,10 @@
+import * as React from "react"
 import _ from "lodash"
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
-import { bandwidthOptions, productOptions, circuitStatusOptions, circuitChangeTypeOptions } from "../../consts/circuitOptions"
+import { circuitStatusOptions, circuitChangeTypeOptions } from "../../consts/circuitOptions"
+import { getCircuitOptionNames, selectCircuitOptionNames } from "../products/circuitOptionSlice"
 
 // Shared circuit row-level Actions logic (Edit/Edit Status/Move/Delete) -
 // originally only on CircuitTable.js (Site Inventory's nested per-site
@@ -34,6 +36,39 @@ export function useCircuitRowPermissions() {
     return { isAdmin, canMove, canEditStatus, canEditStatusForRow }
 }
 
+// "Create Product Management Function for SCX Admin ... these values
+// should be visible in various dropdown menus" - the merged (static +
+// admin-added) Product/Bandwidth name lists, fetched once per mount. Only
+// for a component that mounts once (or a small, fixed number of times) per
+// page - CircuitInventoryTable.js, CreateCircuit.js, OrderDetails.js,
+// OpportunityDetails.js, CreateOpportunity.js, OpportunityTable.js.
+// CircuitTable.js (Site Inventory's per-site nested table) must NOT use
+// this - MUI's Collapse keeps every site row's table mounted even while
+// collapsed (see InventoryTable.js), so with, say, 200+ sites this would
+// fire 200+ duplicate dispatches at once (confirmed live - it froze the
+// tab under a burst of thousands of requests). It uses
+// useCircuitFieldOptionValues below instead, reading whatever
+// InventoryTable.js's own single useCircuitFieldOptions call (one per site-
+// status tab, not per site) has already fetched.
+export function useCircuitFieldOptions() {
+    const dispatch = useDispatch()
+    const { productOptions, bandwidthOptions } = useCircuitFieldOptionValues()
+    React.useEffect(() => {
+        dispatch(getCircuitOptionNames("product"))
+        dispatch(getCircuitOptionNames("bandwidth"))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+    return { productOptions, bandwidthOptions }
+}
+
+// The read-only half of the above - see its comment for when to use this
+// instead.
+export function useCircuitFieldOptionValues() {
+    const productOptions = useSelector(selectCircuitOptionNames("product"))
+    const bandwidthOptions = useSelector(selectCircuitOptionNames("bandwidth"))
+    return { productOptions, bandwidthOptions }
+}
+
 // Legacy circuits (imported before the predefined lists existed) can hold a
 // bandwidth/product value outside bandwidthOptions/productOptions - include
 // it as an extra option so the Edit dropdown doesn't silently blank it out.
@@ -45,7 +80,7 @@ export function selectFieldOptions(predefinedOptions, currentValue) {
     return options
 }
 
-export function buildEditableFields(circuit) {
+export function buildEditableFields(circuit, productOptions, bandwidthOptions) {
     return [
         { name: "vendorCircuitId", label: "Vendor Circuit ID" },
         { name: "customerCircuitId", label: "Customer Circuit ID" },
@@ -84,7 +119,7 @@ export function buildEditableFields(circuit) {
 // change Product and bandwidth" only applies to SCX Admin (not SCX Service
 // Delivery, who shares this same Edit Status dialog for a Ceased/Changed
 // transition but not the full Edit dialog's other fields).
-export function buildStatusEditableFields(values, isAdmin = false) {
+export function buildStatusEditableFields(values, isAdmin = false, productOptions = [], bandwidthOptions = []) {
     const status = _.get(values, "status", "Live")
     const fields = [
         {

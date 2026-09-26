@@ -19,7 +19,7 @@ import PropTypes from "prop-types"
 import { useDispatch, useSelector } from "react-redux"
 import { createOpportunity, getOpportunities, selectPagination } from "./opportunitySlice"
 import { selectCustomerList } from "../customers/customerSlice"
-import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
+import { useCircuitFieldOptions } from "../inventory/circuitActions"
 import {
     linkTypeOptions,
     ipRequirementOptions,
@@ -31,6 +31,10 @@ export default function CreateOpportunity({ onCreated }) {
     const dispatch = useDispatch()
     const pagination = useSelector(selectPagination)
     const customerList = useSelector(selectCustomerList)
+    // "Create Product Management Function for SCX Admin ... these values
+    // should be visible in various dropdown menus" - Product/Bandwidth
+    // dropdowns below now read the merged (static + admin-added) list.
+    const { productOptions, bandwidthOptions } = useCircuitFieldOptions()
     const [feedback, setFeedback] = React.useState(null)
     const [selectedCustomer, setSelectedCustomer] = React.useState("")
     const [linkType, setLinkType] = React.useState("")

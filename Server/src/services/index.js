@@ -13,3 +13,4 @@ module.exports.alertService = require("./alert.service");
 module.exports.dashboardService = require("./dashboard.service");
 module.exports.opportunityService = require("./opportunity.service");
 module.exports.deliveryOrderService = require("./deliveryOrder.service");
+module.exports.circuitOptionService = require("./circuitOption.service");

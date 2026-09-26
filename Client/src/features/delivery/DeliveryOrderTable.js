@@ -25,6 +25,7 @@ import {
     deactivateDeliveryOrder,
 } from "./deliveryOrderSlice"
 import { selectVendorList } from "../vendors/vendorSlice"
+import { formatVendorDisplay } from "../../utils/circuitDisplay"
 import { selectUser } from "../auth/authSlice"
 import { roles } from "../../consts"
 import ConfirmDialog from "../../components/ConfirmDialog"
@@ -60,7 +61,7 @@ const baseColumns = [
     { id: "customerNameText", label: "Customer Name" },
     { id: "scloudxOrderReference", label: "SCloudX Order Ref" },
     { id: "customerOrderReference", label: "Customer PO" },
-    { id: "vendorName", label: "Vendor" },
+    { id: "vendorDisplay", label: "Vendor" },
     { id: "orderDateText", label: "Order Date" },
     { id: "status", label: "Status" },
 ]
@@ -99,7 +100,7 @@ function buildColumns(dashboardView, showDeliveryDate, showCustomerPO) {
         const endUserAfterId = showCustomerPO ? "customerOrderReference" : "scloudxOrderReference"
         const endUserAfterIndex = columns.findIndex((column) => column.id === endUserAfterId)
         columns.splice(endUserAfterIndex + 1, 0, { id: "endUser", label: "End User Name" })
-        const vendorIndex = columns.findIndex((column) => column.id === "vendorName")
+        const vendorIndex = columns.findIndex((column) => column.id === "vendorDisplay")
         columns.splice(vendorIndex + 1, 0, { id: "lmpName", label: "LMP Name" })
         // Narrow, with word-wrap on the cell below - a milestone name like
         // "Configuration provisioning and testing" would otherwise stretch
@@ -162,14 +163,26 @@ export default function DeliveryOrderTable({ rows, canEdit, canDelete, dashboard
         [vendorList]
     )
 
-    const displayRows = rows.map((row) => ({
-        ...row,
-        customerNameText: customerName(row),
-        vendorName: vendorNameById.get(row.vendorId) || "",
-        orderDateText: formatDate(row.orderDate),
-        deliveryDateText: formatDate(row.deliveryDate),
-        milestoneStatus: dashboardView ? currentMilestoneStatus(row) : "",
-    }))
+    const displayRows = rows.map((row) => {
+        const vendorName = vendorNameById.get(row.vendorId) || ""
+        return {
+            ...row,
+            customerNameText: customerName(row),
+            vendorName,
+            // "In Vendor Name - Show Vendor Name + Vendor LEC Name" -
+            // Delivery Orders (Open and Delivered), combining the Vendor
+            // with this order's own LMP Name field ("vendorLECName should
+            // be same as LMP Name" - see deliveryOrder.service.js's
+            // createCircuitFromOrder, which carries this same value over
+            // onto the Circuit's own vendorLECName once the order
+            // completes). Not for dashboardView, which already shows LMP
+            // Name as its own separate column right after Vendor.
+            vendorDisplay: dashboardView ? vendorName : formatVendorDisplay(vendorName, row.lmpName),
+            orderDateText: formatDate(row.orderDate),
+            deliveryDateText: formatDate(row.deliveryDate),
+            milestoneStatus: dashboardView ? currentMilestoneStatus(row) : "",
+        }
+    })
 
     const handleChangePage = (event, newPage) => {
         dispatch(changePage(newPage))

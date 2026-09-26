@@ -66,11 +66,20 @@ export const rfoRequestStatusOptions = ["Not Received", "Received", "Awaiting fr
 export const rfoCodeOptions = [
     "Network Issue - Fibre Cut",
     "Network Issue - Hardware Issue",
-    "Network Issue - Latency Packet Loss",
+    "Latency/ Packet Loss",
     "Network Issue - Site Equipment",
     "Customer Site Issue",
     "Force Majeure",
 ]
+
+// The "Network Issue" category's own 4 values, called out separately -
+// "Network Downtime (HH:MM) = Net[/Effective] Down Time If RFO Code
+// contains Network Issue" (TicketDetails.js) used to just check the string
+// prefix, which broke once "Network Issue - Latency Packet Loss" was
+// renamed to "Latency/ Packet Loss" (no longer literally starting with
+// "Network Issue") - membership in this array is what actually defines the
+// category now, independent of each value's own display text.
+export const networkIssueRfoCodes = rfoCodeOptions.slice(0, 4)
 
 // Status of the ticket on the vendor's side, on the Vendor Communication tab.
 export const vendorTicketStatusOptions = [

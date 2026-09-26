@@ -2,7 +2,7 @@ const httpStatus = require("http-status");
 const _ = require("lodash");
 const moment = require("moment");
 const { parse } = require("csv-parse/sync");
-const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
+const { bandwidthOptions } = require("../config/circuitOptions");
 const { ipRequirementOptions, interfaceOptions } = require("../config/opportunityOptions");
 const { milestoneNames, orderTypeOptions, siteTypeOptions } = require("../config/deliveryOrderOptions");
 const { DeliveryOrder, Counter, Customer, Vendor, Site, Circuit } = require("../models");
@@ -14,6 +14,7 @@ const { getActiveCustomerById } = require("./customer.service");
 const { getActiveVendorById } = require("./vendor.service");
 const { getActiveSiteById } = require("./site.service");
 const circuitService = require("./circuit.service");
+const { getCircuitOptionNames } = require("./circuitOption.service");
 
 // Bulk upload dates, matching the rest of the app's CSV convention (Circuit
 // bill start dates - see circuit.service.js).
@@ -643,9 +644,15 @@ const validateBulkUploadDeliveryOrders = async (fileBuffer) => {
     if (customerName) customerCodes.add(createCodeFromName(customerName));
     if (vendorName) vendorCodes.add(createCodeFromName(vendorName));
   });
-  const [customers, vendors] = await Promise.all([
+  const [customers, vendors, validProducts, validBandwidths] = await Promise.all([
     Customer.find({ code: { $in: [...customerCodes] } }),
     Vendor.find({ code: { $in: [...vendorCodes] } }),
+    // "Create Product Management Function for SCX Admin ... these values
+    // should be visible in various dropdown menus" - the CSV's own "is a
+    // valid option" check now includes whatever Admin has added, not just
+    // the original static list.
+    getCircuitOptionNames("product"),
+    getCircuitOptionNames("bandwidth"),
   ]);
   const customersByCode = new Map(customers.map((customer) => [customer.code, customer]));
   const vendorsByCode = new Map(vendors.map((vendor) => [vendor.code, vendor]));
@@ -670,8 +677,8 @@ const validateBulkUploadDeliveryOrders = async (fileBuffer) => {
     if (!customerName) errors.push("Customer Name is required");
     if (!scloudxOrderReference) errors.push("SCloudX Order Ref is required");
     if (!vendorName) errors.push("Vendor Name is required");
-    if (product && !productOptions.includes(product)) errors.push(`Product "${product}" is not a valid option`);
-    if (bandwidth && !bandwidthOptions.includes(bandwidth)) errors.push(`BW "${bandwidth}" is not a valid option`);
+    if (product && !validProducts.includes(product)) errors.push(`Product "${product}" is not a valid option`);
+    if (bandwidth && !validBandwidths.includes(bandwidth)) errors.push(`BW "${bandwidth}" is not a valid option`);
     if (ipRequirement && !ipRequirementOptions.includes(ipRequirement)) errors.push(`IP "${ipRequirement}" is not a valid option`);
     if (!orderDate) errors.push("Order Date is required");
     else if (!isValidBulkDate(orderDate)) errors.push("Order Date must be dd-mm-yyyy");
@@ -845,9 +852,11 @@ const validateBulkUploadClosedDeliveryOrders = async (fileBuffer) => {
     if (customerName) customerCodes.add(createCodeFromName(customerName));
     if (vendorName) vendorCodes.add(createCodeFromName(vendorName));
   });
-  const [customers, vendors] = await Promise.all([
+  const [customers, vendors, validProducts, validBandwidths] = await Promise.all([
     Customer.find({ code: { $in: [...customerCodes] } }),
     Vendor.find({ code: { $in: [...vendorCodes] } }),
+    getCircuitOptionNames("product"),
+    getCircuitOptionNames("bandwidth"),
   ]);
   const customersByCode = new Map(customers.map((customer) => [customer.code, customer]));
   const vendorsByCode = new Map(vendors.map((vendor) => [vendor.code, vendor]));
@@ -891,8 +900,8 @@ const validateBulkUploadClosedDeliveryOrders = async (fileBuffer) => {
     if (!scloudxOrderReference) errors.push("SCloudX Order Ref is required");
     if (!vendorName) errors.push("Vendor Name is required");
     if (orderType && !orderTypeOptions.includes(orderType)) errors.push(`Order Type "${orderType}" is not a valid option`);
-    if (product && !productOptions.includes(product)) errors.push(`Product "${product}" is not a valid option`);
-    if (bandwidth && !bandwidthOptions.includes(bandwidth)) errors.push(`BW "${bandwidth}" is not a valid option`);
+    if (product && !validProducts.includes(product)) errors.push(`Product "${product}" is not a valid option`);
+    if (bandwidth && !validBandwidths.includes(bandwidth)) errors.push(`BW "${bandwidth}" is not a valid option`);
     if (ipRequirement && !ipRequirementOptions.includes(ipRequirement)) errors.push(`IP "${ipRequirement}" is not a valid option`);
     if (interfaceValue && !interfaceOptions.includes(interfaceValue)) errors.push(`Interface "${interfaceValue}" is not a valid option`);
     if (!orderDate) errors.push("Order Date is required");

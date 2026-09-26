@@ -11,7 +11,7 @@ import InventoryTable from "./InventoryTable"
 import CircuitInventoryTable from "./CircuitInventoryTable"
 import CreateCircuit from "./CreateCircuit"
 import BulkUploadCircuits from "./BulkUploadCircuits"
-import { selectPagination, selectSearch, getSites, setSearch, selectTotalCircuits } from "./inventorySlice"
+import { selectPagination, selectSearch, getSites, setSearch, selectTotalCircuitsByStatus } from "./inventorySlice"
 import { getVendors } from "../vendors/vendorSlice"
 import { fetchDeletedCircuits, fetchRestoreCircuit, fetchPermanentlyDeleteCircuit } from "./circuitAPI"
 import { useSelector, useDispatch } from "react-redux"
@@ -95,7 +95,7 @@ function InventoryContent() {
 
     const pagination = useSelector(selectPagination)
     const search = useSelector(selectSearch)
-    const totalCircuits = useSelector(selectTotalCircuits)
+    const totalCircuitsByStatus = useSelector(selectTotalCircuitsByStatus)
     const currentUser = useSelector(selectUser)
     // "Remove Create circuit option from NOC" - SCX Admin only now (SCX
     // Service Delivery doesn't hold createCircuits either; it creates
@@ -138,7 +138,14 @@ function InventoryContent() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchInput])
 
-    const searchBox = (
+    // "SCX Admin - Inventory - Live Circuit Inventory says Number of
+    // Circuits 217; Live Site Inventory says Total Circuits 221. Why this
+    // difference?" - the old combined count included every active circuit
+    // regardless of status; each Site Inventory tab now gets just its own
+    // status's total (matching what Live/Ceased Circuit Inventory already
+    // show), via renderSearchBox(statusFilter) below instead of one shared
+    // element for all three site tabs.
+    const renderSearchBox = (statusFilter) => (
         <>
             {/* "need Total Count of Circuits in Total and based on search
                 option" / "Display Circuit Count at Top of the list" -
@@ -146,7 +153,7 @@ function InventoryContent() {
                 the same server-side filter (see site.controller.js's
                 getSites), not just what's summed from the current page. */}
             <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                Total Circuits: {totalCircuits}
+                Total Circuits: {totalCircuitsByStatus[statusFilter] ?? 0}
             </Typography>
             <TextField
                 fullWidth
@@ -196,7 +203,7 @@ function InventoryContent() {
                 label: "Live Site Inventory",
                 content: (
                     <>
-                        {searchBox}
+                        {renderSearchBox("Live")}
                         <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Live" canDownloadCsv={isAdmin} />
                     </>
                 ),
@@ -205,7 +212,7 @@ function InventoryContent() {
                 label: "Changed Site Inventory",
                 content: (
                     <>
-                        {searchBox}
+                        {renderSearchBox("Changed")}
                         <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Changed" canDownloadCsv={isAdmin} />
                     </>
                 ),
@@ -214,7 +221,7 @@ function InventoryContent() {
                 label: "Ceased Site Inventory",
                 content: (
                     <>
-                        {searchBox}
+                        {renderSearchBox("Ceased")}
                         <InventoryTable pagination={pagination} open={openInventoryTable} handleToggle={handleToggleInventoryTable} details={true} statusFilter="Ceased" canDownloadCsv={isAdmin} />
                     </>
                 ),

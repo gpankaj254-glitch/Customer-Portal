@@ -9,6 +9,9 @@ export const pages = {
     VENDOR_MANAGEMENT: "vendorManagement",
     SALES_OPPORTUNITIES: "salesOpportunities",
     DELIVERY_ORDERS: "deliveryOrders",
+    // "Create Product Management Function for SCX Admin ... independent
+    // like NOC/ Delivery management, visible at Left side of Admin Login"
+    PRODUCT_MANAGEMENT: "productManagement",
 }
 
 export const sideMenuItems = {
@@ -22,6 +25,7 @@ export const sideMenuItems = {
     VENDOR_MANAGEMENT: "vendorManagement",
     SALES_OPPORTUNITIES: "salesOpportunities",
     DELIVERY_ORDERS: "deliveryOrders",
+    PRODUCT_MANAGEMENT: "productManagement",
 }
 
 export const roles = {
@@ -76,5 +80,6 @@ export const permisiions = {
     SITE_MANAGEMENT: "siteManagement",
     VENDOR_MANAGEMENT: "vendorManagement",
     SALES_OPPORTUNITIES: "salesOpportunities",
-    DELIVERY_ORDERS: "deliveryOrders"
+    DELIVERY_ORDERS: "deliveryOrders",
+    PRODUCT_MANAGEMENT: "productManagement",
 }

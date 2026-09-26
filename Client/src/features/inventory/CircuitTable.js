@@ -26,7 +26,7 @@ import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
 import MoveCircuitDialog from "./MoveCircuitDialog"
 import { getFormattedDateTime, getFormattedStoredDate as reformatStoredDate } from "../../utils/dates"
-import { useCircuitRowPermissions, buildEditableFields, buildStatusEditableFields, STATUS_FIELD_NAMES } from "./circuitActions"
+import { useCircuitRowPermissions, useCircuitFieldOptionValues, buildEditableFields, buildStatusEditableFields, STATUS_FIELD_NAMES } from "./circuitActions"
 
 // "Every Circuit Should have following status ... Live since (Bill Start
 // date) / Ceased (Capture Bill Stop date) / Changed (Captured Change -
@@ -75,6 +75,10 @@ export default function CircuitTable(props) {
     const dispatch = useDispatch()
     const currentUser = useSelector(selectUser)
     const { isAdmin, canMove, canEditStatusForRow } = useCircuitRowPermissions()
+    // Not useCircuitFieldOptions - this component mounts once per SITE ROW
+    // (potentially 200+ at once, always-mounted under Collapse), so its own
+    // dispatch would refire that many times over - see that hook's comment.
+    const { productOptions, bandwidthOptions } = useCircuitFieldOptionValues()
     const isCustomerRole = currentUser.role === roles.CUSTOMER_ADMIN || currentUser.role === roles.CUSTOMER_USER
     const pagination = useSelector(selectPagination)
     const vendorList = useSelector(selectVendorList)
@@ -236,8 +240,8 @@ export default function CircuitTable(props) {
             <EditDialog
                 open={!!circuitToEdit}
                 title="Edit circuit"
-                fields={buildEditableFields(circuitToEdit)}
-                initialValues={circuitToEdit ? _.pick(circuitToEdit, buildEditableFields(circuitToEdit).map((field) => field.name)) : {}}
+                fields={buildEditableFields(circuitToEdit, productOptions, bandwidthOptions)}
+                initialValues={circuitToEdit ? _.pick(circuitToEdit, buildEditableFields(circuitToEdit, productOptions, bandwidthOptions).map((field) => field.name)) : {}}
                 lastEditedNote={
                     circuitToEdit && circuitToEdit.updatedBy && circuitToEdit.updatedBy.name
                         ? `Last edited by ${circuitToEdit.updatedBy.name} on ${getFormattedDateTime(circuitToEdit.updatedAt)}`
@@ -251,7 +255,7 @@ export default function CircuitTable(props) {
                 open={!!circuitToEditStatus}
                 title="Change Circuit Status"
                 dense
-                fields={(values) => buildStatusEditableFields(values, isAdmin)}
+                fields={(values) => buildStatusEditableFields(values, isAdmin, productOptions, bandwidthOptions)}
                 initialValues={
                     circuitToEditStatus
                         ? {

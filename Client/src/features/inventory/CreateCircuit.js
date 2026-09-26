@@ -19,7 +19,7 @@ import moment from "moment"
 import { createCircuit } from "./circuitSlice"
 import { getSites, selectSiteList, selectPagination } from "./inventorySlice"
 import { selectVendorList } from "../vendors/vendorSlice"
-import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
+import { useCircuitFieldOptions } from "./circuitActions"
 
 const BILL_START_DATE_FORMAT = "DD-MM-YYYY"
 const DATE_INPUT_FORMAT = "YYYY-MM-DD"
@@ -64,6 +64,7 @@ export default function CreateCircuit() {
     const siteList = useSelector(selectSiteList)
     const vendorList = useSelector(selectVendorList)
     const pagination = useSelector(selectPagination)
+    const { productOptions, bandwidthOptions } = useCircuitFieldOptions()
 
     const [selectedCustomerId, setSelectedCustomerId] = React.useState("")
     const [selectedSite, setSelectedSite] = React.useState(null)

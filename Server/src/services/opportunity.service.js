@@ -8,6 +8,7 @@ const ApiError = require("../utils/ApiError");
 const { extractUserDetails, extractNameAndCode } = require("../utils/extractors");
 const { uploadBuffer } = require("../utils/s3");
 const { getCustomerByName } = require("./customer.service");
+const { getCircuitOptionNames } = require("./circuitOption.service");
 const {
   linkTypeOptions,
   ipRequirementOptions,
@@ -15,7 +16,6 @@ const {
   quoteStatusOptions,
   supplierQuoteStatusOptions,
 } = require("../config/opportunityOptions");
-const { bandwidthOptions, productOptions } = require("../config/circuitOptions");
 const { currencyOptions } = require("../config/currencyOptions");
 
 const currencyCodes = currencyOptions.map((option) => option.code);
@@ -581,9 +581,17 @@ const bulkUploadOpportunities = async (fileBuffer, actingUser) => {
 
   // Existing active opportunities' keys, to reject duplicates against what's
   // already in the database (not just duplicates within this file).
-  const existingOpportunities = await Opportunity.find({ active: true })
-    .select("opportunityId customer.name prospectName customerRequest.requestDate customerRequest.requestId customerRequest.linkType customerRequest.siteAddress")
-    .lean();
+  // "Create Product Management Function for SCX Admin ... these values
+  // should be visible in various dropdown menus" - the CSV's own "is a
+  // valid option" check now includes whatever Admin has added, not just
+  // the original static list.
+  const [existingOpportunities, validProducts, validBandwidths] = await Promise.all([
+    Opportunity.find({ active: true })
+      .select("opportunityId customer.name prospectName customerRequest.requestDate customerRequest.requestId customerRequest.linkType customerRequest.siteAddress")
+      .lean(),
+    getCircuitOptionNames("product"),
+    getCircuitOptionNames("bandwidth"),
+  ]);
   const existingKeyToOpportunityId = new Map();
   existingOpportunities.forEach((opportunity) => {
     const customerLabel = _.get(opportunity, "customer.name") || opportunity.prospectName || "";
@@ -630,15 +638,15 @@ const bulkUploadOpportunities = async (fileBuffer, actingUser) => {
 
     if (!name) errors.push("Opportunity Name is required");
     if (linkType && !linkTypeOptions.includes(linkType)) errors.push(`Link Type "${linkType}" is not a valid option`);
-    if (product && !productOptions.includes(product)) errors.push(`Product "${product}" is not a valid option`);
+    if (product && !validProducts.includes(product)) errors.push(`Product "${product}" is not a valid option`);
     if (ipRequirement && !ipRequirementOptions.includes(ipRequirement)) errors.push(`IP Requirement "${ipRequirement}" is not a valid option`);
     if (!quoteStatusOptions.includes(quoteStatus)) errors.push(`Quote Status "${quoteStatus}" is not a valid option`);
     if (currency && !currencyCodes.includes(currency)) errors.push(`Currency "${currency}" is not a valid option`);
     const nrc = parseOptionalNumber(_.get(record, "NRC", ""), "NRC", errors);
     const mrc = parseOptionalNumber(_.get(record, "MRC", ""), "MRC", errors);
     if (interfaceType && !interfaceOptions.includes(interfaceType)) errors.push(`Interface "${interfaceType}" is not a valid option`);
-    if (downBandwidth && !bandwidthOptions.includes(downBandwidth)) errors.push(`Down Bandwidth "${downBandwidth}" is not a valid option`);
-    if (upBandwidth && !bandwidthOptions.includes(upBandwidth)) errors.push(`Up Bandwidth "${upBandwidth}" is not a valid option`);
+    if (downBandwidth && !validBandwidths.includes(downBandwidth)) errors.push(`Down Bandwidth "${downBandwidth}" is not a valid option`);
+    if (upBandwidth && !validBandwidths.includes(upBandwidth)) errors.push(`Up Bandwidth "${upBandwidth}" is not a valid option`);
 
     let relatedCustomer = null;
     if (customerName) {
@@ -784,7 +792,10 @@ const bulkUploadSupplierResponses = async (fileBuffer, actingUser) => {
     throw new ApiError(httpStatus.BAD_REQUEST, `CSV is missing required column(s): ${missingColumns.join(", ")}`);
   }
 
-  const activeOpportunities = await Opportunity.find({ active: true });
+  const [activeOpportunities, validBandwidths] = await Promise.all([
+    Opportunity.find({ active: true }),
+    getCircuitOptionNames("bandwidth"),
+  ]);
   const keyToOpportunity = new Map();
   const ambiguousKeys = new Set();
   activeOpportunities.forEach((opportunity) => {
@@ -828,7 +839,7 @@ const bulkUploadSupplierResponses = async (fileBuffer, actingUser) => {
     if (!supplier) errors.push("Supplier is required");
     if (currency && !currencyCodes.includes(currency)) errors.push(`Currency "${currency}" is not a valid option`);
     if (!supplierQuoteStatusOptions.includes(quoteStatus)) errors.push(`Quote Status "${quoteStatus}" is not a valid option`);
-    if (bandwidth && !bandwidthOptions.includes(bandwidth)) errors.push(`Bandwidth "${bandwidth}" is not a valid option`);
+    if (bandwidth && !validBandwidths.includes(bandwidth)) errors.push(`Bandwidth "${bandwidth}" is not a valid option`);
     const nrc = parseOptionalNumber(_.get(record, "NRC", ""), "NRC", errors);
     const mrc = parseOptionalNumber(_.get(record, "MRC", ""), "MRC", errors);
 

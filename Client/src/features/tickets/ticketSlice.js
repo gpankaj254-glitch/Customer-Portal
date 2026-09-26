@@ -8,6 +8,7 @@ const initialState = {
     openTicketList: [],
     closedTicketList: [],
     completedTicketList: [],
+    openRfoTicketList: [],
     pageStatus: pageStatusVals.loading,
     getTicketError: null,
     createTicketError: null,
@@ -85,6 +86,19 @@ export const getOpenTickets = createAsyncThunk(
     "tickets/fetchGetOpenTicket",
     async (data, { rejectWithValue }) => {
         data.closed = false
+        const response = await fetchGetTickets(data, rejectWithValue)
+        return response
+    }
+)
+
+// "In NOC Management, Create New tab 'View Open RFO' ... Logic where 'RFO
+// Request Received = Yes' 'RFO Status is not Closed'" - every ticket
+// matching that, regardless of the ticket's own open/closed status (an RFO
+// can still be outstanding after the ticket itself is Closed/Completed).
+export const getOpenRfoTickets = createAsyncThunk(
+    "tickets/fetchGetOpenRfoTicket",
+    async (data, { rejectWithValue }) => {
+        data.rfoOpen = true
         const response = await fetchGetTickets(data, rejectWithValue)
         return response
     }
@@ -250,6 +264,21 @@ export const ticketSlice = createSlice({
                 state.pagination.totalResults = payload.totalResults
                 state.pagination.totalPages = payload.totalPages
             })
+            .addCase(getOpenRfoTickets.rejected, (state, {payload}) => {
+                state.pageStatus = pageStatusVals.error
+                state.getTicketError = payload
+            })
+            .addCase(getOpenRfoTickets.pending, (state) => {
+                state.pageStatus = pageStatusVals.loading
+                state.updateTicketMessage = null
+                state.updateTicketError = null
+            })
+            .addCase(getOpenRfoTickets.fulfilled, (state, {payload}) => {
+                state.pageStatus = pageStatusVals.fetched
+                state.openRfoTicketList = payload.results
+                state.pagination.totalResults = payload.totalResults
+                state.pagination.totalPages = payload.totalPages
+            })
             .addCase(createTicket.rejected, (state, {payload}) => {
                 state.createTicketError = payload
             })
@@ -278,6 +307,8 @@ export const ticketSlice = createSlice({
                 if (closedIndex !== -1) state.closedTicketList[closedIndex] = updated
                 const completedIndex = state.completedTicketList.findIndex((t) => t.id === updated.id)
                 if (completedIndex !== -1) state.completedTicketList[completedIndex] = updated
+                const openRfoIndex = state.openRfoTicketList.findIndex((t) => t.id === updated.id)
+                if (openRfoIndex !== -1) state.openRfoTicketList[openRfoIndex] = updated
             })
             .addCase(saveTicketRfo.rejected, (state, {payload}) => {
                 state.saveRfoMessage = null
@@ -298,6 +329,8 @@ export const ticketSlice = createSlice({
                 if (closedIndex !== -1) state.closedTicketList[closedIndex] = updated
                 const completedIndex = state.completedTicketList.findIndex((t) => t.id === updated.id)
                 if (completedIndex !== -1) state.completedTicketList[completedIndex] = updated
+                const openRfoIndex = state.openRfoTicketList.findIndex((t) => t.id === updated.id)
+                if (openRfoIndex !== -1) state.openRfoTicketList[openRfoIndex] = updated
             })
             .addCase(appendTicketDescription.rejected, (state, {payload}) => {
                 state.appendDescriptionMessage = null
@@ -353,6 +386,7 @@ export const ticketSlice = createSlice({
                 state.openTicketList = state.openTicketList.filter((t) => t.id !== deletedId)
                 state.closedTicketList = state.closedTicketList.filter((t) => t.id !== deletedId)
                 state.completedTicketList = state.completedTicketList.filter((t) => t.id !== deletedId)
+                state.openRfoTicketList = state.openRfoTicketList.filter((t) => t.id !== deletedId)
                 state.pagination.totalResults = Math.max(0, state.pagination.totalResults - 1)
             })
             .addCase(deactivateTicket.rejected, (state) => {
@@ -377,6 +411,7 @@ export const selectTicketList = (state) => state.tickets.ticketList
 export const selectOpenTicketList = (state) => state.tickets.openTicketList
 export const selectClosedTicketList = (state) => state.tickets.closedTicketList
 export const selectCompletedTicketList = (state) => state.tickets.completedTicketList
+export const selectOpenRfoTicketList = (state) => state.tickets.openRfoTicketList
 
 export const selectGetTicketError = (state) => state.tickets.getTicketError
 export const selectCreateTicketError = (state) => state.tickets.createTicketError

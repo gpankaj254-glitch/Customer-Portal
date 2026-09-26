@@ -109,6 +109,15 @@ function TicketsContent() {
     const tabs = [
         { label: "View Open Ticket", content: <TicketsTable pagination={pagination} mode="open" /> },
     ]
+    // "In NOC Management, Create New tab 'View Open RFO' ... show all
+    // Tickets with fields as shown in 'View Open Ticket' - Logic where 'RFO
+    // Request Received = Yes' 'RFO Status is not Closed'" - SCX-side only
+    // (not Customer), same as every other operational tab here; the row-
+    // level Action/edit capability within it is further scoped to just SCX
+    // NOC/Admin (see TicketsTable's canActOnOpenRfo).
+    if (!isCustomer) {
+        tabs.push({ label: "View Open RFO", content: <TicketsTable pagination={pagination} mode="openRfo" /> })
+    }
     if (!isManagement) {
         tabs.push({ label: "Create New Ticket", content: <CreateTicket /> })
     }

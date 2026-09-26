@@ -32,7 +32,7 @@ import { updateOpportunity, uploadSupplierCommunicationAttachment } from "./oppo
 import { downloadSupplierCommunicationAttachment } from "./opportunityAPI"
 import { supplierQuoteStatusOptions } from "../../consts/opportunityCommOptions"
 import { currencyOptions } from "../../consts/currencyOptions"
-import { bandwidthOptions } from "../../consts/circuitOptions"
+import { useCircuitFieldOptions } from "../inventory/circuitActions"
 import { selectVendorList } from "../vendors/vendorSlice"
 import ConfirmDialog from "../../components/ConfirmDialog"
 import EditDialog from "../../components/EditDialog"
@@ -143,7 +143,7 @@ const currencySelectOptions = currencyOptions.map((option) => ({
     label: `${option.code} - ${option.name}`,
 }))
 
-function buildSupplierCommunicationFields(vendorOptions) {
+function buildSupplierCommunicationFields(vendorOptions, bandwidthOptions) {
     return [
         { name: "supplier", label: "Supplier", type: "autocomplete", options: vendorOptions },
         { name: "quoteRequestDate", label: "Quote Request Date", type: "date" },
@@ -447,7 +447,11 @@ export default function OpportunityDetails({ opportunity, readOnly, onEdit }) {
     const dispatch = useDispatch()
     const vendorList = useSelector(selectVendorList)
     const vendorOptions = vendorList.map((vendor) => ({ value: vendor.name, label: vendor.name }))
-    const supplierCommunicationFields = buildSupplierCommunicationFields(vendorOptions)
+    // "Create Product Management Function for SCX Admin ... these values
+    // should be visible in various dropdown menus" - Bandwidth dropdown
+    // below now reads the merged (static + admin-added) list.
+    const { bandwidthOptions } = useCircuitFieldOptions()
+    const supplierCommunicationFields = buildSupplierCommunicationFields(vendorOptions, bandwidthOptions)
     const [supplierCommunications, setSupplierCommunications] = React.useState(_.get(opportunity, "supplierCommunications", []))
     const [saving, setSaving] = React.useState(false)
     const [feedback, setFeedback] = React.useState(null)

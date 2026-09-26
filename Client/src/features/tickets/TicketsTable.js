@@ -18,7 +18,7 @@ import Snackbar from "@mui/material/Snackbar"
 
 import PropTypes from "prop-types"
 
-import {changeLimit, changePage, getClosedTickets, getCompletedTickets, selectGetTicketError, selectPageStatus, getOpenTickets, selectClosedTicketList, selectCompletedTicketList, selectOpenTicketList, selectSearch, setSearch, deactivateTicket, selectFocusTicketId, clearFocusTicket} from "./ticketSlice"
+import {changeLimit, changePage, getClosedTickets, getCompletedTickets, selectGetTicketError, selectPageStatus, getOpenTickets, getOpenRfoTickets, selectClosedTicketList, selectCompletedTicketList, selectOpenTicketList, selectOpenRfoTicketList, selectSearch, setSearch, deactivateTicket, selectFocusTicketId, clearFocusTicket} from "./ticketSlice"
 import { useSelector, useDispatch } from "react-redux"
 import { Alert, Collapse, Typography} from "@mui/material"
 import { pageStatusVals} from "./utils"
@@ -68,7 +68,9 @@ const stickyActionsSx = {
 // completed, same reasoning as Days Pending. View Closed/Completed instead
 // get Problem Start Date and Ticket Close Date after Created Date.
 function buildColumns (mode) {
-    const isOpen = mode === "open"
+    // "View Open RFO ... show all Tickets with fields as shown in 'View
+    // Open Ticket'" - same column set, whichever of the two modes this is.
+    const isOpen = mode === "open" || mode === "openRfo"
     const columns = [
         { id: "ticketId", label: "Ticket ID" },
         { id: "customerReference", label: "Customer Reference" },
@@ -98,6 +100,16 @@ function buildColumns (mode) {
         columns.push(
             { id: "problemStartDateText", label: "Problem Start Date/Time (GMT)" },
             { id: "closedAtText", label: "Ticket Close Date/Time (GMT)" }
+        )
+    }
+    // "NOC management: In View Open RFO / View Closed Tickets / Completed
+    // Tickets list, add Column 'RFO Status' and 'RFO Code'" - not on plain
+    // View Open Ticket, which is about tickets in general, not specifically
+    // RFO tracking.
+    if (mode === "openRfo" || mode === "closed" || mode === "completed") {
+        columns.push(
+            { id: "rfoStatus", label: "RFO Status" },
+            { id: "rfoCode", label: "RFO Code" }
         )
     }
     return columns
@@ -140,6 +152,8 @@ function createDisplayData (data) {
         problemStartDateText: formatProblemStartDate(_.get(data, "problemStartDate", "")),
         closedAtText: getFormattedDateTimeGMT(_.get(data, "closedAt", "")),
         daysPending: _.get(data, "createdAt") ? moment().diff(moment(data.createdAt), "days") : "",
+        rfoStatus: _.get(data, "rfo.status", ""),
+        rfoCode: _.get(data, "rfo.code", ""),
     }
 }
 
@@ -150,12 +164,20 @@ export default function TicketsTable(props) {
     const opneTicketList = useSelector(selectOpenTicketList)
     const closedTicketList = useSelector(selectClosedTicketList)
     const completedTicketList = useSelector(selectCompletedTicketList)
+    const openRfoTicketList = useSelector(selectOpenRfoTicketList)
     const search = useSelector(selectSearch)
     const focusTicketId = useSelector(selectFocusTicketId)
     const currentUser = useSelector(selectUser)
     const canDelete = currentUser.role === roles.SCLOUDX_ADMIN
     // The Activity Log is for SCX only - customers never see it.
     const canViewLog = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_USER
+    // "Also add Action Tab for SCX NOC and SCX Admin users" - on View Open
+    // RFO specifically, only these two roles get the row-expand/Edit action
+    // at all (every other role that can see this tab - Sales/Delivery/
+    // Management - gets a read-only list, same idea as canDelete/canViewLog
+    // above already being scoped narrower than "anyone who can see this
+    // table").
+    const canActOnOpenRfo = currentUser.role === roles.SCLOUDX_ADMIN || currentUser.role === roles.SCLOUDX_USER
 
     const pagination = props.pagination
     const mode = props.mode
@@ -228,12 +250,14 @@ export default function TicketsTable(props) {
                         </TableCell>
                     ))}
                 <TableCell align="right" sx={stickyActionsSx}>
-                    <IconButton
-                        aria-label={`${open === row.id ? "collapse" : "expand"} ${row.ticketId}`}
-                        onClick={(event) => handleRowClick(event, row.id)}
-                    >
-                        {open === row.id ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
-                    </IconButton>
+                    {(mode !== "openRfo" || canActOnOpenRfo) && (
+                        <IconButton
+                            aria-label={`${open === row.id ? "collapse" : "expand"} ${row.ticketId}`}
+                            onClick={(event) => handleRowClick(event, row.id)}
+                        >
+                            {open === row.id ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+                        </IconButton>
+                    )}
                     {canViewLog && (
                         <IconButton
                             aria-label={`activity log ${row.ticketId}`}
@@ -268,6 +292,8 @@ export default function TicketsTable(props) {
             dispatch(getClosedTickets(data))
         } else if (mode === "completed") {
             dispatch(getCompletedTickets(data))
+        } else if (mode === "openRfo") {
+            dispatch(getOpenRfoTickets(data))
         } else {
             dispatch(getOpenTickets(data))
         }
@@ -305,7 +331,7 @@ export default function TicketsTable(props) {
     } else if (status === pageStatusVals.loading) {
         return <div>loading</div>
     } else if (status === pageStatusVals.fetched) {
-        const ticketList = mode === "closed" ? closedTicketList : mode === "completed" ? completedTicketList : opneTicketList
+        const ticketList = mode === "closed" ? closedTicketList : mode === "completed" ? completedTicketList : mode === "openRfo" ? openRfoTicketList : opneTicketList
         return (
             <Paper sx={{ width: "100%", overflow: "hidden", p: 2 }}>
                 {/* "All Logins - ... View Open tickets, View Closed Tickets,
@@ -397,7 +423,7 @@ export default function TicketsTable(props) {
 
 TicketsTable.propTypes = {
     pagination: PropTypes.object,
-    mode: PropTypes.oneOf(["open", "closed", "completed"]),
+    mode: PropTypes.oneOf(["open", "closed", "completed", "openRfo"]),
 }
 
 TicketsTable.defaultProps = {

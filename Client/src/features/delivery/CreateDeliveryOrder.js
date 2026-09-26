@@ -20,7 +20,7 @@ import moment from "moment"
 import { createDeliveryOrder, getDeliveryOrders, selectOpenOrderList, selectDeliveredOrderList } from "./deliveryOrderSlice"
 import { getCustomers, selectCustomerList } from "../customers/customerSlice"
 import { getVendors, selectVendorList } from "../vendors/vendorSlice"
-import { bandwidthOptions, productOptions } from "../../consts/circuitOptions"
+import { useCircuitFieldOptions } from "../inventory/circuitActions"
 import { ipRequirementOptions, interfaceOptions } from "../../consts/opportunityCommOptions"
 import { countryOptions } from "../../consts/countryOptions"
 import { orderTypeOptions } from "../../consts/deliveryOrderOptions"
@@ -58,6 +58,10 @@ export default function CreateDeliveryOrder({ liveCircuitOrderRefs }) {
     // to fetch again here.
     const openOrderList = useSelector(selectOpenOrderList)
     const deliveredOrderList = useSelector(selectDeliveredOrderList)
+    // "Create Product Management Function for SCX Admin ... these values
+    // should be visible in various dropdown menus" - Product/Bandwidth
+    // dropdowns below now read the merged (static + admin-added) list.
+    const { productOptions, bandwidthOptions } = useCircuitFieldOptions()
     // "we need 216 Order ref Numbers in Dropdown option of Existing Order
     // Ref Number field" - one option per distinct Live circuit's own SCX
     // Order Ref, not filtered down to just the ones that already have a

@@ -55,7 +55,7 @@ const getTickets = catchAsync(async (req, res) => {
   // it isn't itself a Ticket field, so leaving it in would require every
   // document to literally have a "search" field matching the term.
   const search = _.trim(_.get(req.body, "search", ""));
-  const baseFilter = activeOnly(_.omit(req.body, "search"));
+  const baseFilter = activeOnly(_.omit(req.body, ["search", "rfoOpen"]));
   const filter = filterByCustomerId(req.user, baseFilter);
   // getClosedTickets (ticketSlice.js) sends status as a plain array
   // (["Closed", "RFO Closed"]) rather than { $in: [...] } - express-mongo-
@@ -64,6 +64,15 @@ const getTickets = catchAsync(async (req, res) => {
   // as deliveryOrder.controller.js's own tab -> $ne/$in handling.
   if (Array.isArray(filter.status)) {
     filter.status = { $in: filter.status };
+  }
+  // "View Open RFO - RFO Request Received = Yes, RFO Status is not Closed" -
+  // getOpenRfoTickets (ticketSlice.js) sends a plain rfoOpen:true flag
+  // rather than the $ne itself, same $-stripping reason as above. Not
+  // scoped to the ticket's own open/closed status - an RFO can still be
+  // outstanding after the ticket itself is Closed/Completed.
+  if (req.body.rfoOpen) {
+    filter["rfo.requested"] = "Yes";
+    filter["rfo.status"] = { $ne: "Closed" };
   }
 
   if (search) {
